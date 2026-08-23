@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bluetooth
+Comment=Manage Bluetooth devices in Meo Settings
+Exec=meo-settings --route bluetooth
+Icon=bluetooth
+Categories=Settings;Qt;KDE;
+StartupNotify=true
+NoDisplay=true

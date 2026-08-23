@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Meo Settings
+Comment=Configure MeoArch and KDE settings
+Exec=meo-settings
+Icon=preferences-system
+Categories=Settings;Qt;KDE;
+StartupNotify=true

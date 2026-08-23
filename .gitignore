@@ -1,0 +1,6 @@
+/.cache/
+/out/
+/.qt/
+/.qmlcache/
+*.user
+*.user.*
