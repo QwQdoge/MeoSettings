@@ -11,39 +11,6 @@ Item {
     property var rootMetrics: null
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
 
-    readonly property var brightnessRows: {
-        const rows = []
-        for (let index = 0; index < Platform.brightnessDisplays.length; ++index) {
-            const display = Platform.brightnessDisplays[index]
-            const maximum = Math.max(1, Number(display.maximum))
-            const brightness = Math.max(0, Math.min(maximum, Number(display.brightness)))
-            const label = display.label
-                          ? display.label
-                          : qsTr("Display %1").arg(index + 1)
-            rows.push({
-                "id": "brightness-" + display.id,
-                "displayId": display.id,
-                "title": label,
-                "subtitle": display.internal
-                            ? qsTr("Built-in display brightness")
-                            : qsTr("External display brightness"),
-                "icon": "light_mode",
-                "tone": "secondary",
-                "trailingKind": "slider",
-                "from": 0,
-                "to": maximum,
-                "value": brightness,
-                "stepSize": 1,
-                "discrete": true,
-                "valueSuffix": "%",
-                "trailingText": Math.round((brightness * 100) / maximum) + "%",
-                "sliderSize": "s",
-                "sliderValueLabelEnabled": false
-            })
-        }
-        return rows
-    }
-
     readonly property string nightLightSummary: {
         if (!Platform.nightLightEnabled)
             return qsTr("Off")
@@ -54,6 +21,33 @@ Item {
         return qsTr("Enabled; waiting for its schedule")
     }
 
+    // These stay as verified handoffs: the desktop KCM owns lock policy and
+    // the Power page owns timeout policy, so this page never renders a
+    // decorative switch that cannot change the real session.
+    readonly property var lockDisplayRows: {
+        const rows = []
+        if (KcmBridge.isAvailable("kcm_screenlocker")) {
+            rows.push({
+                "title": qsTr("Lock screen"),
+                "subtitle": qsTr("Open verified screen lock controls"),
+                "icon": "lock",
+                "tone": "secondary",
+                "route": "kcm:kcm_screenlocker",
+                "trailingKind": "choice",
+                "trailingText": qsTr("Advanced")
+            })
+        }
+        rows.push({
+            "title": qsTr("Screen timeout"),
+            "subtitle": qsTr("Open power and display timeout controls"),
+            "icon": "timer",
+            "tone": "secondary",
+            "route": "power",
+            "trailingKind": "navigation"
+        })
+        return rows
+    }
+
     readonly property var nightLightRows: [{
         "id": "night-light",
         "title": qsTr("Night Light"),
@@ -62,6 +56,19 @@ Item {
         "tone": "tertiary",
         "trailingKind": "toggle",
         "checked": Platform.nightLightEnabled
+    }]
+
+    // This is a truthful handoff, not a cosmetic font-size slider. KDE owns
+    // global font/display scaling and its confirmation/revert behaviour; Meo
+    // exposes the same reference-shaped entry point and sends users to the
+    // verified Appearance/KCM workflow.
+    readonly property var textAppearanceRows: [{
+        "title": qsTr("Display size & text"),
+        "subtitle": qsTr("Preview text, interface appearance, and open verified system font controls"),
+        "icon": "format_size",
+        "tone": "secondary",
+        "route": "appearance",
+        "trailingKind": "navigation"
     }]
 
     readonly property var advancedRows: {
@@ -95,26 +102,15 @@ Item {
         id: page
         anchors.fill: parent
         metricsOverride: root.rootMetrics
-        title: root.isCompact ? "" : qsTr("Displays")
-        subtitle: qsTr("Adjust brightness and Night Light directly. Display topology changes stay in KDE’s display module until Meo Settings has a verified confirmation-and-revert flow.")
+        title: root.isCompact ? "" : qsTr("Display & touch")
+        subtitle: ""
 
-        MeoCard {
+        MeoSettingsGroup {
             width: parent.width
-            type: "outlined"
-
-            Row {
-                width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "info"; size: 24; color: MeoTheme.primary }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: qsTr("Brightness and Night Light use the live PowerDevil and KWin services. Resolution, scale, refresh rate, HDR, VRR, and display arrangement remain guarded until a recovery-safe workflow exists.")
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.contentOnSurfaceVariant
-                    wrapMode: Text.WordWrap
-                }
-            }
+            title: qsTr("Lock display")
+            subtitle: ""
+            model: root.lockDisplayRows
+            onRowActivated: (index, row) => root.navigateTo(row.route)
         }
 
         MeoCard {
@@ -157,15 +153,57 @@ Item {
             }
         }
 
-        MeoSettingsGroup {
+        ColumnLayout {
             width: parent.width
             visible: Platform.brightnessAvailable
-            title: qsTr("Brightness")
-            subtitle: qsTr("Each slider changes the current brightness of its reported display")
-            model: root.brightnessRows
-            onRowSliderMoved: (index, value, row) => {
-                if (row.displayId)
-                    Platform.setBrightness(row.displayId, Math.round(value))
+            spacing: MeoTheme.space8
+
+            MeoText {
+                Layout.fillWidth: true
+                text: qsTr("Brightness")
+                typeRole: "title"
+                typeSize: "small"
+                emphasized: true
+                color: MeoTheme.contentOnSurface
+            }
+
+            MeoText {
+                Layout.fillWidth: true
+                text: qsTr("Each control changes the current brightness of its reported display")
+                typeRole: "body"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
+            }
+
+            Repeater {
+                model: Platform.brightnessDisplays
+
+                delegate: MeoCard {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    type: "outlined"
+
+                    MeoSteppedSlider {
+                        anchors.fill: parent
+                        readonly property real maximum: Math.max(1, Number(modelData.maximum))
+                        readonly property real brightness: Math.max(0, Math.min(maximum, Number(modelData.brightness)))
+                        title: modelData.label
+                               ? modelData.label
+                               : qsTr("Display brightness")
+                        supportingText: modelData.internal
+                                        ? qsTr("Built-in display")
+                                        : qsTr("External display")
+                        from: 0
+                        to: maximum
+                        value: brightness
+                        stepSize: 1
+                        discrete: true
+                        showValueLabel: true
+                        valueText: Math.round((brightness * 100) / maximum) + "%"
+                        onMoved: Platform.setBrightness(modelData.id, Math.round(value))
+                    }
+                }
             }
         }
 
@@ -173,12 +211,20 @@ Item {
             width: parent.width
             visible: Platform.nightLightAvailable
             title: qsTr("Night Light")
-            subtitle: qsTr("Use the KWin Night Light service directly")
+            subtitle: ""
             model: root.nightLightRows
             onRowToggled: (index, checked, row) => {
                 if (row.id === "night-light")
                     Platform.nightLightEnabled = checked
             }
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("Appearance")
+            subtitle: ""
+            model: root.textAppearanceRows
+            onRowActivated: (index, row) => root.navigateTo(row.route)
         }
 
         MeoCard {

@@ -21,6 +21,47 @@ Item {
         return count
     }
 
+    // The editor receives presentation-only copies. The source of truth stays
+    // `draftTiles`, which is eventually validated and written by
+    // ControlCenterBackend through the active Meo top-bar applet.
+    readonly property var visibleEditorTiles: {
+        const tiles = []
+        for (let index = 0; index < draftTiles.length; ++index) {
+            const tile = draftTiles[index]
+            if (!tile.visible)
+                continue
+            tiles.push({
+                "id": tile.id,
+                "sourceIndex": index,
+                "title": root.tileTitle(tile.id),
+                "supportingText": root.tileDescription(tile),
+                "iconName": root.tileIcon(tile.id),
+                "span": tile.span,
+                "removable": root.visibleDraftCount > 1,
+                "resizable": true
+            })
+        }
+        return tiles
+    }
+
+    readonly property var availableEditorTiles: {
+        const tiles = []
+        for (let index = 0; index < draftTiles.length; ++index) {
+            const tile = draftTiles[index]
+            if (tile.visible)
+                continue
+            tiles.push({
+                "id": tile.id,
+                "sourceIndex": index,
+                "title": root.tileTitle(tile.id),
+                "iconName": root.tileIcon(tile.id),
+                "span": tile.span,
+                "resizable": true
+            })
+        }
+        return tiles
+    }
+
     function loadDraft() {
         if (!ControlCenterBackend.available)
             return
@@ -54,6 +95,25 @@ Item {
         const nextTiles = draftTiles.slice()
         const moved = nextTiles.splice(index, 1)[0]
         nextTiles.splice(destination, 0, moved)
+        draftTiles = nextTiles
+        hasDraftChanges = true
+    }
+
+    function moveVisibleTile(fromVisibleIndex, toVisibleIndex) {
+        const sourceIndexes = []
+        for (let index = 0; index < draftTiles.length; ++index) {
+            if (draftTiles[index].visible)
+                sourceIndexes.push(index)
+        }
+        if (fromVisibleIndex < 0 || toVisibleIndex < 0
+                || fromVisibleIndex >= sourceIndexes.length
+                || toVisibleIndex >= sourceIndexes.length
+                || fromVisibleIndex === toVisibleIndex)
+            return
+
+        const nextTiles = draftTiles.slice()
+        const moved = nextTiles.splice(sourceIndexes[fromVisibleIndex], 1)[0]
+        nextTiles.splice(sourceIndexes[toVisibleIndex], 0, moved)
         draftTiles = nextTiles
         hasDraftChanges = true
     }
@@ -153,84 +213,33 @@ Item {
             }
         }
 
-        MeoText {
+        MeoQuickSettingsEditor {
+            id: tileEditor
             width: parent.width
             visible: ControlCenterBackend.available
-            text: qsTr("Quick Settings tiles")
-            typeRole: "title"; typeSize: "small"; emphasized: true
-            color: MeoTheme.contentOnSurface
-        }
-
-        Column {
-            width: parent.width
-            visible: ControlCenterBackend.available
-            spacing: 8 * MeoTheme.globalScale
-
-            Repeater {
-                model: root.draftTiles
-                delegate: MeoCard {
-                    id: tileCard
-                    required property int index
-                    required property var modelData
-                    width: parent.width
-                    implicitHeight: 132 * MeoTheme.globalScale
-                    type: "outlined"
-
-                    ColumnLayout {
-                        anchors.fill: parent
-                        spacing: 8 * MeoTheme.globalScale
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 12 * MeoTheme.globalScale
-                            MeoIcon { icon: root.tileIcon(tileCard.modelData.id); size: 24; color: MeoTheme.primary }
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 2 * MeoTheme.globalScale
-                                MeoText {
-                                    Layout.fillWidth: true
-                                    text: root.tileTitle(tileCard.modelData.id)
-                                    typeRole: "title"; typeSize: "small"; emphasized: true
-                                    color: MeoTheme.contentOnSurface; elide: Text.ElideRight
-                                }
-                                MeoText {
-                                    Layout.fillWidth: true
-                                    text: root.tileDescription(tileCard.modelData)
-                                    typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant
-                                }
-                            }
-                            MeoSwitch {
-                                checked: tileCard.modelData.visible
-                                enabled: !ControlCenterBackend.busy
-                                         && (!tileCard.modelData.visible || root.visibleDraftCount > 1)
-                                Accessible.name: tileCard.modelData.visible
-                                                 ? qsTr("Hide %1").arg(root.tileTitle(tileCard.modelData.id))
-                                                 : qsTr("Show %1").arg(root.tileTitle(tileCard.modelData.id))
-                                onToggled: (checked) => root.updateTile(tileCard.index, "visible", checked)
-                            }
-                        }
-                        Flow {
-                            Layout.fillWidth: true
-                            spacing: 6 * MeoTheme.globalScale
-                            MeoButton {
-                                text: tileCard.modelData.span === 2 ? qsTr("Wide") : qsTr("Compact")
-                                type: "tonal"; enabled: !ControlCenterBackend.busy
-                                onClicked: root.updateTile(tileCard.index, "span", tileCard.modelData.span === 2 ? 1 : 2)
-                            }
-                            MeoIconButton {
-                                type: "standard"; size: "s"; icon.name: "arrow_upward"
-                                enabled: tileCard.index > 0 && !ControlCenterBackend.busy
-                                Accessible.name: qsTr("Move %1 up").arg(root.tileTitle(tileCard.modelData.id))
-                                onClicked: root.moveTile(tileCard.index, -1)
-                            }
-                            MeoIconButton {
-                                type: "standard"; size: "s"; icon.name: "arrow_downward"
-                                enabled: tileCard.index < root.draftTiles.length - 1 && !ControlCenterBackend.busy
-                                Accessible.name: qsTr("Move %1 down").arg(root.tileTitle(tileCard.modelData.id))
-                                onClicked: root.moveTile(tileCard.index, 1)
-                            }
-                        }
-                    }
-                }
+            title: qsTr("Edit tiles")
+            subtitle: qsTr("Select tiles to rearrange and resize")
+            tiles: root.visibleEditorTiles
+            availableTiles: root.availableEditorTiles
+            columns: 4
+            editingEnabled: !ControlCenterBackend.busy
+            undoEnabled: root.hasDraftChanges && !ControlCenterBackend.busy
+            Accessible.name: qsTr("Edit Meo Quick Settings tiles")
+            onBackRequested: root.navigateTo("home")
+            onUndoRequested: root.loadDraft()
+            onTileMoved: (from, to) => root.moveVisibleTile(from, to)
+            onTileResizeRequested: (index, span) => {
+                const tile = root.visibleEditorTiles[index]
+                if (tile)
+                    root.updateTile(tile.sourceIndex, "span", span)
+            }
+            onTileRemoveRequested: (index, tile) => {
+                if (tile && root.visibleDraftCount > 1)
+                    root.updateTile(tile.sourceIndex, "visible", false)
+            }
+            onTileAddRequested: (index, tile) => {
+                if (tile)
+                    root.updateTile(tile.sourceIndex, "visible", true)
             }
         }
 

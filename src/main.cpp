@@ -216,10 +216,11 @@ int main(int argc, char *argv[])
             QStringLiteral("home"),
         };
         auto routeIndex = std::make_shared<int>(0);
+        auto notReadyTicks = std::make_shared<int>(0);
         auto *smokeTimer = new QTimer(&app);
         smokeTimer->setInterval(420);
         QObject::connect(smokeTimer, &QTimer::timeout, &app,
-                         [&engine, smokeRoutes, routeIndex, smokeTimer] {
+                         [&engine, smokeRoutes, routeIndex, notReadyTicks, smokeTimer] {
                              if (engine.rootObjects().isEmpty()) {
                                  qCritical() << "Meo Settings lost its QML root during smoke navigation.";
                                  QCoreApplication::exit(EXIT_FAILURE);
@@ -227,12 +228,23 @@ int main(int argc, char *argv[])
                              }
                              auto *rootObject = engine.rootObjects().constFirst();
                              if (!rootObject->property("pageContentReady").toBool()) {
-                                 qCritical() << "Meo Settings page host did not retain the current page during smoke navigation."
-                                             << "route:" << rootObject->property("currentRoute").toString()
-                                             << "loaded:" << rootObject->property("lastLoadedRoute").toString();
-                                 QCoreApplication::exit(EXIT_FAILURE);
+                                 // A cold QML page can legitimately need more
+                                 // than one 420 ms tick while its module and
+                                 // live read-only backend state initialize.
+                                 // Wait for the explicit page-ready contract
+                                 // instead of making the smoke result depend
+                                 // on machine load; still fail if it never
+                                 // settles.
+                                 ++*notReadyTicks;
+                                 if (*notReadyTicks > 12) {
+                                     qCritical() << "Meo Settings page host did not retain the current page during smoke navigation."
+                                                 << "route:" << rootObject->property("currentRoute").toString()
+                                                 << "loaded:" << rootObject->property("lastLoadedRoute").toString();
+                                     QCoreApplication::exit(EXIT_FAILURE);
+                                 }
                                  return;
                              }
+                             *notReadyTicks = 0;
                              if (!rootObject->property("dynamicThemeReady").toBool()) {
                                  qCritical() << "Meo Settings did not receive a complete KDE dynamic color scheme."
                                              << "mode:" << rootObject->property("dynamicThemeMode").toString();

@@ -158,6 +158,8 @@ ApplicationWindow {
         currentIndex: root.sidebarIndexForRoute(root.currentRoute)
         compactNavigationLimit: 5
         compactPresentation: "drawer"
+        preferPersistentDrawer: true
+        navigationVisualStyle: "settings"
         // A medium-width rail is deliberately icon-first. It avoids squeezing
         // category labels such as “Privacy & security” into an 80 dp column;
         // the full persistent drawer returns at the large window class.
@@ -182,7 +184,8 @@ ApplicationWindow {
             anchors.top: parent.top
             visible: navigation.isCompact
             title: root.currentRoute === "home" ? qsTr("Settings")
-                                               : root.titleForRoute(root.currentRoute)
+                  : (root.currentRoute === "display" ? qsTr("Display & touch")
+                                                      : root.titleForRoute(root.currentRoute))
             type: "small"
             navigationIcon: Component {
                 MeoIconButton {

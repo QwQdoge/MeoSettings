@@ -88,42 +88,76 @@ Item {
         return StorageBackend.summary
     }
 
-    readonly property var quickRows: {
+    // This mirrors the familiar search-first Android settings hierarchy while
+    // retaining Meo's actual category routes and live service summaries.
+    // Names such as "Display & touch" are navigation labels only; the target
+    // page still exposes only the desktop controls it can verify and write.
+    readonly property var referenceRows: {
         const rows = [{
-            "title": qsTr("Wi-Fi"),
-            "subtitle": NetworkBackend.connectionName || (NetworkBackend.wifiEnabled ? qsTr("On, not connected") : qsTr("Off or unavailable")),
-            "icon": "wifi", "tone": "primary", "route": "wifi", "trailingKind": "navigation"
+            "title": qsTr("Network & Internet"),
+            "subtitle": NetworkBackend.connectionName || (NetworkBackend.wifiEnabled ? qsTr("Wi-Fi on, not connected") : qsTr("Wi-Fi off or unavailable")),
+            "icon": "wifi", "tone": "primary", "route": "category:network", "trailingKind": "navigation"
         },
         {
-            "title": qsTr("Bluetooth"),
-            "subtitle": BluetoothBackend.enabled ? qsTr("On") : qsTr("Off or unavailable"),
-            "icon": "bluetooth", "tone": "secondary", "route": "bluetooth", "trailingKind": "navigation"
+            "title": qsTr("Connected devices"),
+            "subtitle": BluetoothBackend.enabled ? qsTr("Bluetooth on") : qsTr("Bluetooth off or unavailable"),
+            "icon": "devices", "tone": "primary", "route": "category:devices", "trailingKind": "navigation"
         },
         {
-            "title": qsTr("Sound"),
-            "subtitle": AudioBackend.outputName || qsTr("Choose an output"),
-            "icon": "volume_up", "tone": "secondary", "route": "sound", "trailingKind": "navigation"
+            "title": qsTr("Apps & notifications"),
+            "subtitle": root.doNotDisturbEnabled ? qsTr("Do Not Disturb is on") : qsTr("Notifications and default apps"),
+            "icon": "apps", "tone": "secondary", "route": "category:apps", "trailingKind": "navigation"
         },
         {
             "title": qsTr("Notifications"),
             "subtitle": root.doNotDisturbEnabled ? qsTr("Do Not Disturb is on")
                                                 : qsTr("Popups and focus"),
             "icon": root.doNotDisturbEnabled ? "do_not_disturb_on" : "notifications",
-            "tone": "primary", "route": "notifications", "trailingKind": "navigation"
+            "tone": "secondary", "route": "notifications", "trailingKind": "navigation"
         },
         {
-            "title": qsTr("Storage & apps"),
-            "subtitle": root.storageSummary(),
-            "icon": "storage", "tone": "tertiary", "route": "storage", "trailingKind": "navigation"
+            "title": qsTr("Sound & vibration"),
+            "subtitle": AudioBackend.outputName || qsTr("Choose an output"),
+            "icon": "volume_up", "tone": "primary", "route": "sound", "trailingKind": "navigation"
         },
         {
-            "title": qsTr("Power & battery"),
-            "subtitle": root.powerSummary(),
-            "icon": PowerBackend.charging ? "battery_charging_full" : "battery_full",
-            "tone": "primary", "route": "power", "trailingKind": "navigation"
+            "title": qsTr("Control Center"),
+            "subtitle": qsTr("Quick Settings tiles, layout, and density"),
+            "icon": "tune", "tone": "secondary", "route": "control-center", "trailingKind": "navigation"
+        },
+        {
+            "title": qsTr("Display & touch"),
+            "subtitle": qsTr("Brightness, Night Light, displays, and text"),
+            "icon": "monitor", "tone": "tertiary", "route": "display", "trailingKind": "navigation"
+        },
+        {
+            "title": qsTr("Wallpaper & style"),
+            "subtitle": qsTr("Dynamic color, wallpaper, icons, and fonts"),
+            "icon": "palette", "tone": "tertiary", "route": "appearance", "trailingKind": "navigation"
         }]
         return rows
     }
+
+    readonly property var systemRows: [{
+        "title": qsTr("Storage"),
+        "subtitle": root.storageSummary(),
+        "icon": "storage", "tone": "secondary", "route": "storage", "trailingKind": "navigation"
+    },
+    {
+        "title": qsTr("Power & battery"),
+        "subtitle": root.powerSummary(),
+        "icon": PowerBackend.charging ? "battery_charging_full" : "battery_full",
+        "tone": "primary", "route": "power", "trailingKind": "navigation"
+    },
+    root.categoryRow("system"),
+    root.categoryRow("privacy"),
+    root.categoryRow("accessibility"),
+    root.categoryRow("updates"),
+    {
+        "title": qsTr("About Meo"),
+        "subtitle": qsTr("MeoArch, hardware, and runtime information"),
+        "icon": "info", "tone": "neutral", "route": "about", "trailingKind": "navigation"
+    }]
 
     readonly property var searchRows: {
         const rows = []
@@ -159,19 +193,22 @@ Item {
         id: page
         anchors.fill: parent
         metricsOverride: root.rootMetrics
-        compactWidth: 680 * MeoTheme.globalScale
-        mediumWidth: 760 * MeoTheme.globalScale
-        expandedWidth: 760 * MeoTheme.globalScale
-        title: root.isCompact ? "" : qsTr("Settings")
-        subtitle: root.searching
-                  ? qsTr("Results are grouped by their system owner.")
-                  : qsTr("Search first, then move through one clear category at a time.")
+        compactWidth: Math.min(680 * MeoTheme.globalScale, MeoTheme.settingsContentMaxWidth)
+        mediumWidth: MeoTheme.settingsContentMaxWidth
+        expandedWidth: MeoTheme.settingsContentMaxWidth
+        // The desktop product and Pixel reference are search-first.  A second
+        // in-page title duplicated the window title and shifted every measured
+        // surface downward, so Home starts directly with the 64 dp search.
+        title: ""
+        subtitle: ""
+        topPadding: 0
 
         MeoSearchBar {
             id: searchBar
             width: parent.width
             placeholder: qsTr("Search settings")
             trailingIcon: ""
+            visualStyle: "settings"
             Accessible.name: qsTr("Search settings")
         }
 
@@ -179,70 +216,23 @@ Item {
         // signed-in Meo Account, every Settings identity surface uses its
         // scoped cloud name/avatar rather than silently mixing it with the
         // local Unix profile.  A denied profile ID remains absent by design.
-        MeoCard {
+        MeoSettingsAccountCard {
             width: parent.width
             visible: !root.searching
-            type: "filled"
-            compact: root.isCompact
-            interactive: true
+            title: root.accountDisplayName
+            subtitle: root.accountSummary
+            avatarSource: root.accountAvatarSource
+            initials: root.initials(root.accountDisplayName)
             Accessible.name: root.showingCloudIdentity ? qsTr("Meo Account and device")
                                                         : qsTr("Local user and device")
             onClicked: root.navigateTo("accounts")
-
-            Row {
-                width: parent.width
-                spacing: 14 * MeoTheme.globalScale
-
-                MeoAvatar {
-                    anchors.verticalCenter: parent.verticalCenter
-                    source: root.accountAvatarSource
-                    initials: root.initials(root.accountDisplayName)
-                    size: root.isCompact ? 44 : 52
-                    color: MeoTheme.primaryContainer
-                    textColor: MeoTheme.contentOnPrimaryContainer
-                }
-
-                Column {
-                    width: parent.width - (root.isCompact ? 44 : 52) * MeoTheme.globalScale
-                           - parent.spacing - accountChevron.width
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 2 * MeoTheme.globalScale
-
-                    MeoText {
-                        width: parent.width
-                        text: root.accountDisplayName
-                        typeRole: "title"
-                        typeSize: "small"
-                        emphasized: true
-                        color: MeoTheme.contentOnSurface
-                        elide: Text.ElideRight
-                    }
-
-                    MeoText {
-                        width: parent.width
-                        text: root.accountSummary
-                        typeRole: "body"
-                        typeSize: "small"
-                        color: MeoTheme.contentOnSurfaceVariant
-                        elide: Text.ElideRight
-                    }
-                }
-
-                MeoIcon {
-                    id: accountChevron
-                    anchors.verticalCenter: parent.verticalCenter
-                    icon: "chevron_right"
-                    size: 24
-                    color: MeoTheme.contentOnSurfaceVariant
-                }
-            }
         }
 
         MeoSettingsGroup {
             width: parent.width
             visible: root.searching && root.searchRows.length > 0
             title: qsTr("Search results")
-            subtitle: qsTr("A result opens its Meo page, or an explicitly marked protected advanced tool when necessary.")
+            subtitle: ""
             model: root.searchRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }
@@ -259,58 +249,18 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             visible: !root.searching
-            title: qsTr("Frequent settings")
-            subtitle: qsTr("Live status from the services that Meo Settings can safely manage.")
-            model: root.quickRows
-            onRowActivated: (index, row) => root.navigateTo(row.route)
-        }
-
-        // This is a real session fact, not an imitation system-update banner:
-        // it makes the active platform color source visible and inspectable.
-        MeoSettingsGroup {
-            width: parent.width
-            visible: !root.searching && MeoTheme.colorSchemeMode === "dynamic"
-            title: qsTr("Appearance")
-            model: [{
-                "title": qsTr("Dynamic color"),
-                "subtitle": qsTr("Using the complete Material color scheme from the active KDE session."),
-                "icon": "colors",
-                "tone": "tertiary",
-                "trailingKind": "status",
-                "trailingText": qsTr("Active"),
-                "interactive": false
-            }]
-        }
-
-        MeoSettingsGroup {
-            width: parent.width
-            visible: !root.searching
-            title: qsTr("Connections")
-            model: [root.categoryRow("network"), root.categoryRow("devices"), root.categoryRow("display-sound")]
+            title: ""
+            subtitle: ""
+            model: root.referenceRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }
 
         MeoSettingsGroup {
             width: parent.width
             visible: !root.searching
-            title: qsTr("Personal")
-            model: [root.categoryRow("personalization"), root.categoryRow("apps"), root.categoryRow("accounts")]
-            onRowActivated: (index, row) => root.navigateTo(row.route)
-        }
-
-        MeoSettingsGroup {
-            width: parent.width
-            visible: !root.searching
-            title: qsTr("System")
-            model: [root.categoryRow("storage"), root.categoryRow("system"), root.categoryRow("privacy"),
-                    root.categoryRow("accessibility"), root.categoryRow("updates"), {
-                "title": qsTr("About"),
-                "subtitle": qsTr("MeoArch, hardware, and runtime information"),
-                "icon": "info",
-                "tone": "neutral",
-                "route": "about",
-                "trailingKind": "navigation"
-            }]
+            title: ""
+            subtitle: ""
+            model: root.systemRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }
     }
