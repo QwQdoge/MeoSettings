@@ -215,6 +215,17 @@ QStringList SystemUpdatesContract::configuredRepositoryNames(const QByteArray &p
     return repositories;
 }
 
+QString SystemUpdatesContract::channelForRepositories(const QStringList &repositories)
+{
+    const int betaIndex = repositories.indexOf(QStringLiteral("meo-beta"));
+    const int stableIndex = repositories.indexOf(QStringLiteral("meo"));
+    if (betaIndex >= 0) {
+        return stableIndex >= 0 && betaIndex < stableIndex ? QStringLiteral("beta")
+                                                            : QStringLiteral("invalid");
+    }
+    return stableIndex >= 0 ? QStringLiteral("stable") : QStringLiteral("unconfigured");
+}
+
 QString SystemUpdatesContract::updateFamily(const QString &packageName, const QString &repository,
                                              const QStringList &foreignPackages,
                                              const QStringList &configuredRepositories)
@@ -265,6 +276,7 @@ UpdatesBackend::UpdatesBackend(QObject *parent)
 
 QVariantList UpdatesBackend::updates() const { return m_updates; }
 QVariantList UpdatesBackend::configuredRepositories() const { return m_configuredRepositories; }
+QString UpdatesBackend::updateChannel() const { return m_updateChannel; }
 QVariantList UpdatesBackend::aurUpdates() const { return m_aurUpdates; }
 QString UpdatesBackend::cachedMetadataTimestamp() const { return m_cachedMetadataTimestamp; }
 
@@ -318,7 +330,6 @@ void UpdatesBackend::refresh()
         return;
     }
     updateRuntimeAvailability();
-    updateConfiguredRepositories();
     updateCachedMetadataTimestamp();
     clearError();
     if (!pacmanAvailable()) {
@@ -335,6 +346,14 @@ void UpdatesBackend::refresh()
     m_systemUpdateCount = 0;
     m_customRepositoryUpdateCount = 0;
     setAvailable(true);
+    // pacman-conf is pacman's own parser, including Include files.  Keep the
+    // old header-only reader solely as a safe fallback for minimal systems.
+    if (!m_pacmanConfPath.isEmpty()) {
+        startStage(Stage::ConfiguredRepositories, m_pacmanConfPath,
+                   {QStringLiteral("--repo-list")});
+        return;
+    }
+    updateConfiguredRepositories();
     startStage(Stage::NativeUpdates, m_pacmanPath, {QStringLiteral("-Qu")});
 }
 
@@ -358,13 +377,15 @@ void UpdatesBackend::refreshAurUpdates()
 void UpdatesBackend::updateRuntimeAvailability()
 {
     const QString pacman = QStandardPaths::findExecutable(QStringLiteral("pacman"));
+    const QString pacmanConf = QStandardPaths::findExecutable(QStringLiteral("pacman-conf"));
     const QString paru = QStandardPaths::findExecutable(QStringLiteral("paru"));
     const QString yay = QStandardPaths::findExecutable(QStringLiteral("yay"));
     const QString aurHelper = !paru.isEmpty() ? paru : yay;
-    if (m_pacmanPath == pacman && m_aurHelperPath == aurHelper) {
+    if (m_pacmanPath == pacman && m_pacmanConfPath == pacmanConf && m_aurHelperPath == aurHelper) {
         return;
     }
     m_pacmanPath = pacman;
+    m_pacmanConfPath = pacmanConf;
     m_aurHelperPath = aurHelper;
     Q_EMIT changed();
 }
@@ -377,6 +398,11 @@ void UpdatesBackend::updateConfiguredRepositories()
         contents = config.read(1024 * 1024);
     }
     const QStringList names = SystemUpdatesContract::configuredRepositoryNames(contents);
+    setConfiguredRepositoryNames(names);
+}
+
+void UpdatesBackend::setConfiguredRepositoryNames(const QStringList &names)
+{
     QVariantList nextRepositories;
     nextRepositories.reserve(names.size());
     for (const QString &name : names) {
@@ -388,10 +414,12 @@ void UpdatesBackend::updateConfiguredRepositories()
             {QStringLiteral("description"), repositoryDescription(kind)},
         });
     }
-    if (m_configuredRepositories == nextRepositories) {
+    const QString nextChannel = SystemUpdatesContract::channelForRepositories(names);
+    if (m_configuredRepositories == nextRepositories && m_updateChannel == nextChannel) {
         return;
     }
     m_configuredRepositories = std::move(nextRepositories);
+    m_updateChannel = std::move(nextChannel);
     Q_EMIT changed();
 }
 
@@ -443,6 +471,28 @@ void UpdatesBackend::finishStage(const int exitCode, const QProcess::ExitStatus 
     }
 
     const QByteArray output = m_standardOutput;
+    if (m_stage == Stage::ConfiguredRepositories) {
+        if (exitCode != 0) {
+            // This fallback does not modify configuration; it only preserves
+            // read-only display on systems that lack a usable pacman-conf.
+            updateConfiguredRepositories();
+        } else {
+            QStringList names;
+            for (const QString &rawName : QString::fromUtf8(output).split(QLatin1Char('\n'), Qt::SkipEmptyParts)) {
+                const QString name = safeText(rawName, 128).toCaseFolded();
+                if (!kPackageNameExpression.match(name).hasMatch()) {
+                    finishWithError(tr("Pacman returned an invalid repository record."));
+                    return;
+                }
+                if (!names.contains(name)) {
+                    names.push_back(name);
+                }
+            }
+            setConfiguredRepositoryNames(names);
+        }
+        startStage(Stage::NativeUpdates, m_pacmanPath, {QStringLiteral("-Qu")});
+        return;
+    }
     if (m_stage == Stage::NativeUpdates) {
         // pacman returns 1 with no stdout when its cached sync databases
         // contain no upgrade candidates.  Any non-empty failed result is an

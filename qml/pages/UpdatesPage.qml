@@ -153,6 +153,19 @@ Item {
                     wrapMode: Text.WordWrap
                 }
 
+                MeoText {
+                    width: parent.width
+                    text: UpdatesBackend.updateChannel === "beta"
+                          ? qsTr("Meo update channel: Beta — meo-beta overlays stable Meo packages.")
+                          : (UpdatesBackend.updateChannel === "stable"
+                             ? qsTr("Meo update channel: Stable")
+                             : qsTr("Meo update channel: not configured or invalid"))
+                    typeRole: "body"
+                    typeSize: "small"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+
                 Row {
                     spacing: 8 * MeoTheme.globalScale
                     MeoButton {
@@ -168,6 +181,11 @@ Item {
                         visible: KcmBridge.isAvailable("kcm_updates")
                         enabled: !UpdatesBackend.busy
                         onClicked: root.navigateTo("kcm:kcm_updates")
+                    }
+                    MeoButton {
+                        text: qsTr("Manage in OmniStore")
+                        type: "outlined"
+                        onClicked: OmniStoreAppsBackend.openOmniStore()
                     }
                 }
             }
