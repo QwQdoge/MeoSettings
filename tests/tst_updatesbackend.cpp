@@ -11,6 +11,7 @@ private Q_SLOTS:
     void rejectsUnsafeUpdateLine();
     void identifiesRepositoryFromCStableSyncInfo();
     void readsOnlyActiveRepositorySections();
+    void detectsChannelFromResolvedRepositoryOrder();
     void classifiesMeoKdeCustomAndSystemUpdates();
 };
 
@@ -59,6 +60,18 @@ Server = https://packages.example/meo
 )";
     QCOMPARE(SystemUpdatesContract::configuredRepositoryNames(config),
              QStringList({QStringLiteral("core"), QStringLiteral("meo")}));
+}
+
+void UpdatesBackendTest::detectsChannelFromResolvedRepositoryOrder()
+{
+    QCOMPARE(SystemUpdatesContract::channelForRepositories(
+                 {QStringLiteral("meo-beta"), QStringLiteral("meo")}),
+             QStringLiteral("beta"));
+    QCOMPARE(SystemUpdatesContract::channelForRepositories(
+                 {QStringLiteral("meo"), QStringLiteral("meo-beta")}),
+             QStringLiteral("invalid"));
+    QCOMPARE(SystemUpdatesContract::channelForRepositories({QStringLiteral("extra"), QStringLiteral("meo")}),
+             QStringLiteral("stable"));
 }
 
 void UpdatesBackendTest::classifiesMeoKdeCustomAndSystemUpdates()

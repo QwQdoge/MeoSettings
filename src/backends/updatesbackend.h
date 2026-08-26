@@ -22,6 +22,7 @@ public:
     static QVariantMap parsePacmanUpdateLine(const QString &line);
     static QVariantMap syncInfoForPackage(const QByteArray &output, const QString &packageName);
     static QStringList configuredRepositoryNames(const QByteArray &pacmanConfig);
+    static QString channelForRepositories(const QStringList &repositories);
     static QString updateFamily(const QString &packageName, const QString &repository,
                                 const QStringList &foreignPackages,
                                 const QStringList &configuredRepositories);
@@ -42,6 +43,7 @@ class UpdatesBackend final : public BackendBase
     Q_OBJECT
     Q_PROPERTY(QVariantList updates READ updates NOTIFY changed)
     Q_PROPERTY(QVariantList configuredRepositories READ configuredRepositories NOTIFY changed)
+    Q_PROPERTY(QString updateChannel READ updateChannel NOTIFY changed)
     Q_PROPERTY(QVariantList aurUpdates READ aurUpdates NOTIFY changed)
     Q_PROPERTY(QString cachedMetadataTimestamp READ cachedMetadataTimestamp NOTIFY changed)
     Q_PROPERTY(QString summary READ summary NOTIFY changed)
@@ -61,6 +63,7 @@ public:
 
     QVariantList updates() const;
     QVariantList configuredRepositories() const;
+    QString updateChannel() const;
     QVariantList aurUpdates() const;
     QString cachedMetadataTimestamp() const;
     QString summary() const;
@@ -88,6 +91,7 @@ Q_SIGNALS:
 private:
     enum class Stage {
         Idle,
+        ConfiguredRepositories,
         NativeUpdates,
         ForeignPackages,
         SyncInformation,
@@ -96,6 +100,7 @@ private:
 
     void updateRuntimeAvailability();
     void updateConfiguredRepositories();
+    void setConfiguredRepositoryNames(const QStringList &names);
     void updateCachedMetadataTimestamp();
     void startStage(Stage stage, const QString &program, const QStringList &arguments);
     void finishStage(int exitCode, QProcess::ExitStatus exitStatus);
@@ -112,6 +117,7 @@ private:
     QTimer *m_timeoutTimer = nullptr;
     QByteArray m_standardOutput;
     QString m_pacmanPath;
+    QString m_pacmanConfPath;
     QString m_aurHelperPath;
     Stage m_stage = Stage::Idle;
     bool m_operationActive = false;
@@ -120,6 +126,7 @@ private:
     bool m_hasAurSnapshot = false;
     QVariantList m_updates;
     QVariantList m_configuredRepositories;
+    QString m_updateChannel = QStringLiteral("unconfigured");
     QVariantList m_aurUpdates;
     QStringList m_candidatePackageNames;
     QStringList m_foreignPackageNames;
