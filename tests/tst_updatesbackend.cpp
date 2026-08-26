@@ -10,7 +10,7 @@ private Q_SLOTS:
     void parsesNativeUpdateLine();
     void rejectsUnsafeUpdateLine();
     void identifiesRepositoryFromCStableSyncInfo();
-    void readsOnlyActiveRepositorySections();
+    void readsOfficialPackageCatalogWithoutPrefixInference();
     void detectsChannelFromResolvedRepositoryOrder();
     void classifiesMeoKdeCustomAndSystemUpdates();
 };
@@ -47,19 +47,17 @@ Version         : 6.0.0-1
     QVERIFY(SystemUpdatesContract::syncInfoForPackage(output, QStringLiteral("absent")).isEmpty());
 }
 
-void UpdatesBackendTest::readsOnlyActiveRepositorySections()
+void UpdatesBackendTest::readsOfficialPackageCatalogWithoutPrefixInference()
 {
-    const QByteArray config = R"([options]
-#[testing]
-[core]
-Include = /etc/pacman.d/mirrorlist
-
-[meo]
-Server = https://packages.example/meo
-# [ignored]
-)";
-    QCOMPARE(SystemUpdatesContract::configuredRepositoryNames(config),
-             QStringList({QStringLiteral("core"), QStringLiteral("meo")}));
+    const QByteArray catalog = R"({
+      "schemaVersion": 2,
+      "officialPackages": ["meo-settings", "omnistore-bin"]
+    })";
+    QCOMPARE(SystemUpdatesContract::officialPackageNames(catalog),
+             QStringList({QStringLiteral("meo-settings"), QStringLiteral("omnistore-bin")}));
+    QVERIFY(SystemUpdatesContract::officialPackageNames(
+                QByteArrayLiteral("{\"schemaVersion\": 1, \"officialPackages\": [\"meo-settings\"]}"))
+                .isEmpty());
 }
 
 void UpdatesBackendTest::detectsChannelFromResolvedRepositoryOrder()
@@ -77,16 +75,19 @@ void UpdatesBackendTest::detectsChannelFromResolvedRepositoryOrder()
 void UpdatesBackendTest::classifiesMeoKdeCustomAndSystemUpdates()
 {
     const QStringList configured{QStringLiteral("core"), QStringLiteral("meo"), QStringLiteral("local-tools")};
-    QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("meo-settings"), QStringLiteral("meo"), {}, configured),
+    const QStringList official{QStringLiteral("meo-settings")};
+    QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("meo-settings"), QStringLiteral("meo"), {}, configured, official),
              QStringLiteral("meo"));
-    QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("plasma-desktop"), QStringLiteral("extra"), {}, configured),
+    QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("meo-unofficial"), QStringLiteral("meo"), {}, configured, official),
+             QStringLiteral("system"));
+    QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("plasma-desktop"), QStringLiteral("extra"), {}, configured, official),
              QStringLiteral("kde"));
-    QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("my-tool"), QStringLiteral("local-tools"), {}, configured),
+    QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("my-tool"), QStringLiteral("local-tools"), {}, configured, official),
              QStringLiteral("custom"));
-    QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("linux"), QStringLiteral("core"), {}, configured),
+    QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("linux"), QStringLiteral("core"), {}, configured, official),
              QStringLiteral("system"));
     QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("foreign-tool"), QString(),
-                                                  {QStringLiteral("foreign-tool")}, configured),
+                                                  {QStringLiteral("foreign-tool")}, configured, official),
              QStringLiteral("aur"));
 }
 

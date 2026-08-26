@@ -159,7 +159,9 @@ Item {
                           ? qsTr("Meo update channel: Beta — meo-beta overlays stable Meo packages.")
                           : (UpdatesBackend.updateChannel === "stable"
                              ? qsTr("Meo update channel: Stable")
-                             : qsTr("Meo update channel: not configured or invalid"))
+                             : (UpdatesBackend.updateChannel === "unavailable"
+                                ? qsTr("Meo update channel: unavailable because pacman-conf could not resolve repository order")
+                                : qsTr("Meo update channel: not configured or invalid")))
                     typeRole: "body"
                     typeSize: "small"
                     color: MeoTheme.contentOnSurfaceVariant

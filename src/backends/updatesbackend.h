@@ -21,11 +21,12 @@ class SystemUpdatesContract final
 public:
     static QVariantMap parsePacmanUpdateLine(const QString &line);
     static QVariantMap syncInfoForPackage(const QByteArray &output, const QString &packageName);
-    static QStringList configuredRepositoryNames(const QByteArray &pacmanConfig);
+    static QStringList officialPackageNames(const QByteArray &catalog);
     static QString channelForRepositories(const QStringList &repositories);
     static QString updateFamily(const QString &packageName, const QString &repository,
                                 const QStringList &foreignPackages,
-                                const QStringList &configuredRepositories);
+                                const QStringList &configuredRepositories,
+                                const QStringList &officialPackages);
     static bool isCustomRepository(const QString &repository);
 };
 
@@ -99,8 +100,8 @@ private:
     };
 
     void updateRuntimeAvailability();
-    void updateConfiguredRepositories();
-    void setConfiguredRepositoryNames(const QStringList &names);
+    void loadOfficialPackageNames();
+    void setConfiguredRepositoryNames(const QStringList &names, bool resolved = true);
     void updateCachedMetadataTimestamp();
     void startStage(Stage stage, const QString &program, const QStringList &arguments);
     void finishStage(int exitCode, QProcess::ExitStatus exitStatus);
@@ -130,6 +131,7 @@ private:
     QVariantList m_aurUpdates;
     QStringList m_candidatePackageNames;
     QStringList m_foreignPackageNames;
+    QStringList m_officialPackageNames;
     QString m_cachedMetadataTimestamp;
     int m_meoUpdateCount = 0;
     int m_kdeUpdateCount = 0;
