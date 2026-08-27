@@ -65,6 +65,15 @@ Item {
     readonly property var systemRows: root.updateRowsFor("system", UpdatesBackend.updates)
     readonly property var nativeAurRows: root.updateRowsFor("aur", UpdatesBackend.updates)
     readonly property var aurRows: root.updateRowsFor("aur", UpdatesBackend.aurUpdates)
+    readonly property string meoRepositoryOrder: {
+        const names = []
+        const repositories = UpdatesBackend.configuredRepositories
+        for (let index = 0; index < repositories.length; ++index) {
+            if (repositories[index].kind === "meo")
+                names.push(repositories[index].name)
+        }
+        return names.join(" → ")
+    }
 
     readonly property var repositoryRows: {
         const rows = []
@@ -166,7 +175,19 @@ Item {
                     wrapMode: Text.WordWrap
                 }
 
-                Row {
+                MeoText {
+                    width: parent.width
+                    visible: root.meoRepositoryOrder !== ""
+                    text: qsTr("Repository priority: %1").arg(root.meoRepositoryOrder)
+                    typeRole: "body"
+                    typeSize: "small"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+
+                Flow {
+                    width: parent.width
+                    implicitHeight: childrenRect.height
                     spacing: 8 * MeoTheme.globalScale
                     MeoButton {
                         text: qsTr("Refresh local metadata")
@@ -183,7 +204,7 @@ Item {
                         onClicked: root.navigateTo("kcm:kcm_updates")
                     }
                     MeoButton {
-                        text: qsTr("Manage in OmniStore")
+                        text: qsTr("Manage updates & channel in OmniStore")
                         type: "outlined"
                         onClicked: OmniStoreAppsBackend.openOmniStore()
                     }
