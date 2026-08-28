@@ -3,6 +3,8 @@
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
 #include <QDBusReply>
 #include <QFileInfo>
 #include <QProcess>
@@ -93,6 +95,9 @@ MeoAccountBackend::MeoAccountBackend(QObject *parent)
     QDBusConnection::sessionBus().connect(serviceName(), objectPath(),
                                           interfaceName(), QStringLiteral("accountChanged"),
                                           this, SLOT(refresh()));
+    QDBusConnection::sessionBus().connect(serviceName(), objectPath(),
+                                          interfaceName(), QStringLiteral("requestChanged"),
+                                          this, SLOT(handleRequestChanged(QString,QString,QVariantMap)));
     updateLauncherAvailability();
     refresh();
 }
@@ -121,6 +126,17 @@ bool MeoAccountBackend::oauthConfigured() const
 {
     return m_oauthConfigured;
 }
+
+bool MeoAccountBackend::busy() const { return m_busy; }
+QString MeoAccountBackend::accountState() const { return m_accountState; }
+qulonglong MeoAccountBackend::logoutEpoch() const { return m_logoutEpoch; }
+QVariantList MeoAccountBackend::clients() const { return m_clients; }
+QVariantList MeoAccountBackend::sessions() const { return m_sessions; }
+bool MeoAccountBackend::mfaEnabled() const { return m_mfaEnabled; }
+QString MeoAccountBackend::syncState() const { return m_syncState; }
+QString MeoAccountBackend::syncError() const { return m_syncError; }
+QString MeoAccountBackend::lastSyncedAt() const { return m_lastSyncedAt; }
+QString MeoAccountBackend::requestState() const { return m_requestState; }
 
 QString MeoAccountBackend::cloudName() const
 {
@@ -174,28 +190,31 @@ void MeoAccountBackend::refresh()
         return;
     }
 
-    const QDBusReply<QVariantMap> statusReply = broker.call(QStringLiteral("GetStatus"));
-    if (!statusReply.isValid()) {
-        applyUnavailableState();
-        setError(tr("The Meo Account service did not return a readable status."));
-        Q_EMIT changed();
-        return;
-    }
-
-    const QVariantMap status = statusReply.value();
-    QVariantMap identity;
-    if (status.value(QStringLiteral("signedIn")).toBool()) {
-        // Profile data is deliberately requested through the broker's
-        // manifest/executable gate.  A package that has not installed the
-        // Settings profile manifest still shows the public status name/avatar,
-        // but never invents an account ID.
-        const QDBusReply<QVariantMap> identityReply = broker.call(
-            QStringLiteral("GetIdentity"), settingsClientId());
-        if (identityReply.isValid()) {
-            identity = identityReply.value();
-        }
-    }
-    applyStatus(status, identity);
+    setBusy(true);
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("GetAccountOverview")), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QVariantMap> reply = *completed;
+                completed->deleteLater();
+                setBusy(false);
+                if (!reply.isValid()) {
+                    applyUnavailableState();
+                    setError(tr("The Meo Account service did not return a readable account overview."));
+                    Q_EMIT changed();
+                    return;
+                }
+                const QVariantMap overview = reply.value();
+                m_clients = overview.value(QStringLiteral("clients")).toList();
+                m_sessions = overview.value(QStringLiteral("sessions")).toList();
+                m_mfaEnabled = overview.value(QStringLiteral("mfaEnabled")).toBool();
+                m_syncState = safeText(overview.value(QStringLiteral("syncState")), 64);
+                m_syncError = safeText(overview.value(QStringLiteral("syncError")), 512);
+                m_lastSyncedAt = safeText(overview.value(QStringLiteral("lastSyncedAt")), 64);
+                m_logoutEpoch = overview.value(QStringLiteral("logoutEpoch")).toULongLong();
+                applyStatus(overview, overview.value(QStringLiteral("identity")).toMap());
+                Q_EMIT changed();
+            });
 }
 
 bool MeoAccountBackend::openAccountSettings()
@@ -224,6 +243,145 @@ bool MeoAccountBackend::openAccountSettings()
     return true;
 }
 
+void MeoAccountBackend::requestAuthentication(const QString &mode)
+{
+    clearError();
+    setBusy(true);
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("RequestAuthentication"), settingsClientId(), mode,
+                         QVariantMap{}), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QString> reply = *completed;
+                completed->deleteLater();
+                if (!reply.isValid() || reply.value().isEmpty()) {
+                    setBusy(false);
+                    m_signOutAfterReauth = false;
+                    m_clientToRevokeAfterReauth.clear();
+                    setError(tr("The Meo Account authentication dialog could not be opened."));
+                    Q_EMIT changed();
+                    return;
+                }
+                m_activeRequestId = reply.value();
+                m_requestState = QStringLiteral("waiting_for_user");
+                Q_EMIT changed();
+            });
+}
+
+void MeoAccountBackend::openHostedAction(const QString &action)
+{
+    clearError();
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    const QDBusReply<bool> reply = broker.call(QStringLiteral("OpenHostedAction"), action);
+    if (!reply.isValid() || !reply.value()) {
+        setError(tr("The requested Meo Account page could not be opened."));
+        Q_EMIT changed();
+    }
+}
+
+void MeoAccountBackend::signOutAll()
+{
+    if (!m_signedIn || m_busy) return;
+    m_clientToRevokeAfterReauth.clear();
+    m_signOutAfterReauth = true;
+    requestAuthentication(QStringLiteral("reauthenticate"));
+}
+
+void MeoAccountBackend::revokeClient(const QString &clientId)
+{
+    if (!m_signedIn || m_busy || clientId.isEmpty() || clientId.size() > 128) return;
+    m_signOutAfterReauth = false;
+    m_clientToRevokeAfterReauth = clientId;
+    requestAuthentication(QStringLiteral("reauthenticate"));
+}
+
+void MeoAccountBackend::startSignOutOperation()
+{
+    clearError();
+    setBusy(true);
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("StartAccountOperation"),
+                         QStringLiteral("sign_out_all"), QVariantMap{}), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QString> reply = *completed;
+                completed->deleteLater();
+                if (!reply.isValid() || reply.value().isEmpty()) {
+                    setBusy(false);
+                    setError(tr("Meo Account could not sign out all applications on this device."));
+                    Q_EMIT changed();
+                    return;
+                }
+                m_activeRequestId = reply.value();
+            });
+}
+
+void MeoAccountBackend::startClientRevocation(const QString &clientId)
+{
+    clearError();
+    setBusy(true);
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("StartAccountOperation"),
+                         QStringLiteral("revoke_client"),
+                         QVariantMap{{QStringLiteral("clientId"), clientId}}), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QString> reply = *completed;
+                completed->deleteLater();
+                if (!reply.isValid() || reply.value().isEmpty()) {
+                    setBusy(false);
+                    setError(tr("The Meo application authorization could not be revoked."));
+                    Q_EMIT changed();
+                    return;
+                }
+                m_activeRequestId = reply.value();
+            });
+}
+
+void MeoAccountBackend::handleRequestChanged(const QString &requestId, const QString &state,
+                                             const QVariantMap &result)
+{
+    if (result.value(QStringLiteral("clientId")).toString() != settingsClientId()) return;
+    if (!m_activeRequestId.isEmpty() && requestId != m_activeRequestId) return;
+    m_activeRequestId = requestId;
+    m_requestState = state;
+    const QString requestError = result.value(QStringLiteral("error")).toString();
+    if (!requestError.isEmpty()) setError(requestError);
+    const bool terminal = state == QStringLiteral("completed")
+        || state == QStringLiteral("failed") || state == QStringLiteral("denied")
+        || state == QStringLiteral("expired");
+    if (terminal) setBusy(false);
+    if (state == QStringLiteral("completed")) {
+        if (m_signOutAfterReauth) {
+            m_signOutAfterReauth = false;
+            QMetaObject::invokeMethod(this, &MeoAccountBackend::startSignOutOperation,
+                                      Qt::QueuedConnection);
+        } else if (!m_clientToRevokeAfterReauth.isEmpty()) {
+            const QString clientId = m_clientToRevokeAfterReauth;
+            m_clientToRevokeAfterReauth.clear();
+            QMetaObject::invokeMethod(this, [this, clientId] {
+                startClientRevocation(clientId);
+            }, Qt::QueuedConnection);
+        } else {
+            refresh();
+        }
+    } else if (terminal) {
+        m_signOutAfterReauth = false;
+        m_clientToRevokeAfterReauth.clear();
+    }
+    Q_EMIT changed();
+}
+
+void MeoAccountBackend::setBusy(const bool busy)
+{
+    if (m_busy == busy) return;
+    m_busy = busy;
+    Q_EMIT changed();
+}
+
 void MeoAccountBackend::updateLauncherAvailability()
 {
     const QString nextLauncher = QStandardPaths::findExecutable(QStringLiteral("meo-account-settings"));
@@ -238,11 +396,21 @@ void MeoAccountBackend::applyUnavailableState()
 {
     const bool stateChanged = m_serviceRunning || m_signedIn || m_identityGranted || m_oauthConfigured
         || !m_cloudName.isEmpty() || !m_cloudId.isEmpty() || !m_cloudAvatarSource.isEmpty()
-        || available();
+        || available() || m_accountState != QStringLiteral("unavailable") || !m_clients.isEmpty()
+        || !m_sessions.isEmpty() || m_syncState != QStringLiteral("not_loaded")
+        || !m_syncError.isEmpty() || !m_lastSyncedAt.isEmpty() || m_mfaEnabled;
     m_serviceRunning = false;
     m_signedIn = false;
     m_identityGranted = false;
     m_oauthConfigured = false;
+    m_accountState = QStringLiteral("unavailable");
+    m_logoutEpoch = 0;
+    m_clients.clear();
+    m_sessions.clear();
+    m_mfaEnabled = false;
+    m_syncState = QStringLiteral("not_loaded");
+    m_syncError.clear();
+    m_lastSyncedAt.clear();
     m_cloudName.clear();
     m_cloudId.clear();
     m_cloudAvatarSource.clear();
@@ -256,6 +424,7 @@ void MeoAccountBackend::applyStatus(const QVariantMap &status, const QVariantMap
 {
     const bool nextSignedIn = status.value(QStringLiteral("signedIn")).toBool();
     const bool nextOauthConfigured = status.value(QStringLiteral("oauthConfigured")).toBool();
+    const QString nextState = safeText(status.value(QStringLiteral("state")), 64);
     const QString statusName = MeoAccountContract::safeProfileText(status.value(QStringLiteral("name")));
     const QString statusAvatar = MeoAccountContract::safeRemoteAvatarSource(status.value(QStringLiteral("avatarUrl")));
     const QString scopedId = MeoAccountContract::safeProfileText(identity.value(QStringLiteral("id")));
@@ -268,11 +437,13 @@ void MeoAccountBackend::applyStatus(const QVariantMap &status, const QVariantMap
     const bool stateChanged = !m_serviceRunning || m_signedIn != nextSignedIn
         || m_identityGranted != nextIdentityGranted || m_oauthConfigured != nextOauthConfigured
         || m_cloudName != nextName || m_cloudId != (nextIdentityGranted ? scopedId : QString())
-        || m_cloudAvatarSource != nextAvatar || !available();
+        || m_cloudAvatarSource != nextAvatar || m_accountState != nextState || !available();
     m_serviceRunning = true;
     m_signedIn = nextSignedIn;
     m_identityGranted = nextIdentityGranted;
     m_oauthConfigured = nextOauthConfigured;
+    m_accountState = nextState.isEmpty()
+        ? (nextSignedIn ? QStringLiteral("signed_in") : QStringLiteral("signed_out")) : nextState;
     m_cloudName = nextName;
     m_cloudId = nextIdentityGranted ? scopedId : QString();
     m_cloudAvatarSource = nextAvatar;
