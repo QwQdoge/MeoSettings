@@ -92,6 +92,12 @@ Item {
           "icon": "key", "tone": "tertiary", "route": "kcm:kcm_kwallet5",
           "enabled": KcmBridge.isAvailable("kcm_kwallet5"), "trailingKind": "choice", "trailingText": qsTr("Advanced") }
     ]
+    readonly property var aiRows: [
+        { "id": "ai-providers", "title": qsTr("AI connections"),
+          "subtitle": qsTr("Choose the encrypted Meo Account AI connection used for generated Pixel-style application icons"),
+          "icon": "auto_awesome", "tone": "primary", "trailingKind": "navigation",
+          "interactive": AccountBackend.serviceRunning }
+    ]
 
     function initials(name) {
         const parts = String(name || "").trim().split(/\s+/).filter(part => part.length > 0)
@@ -237,6 +243,14 @@ Item {
             subtitle: qsTr("These remain under their protected system owners and are not copied into Meo Account.")
             model: root.providerRows
             onRowActivated: (index, row) => { if (row.enabled) root.navigateTo(row.route) }
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("AI & application icons")
+            subtitle: qsTr("AI keys stay encrypted in Meo Account. Each future icon-generation request will show its provider, model, purpose and the app metadata sent before it runs.")
+            model: root.aiRows
+            onRowActivated: (index, row) => { if (row.interactive) AccountBackend.openHostedAction("ai_providers") }
         }
 
         MeoCard {

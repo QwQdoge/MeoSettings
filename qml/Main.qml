@@ -76,6 +76,7 @@ ApplicationWindow {
         case "notifications": return Qt.resolvedUrl("pages/NotificationsPage.qml")
         case "accounts": return Qt.resolvedUrl("pages/AccountsPage.qml")
         case "control-center": return Qt.resolvedUrl("pages/ControlCenterPage.qml")
+        case "desktop-integration": return Qt.resolvedUrl("pages/DesktopIntegrationPage.qml")
         case "storage": return Qt.resolvedUrl("pages/StoragePage.qml")
         case "updates": return Qt.resolvedUrl("pages/UpdatesPage.qml")
         case "about": return Qt.resolvedUrl("pages/AboutPage.qml")

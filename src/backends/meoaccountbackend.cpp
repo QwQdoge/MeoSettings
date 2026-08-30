@@ -8,10 +8,13 @@
 #include <QDBusReply>
 #include <QFileInfo>
 #include <QProcess>
+#include <QSet>
 #include <QStandardPaths>
 #include <QUrl>
+#include <QUuid>
 
 #include <algorithm>
+#include <utility>
 
 namespace
 {
@@ -137,6 +140,13 @@ QString MeoAccountBackend::syncState() const { return m_syncState; }
 QString MeoAccountBackend::syncError() const { return m_syncError; }
 QString MeoAccountBackend::lastSyncedAt() const { return m_lastSyncedAt; }
 QString MeoAccountBackend::requestState() const { return m_requestState; }
+bool MeoAccountBackend::aiBusy() const { return m_aiBusy; }
+QString MeoAccountBackend::aiState() const { return m_aiState; }
+QVariantList MeoAccountBackend::aiCredentials() const { return m_aiCredentials; }
+QVariantMap MeoAccountBackend::aiConsent() const { return m_aiConsent; }
+QString MeoAccountBackend::aiImageSource() const { return m_aiImageSource; }
+QString MeoAccountBackend::aiTargetDesktopId() const { return m_aiTargetDesktopId; }
+QString MeoAccountBackend::aiTargetApplicationName() const { return m_aiTargetApplicationName; }
 
 QString MeoAccountBackend::cloudName() const
 {
@@ -296,6 +306,253 @@ void MeoAccountBackend::revokeClient(const QString &clientId)
     requestAuthentication(QStringLiteral("reauthenticate"));
 }
 
+void MeoAccountBackend::refreshAiCredentials()
+{
+    if (!m_signedIn || m_aiBusy) return;
+    startAiOperation(QStringLiteral("list_ai_credentials"), {},
+                     QStringLiteral("loading_credentials"));
+}
+
+void MeoAccountBackend::prepareIconImage(const QString &desktopId,
+                                         const QString &applicationName,
+                                         const QString &credentialId,
+                                         const QString &model,
+                                         const QString &prompt)
+{
+    if (!m_signedIn || m_aiBusy) return;
+    const QString cleanDesktopId = desktopId.trimmed();
+    const QString cleanName = applicationName.trimmed();
+    const QString cleanCredential = credentialId.trimmed();
+    const QString cleanModel = model.trimmed();
+    const QString cleanPrompt = prompt.trimmed();
+    if (!isSafeText(cleanDesktopId, 512) || !isSafeText(cleanName, 256)
+        || QUuid(cleanCredential).isNull() || !isSafeText(cleanModel, 160)
+        || !isSafeText(cleanPrompt, 4000)) {
+        setError(tr("Choose one application, an AI connection, a model, and a valid prompt."));
+        Q_EMIT changed();
+        return;
+    }
+    m_aiBatchItems.clear();
+    m_aiBatchPrepared.clear();
+    m_aiBatchIndex = -1;
+    m_aiBatchPreparing = false;
+    m_aiBatchGenerating = false;
+    m_aiBatchDenying = false;
+    m_aiTargetDesktopId = cleanDesktopId;
+    m_aiTargetApplicationName = cleanName;
+    m_aiImageSource.clear();
+    m_aiConsent.clear();
+    m_pendingAiArguments = iconImageArguments(cleanDesktopId, cleanName, cleanCredential,
+                                              cleanModel, cleanPrompt);
+    startAiOperation(QStringLiteral("prepare_ai_image"), m_pendingAiArguments,
+                     QStringLiteral("preparing_consent"));
+}
+
+QVariantMap MeoAccountBackend::iconImageArguments(const QString &desktopId,
+                                                  const QString &applicationName,
+                                                  const QString &credentialId,
+                                                  const QString &model,
+                                                  const QString &prompt) const
+{
+    const QString requestPrompt = QStringLiteral(
+        "%1\n\nCreate exactly one desktop launcher icon for %2 (%3). Preserve its recognizable "
+        "brand silhouette, internal cuts, negative spaces, and key visual features. Use one "
+        "centered Pixel / Material You container with a unified wallpaper-derived Monet palette. "
+        "Use at most three foreground tonal layers and only mild Easel-like paper, crayon, or "
+        "watercolor texture. Keep the mark readable at 48 px. Transparent canvas. No words, "
+        "watermark, device mockup, screenshot, perspective, extra logo, second badge, or second "
+        "background plate.")
+                                      .arg(prompt, applicationName, desktopId);
+    return {
+        {QStringLiteral("credentialId"), credentialId},
+        {QStringLiteral("model"), model},
+        {QStringLiteral("userPrompt"), requestPrompt},
+        {QStringLiteral("imageSize"), QStringLiteral("1024x1024")},
+        {QStringLiteral("imageQuality"), QStringLiteral("provider_default")},
+        {QStringLiteral("imageBackground"), QStringLiteral("transparent")},
+    };
+}
+
+void MeoAccountBackend::prepareIconImageBatch(const QVariantList &applications,
+                                              const QString &credentialId,
+                                              const QString &model,
+                                              const QString &prompt)
+{
+    if (!m_signedIn || m_aiBusy) return;
+    const QString cleanCredential = credentialId.trimmed();
+    const QString cleanModel = model.trimmed();
+    const QString cleanPrompt = prompt.trimmed();
+    if (applications.isEmpty() || applications.size() > 128
+        || QUuid(cleanCredential).isNull() || !isSafeText(cleanModel, 160)
+        || !isSafeText(cleanPrompt, 4000)) {
+        setError(tr("Choose 1 to 128 applications, an AI connection, a model, and a valid prompt."));
+        Q_EMIT changed();
+        return;
+    }
+    QVariantList cleanApplications;
+    QSet<QString> ids;
+    for (const QVariant &value : applications) {
+        const QVariantMap item = value.toMap();
+        const QString id = item.value(QStringLiteral("desktopId")).toString().trimmed();
+        const QString name = item.value(QStringLiteral("name")).toString().trimmed();
+        if (!isSafeText(id, 512) || !isSafeText(name, 256) || ids.contains(id)) {
+            setError(tr("The AI icon batch contains an invalid or duplicate application."));
+            Q_EMIT changed();
+            return;
+        }
+        ids.insert(id);
+        cleanApplications.append(QVariantMap{
+            {QStringLiteral("desktopId"), id},
+            {QStringLiteral("name"), name},
+            {QStringLiteral("credentialId"), cleanCredential},
+            {QStringLiteral("model"), cleanModel},
+            {QStringLiteral("prompt"), cleanPrompt},
+        });
+    }
+    clearError();
+    m_aiBatchItems = cleanApplications;
+    m_aiBatchPrepared.clear();
+    m_aiBatchIndex = 0;
+    m_aiBatchPreparing = true;
+    m_aiBatchGenerating = false;
+    m_aiBatchDenying = false;
+    m_aiConsent.clear();
+    m_aiImageSource.clear();
+    prepareNextIconImageBatchItem();
+}
+
+void MeoAccountBackend::prepareNextIconImageBatchItem()
+{
+    if (!m_aiBatchPreparing || m_aiBusy || m_aiBatchIndex < 0
+        || m_aiBatchIndex >= m_aiBatchItems.size()) return;
+    const QVariantMap item = m_aiBatchItems.at(m_aiBatchIndex).toMap();
+    m_aiTargetDesktopId = item.value(QStringLiteral("desktopId")).toString();
+    m_aiTargetApplicationName = item.value(QStringLiteral("name")).toString();
+    m_pendingAiArguments = iconImageArguments(
+        m_aiTargetDesktopId, m_aiTargetApplicationName,
+        item.value(QStringLiteral("credentialId")).toString(),
+        item.value(QStringLiteral("model")).toString(),
+        item.value(QStringLiteral("prompt")).toString());
+    startAiOperation(QStringLiteral("prepare_ai_image"), m_pendingAiArguments,
+                     QStringLiteral("preparing_batch_consent"));
+}
+
+void MeoAccountBackend::startPreparedIconImageBatchItem(const QString &action,
+                                                        const QString &state)
+{
+    if (m_aiBusy || m_aiBatchIndex < 0 || m_aiBatchIndex >= m_aiBatchPrepared.size()) return;
+    const QVariantMap item = m_aiBatchPrepared.at(m_aiBatchIndex).toMap();
+    m_aiTargetDesktopId = item.value(QStringLiteral("desktopId")).toString();
+    m_aiTargetApplicationName = item.value(QStringLiteral("name")).toString();
+    m_pendingAiArguments = item.value(QStringLiteral("arguments")).toMap();
+    m_aiConsent = item.value(QStringLiteral("consent")).toMap();
+    QVariantMap arguments = m_pendingAiArguments;
+    arguments.insert(QStringLiteral("consent"), m_aiConsent);
+    startAiOperation(action, arguments, state);
+}
+
+void MeoAccountBackend::generatePreparedIconImageBatch()
+{
+    if (m_aiBusy || m_aiBatchPreparing || m_aiBatchPrepared.isEmpty()
+        || m_aiState != QLatin1String("batch_consent_ready")) return;
+    m_aiBatchGenerating = true;
+    m_aiBatchDenying = false;
+    m_aiBatchIndex = 0;
+    startPreparedIconImageBatchItem(QStringLiteral("generate_ai_image"),
+                                    QStringLiteral("generating_batch"));
+}
+
+void MeoAccountBackend::continuePreparedIconImageBatch()
+{
+    if (m_aiBusy || !m_aiBatchGenerating
+        || m_aiState != QLatin1String("batch_image_ready")) return;
+    m_aiImageSource.clear();
+    ++m_aiBatchIndex;
+    if (m_aiBatchIndex >= m_aiBatchPrepared.size()) {
+        m_aiBatchGenerating = false;
+        m_aiState = QStringLiteral("batch_ready");
+        m_aiConsent.clear();
+        m_pendingAiArguments.clear();
+        Q_EMIT changed();
+        return;
+    }
+    startPreparedIconImageBatchItem(QStringLiteral("generate_ai_image"),
+                                    QStringLiteral("generating_batch"));
+}
+
+void MeoAccountBackend::denyPreparedIconImageBatch()
+{
+    if (m_aiBusy || m_aiBatchPrepared.isEmpty()) return;
+    m_aiBatchPreparing = false;
+    m_aiBatchGenerating = false;
+    m_aiBatchDenying = true;
+    m_aiBatchIndex = 0;
+    startPreparedIconImageBatchItem(QStringLiteral("deny_ai_image"),
+                                    QStringLiteral("denying_batch"));
+}
+
+void MeoAccountBackend::generatePreparedIconImage()
+{
+    if (m_aiBusy || m_pendingAiArguments.isEmpty() || m_aiConsent.isEmpty()) return;
+    QVariantMap arguments = m_pendingAiArguments;
+    arguments.insert(QStringLiteral("consent"), m_aiConsent);
+    startAiOperation(QStringLiteral("generate_ai_image"), arguments,
+                     QStringLiteral("generating"));
+}
+
+void MeoAccountBackend::denyPreparedIconImage()
+{
+    if (m_aiBusy || m_pendingAiArguments.isEmpty() || m_aiConsent.isEmpty()) return;
+    QVariantMap arguments = m_pendingAiArguments;
+    arguments.insert(QStringLiteral("consent"), m_aiConsent);
+    startAiOperation(QStringLiteral("deny_ai_image"), arguments,
+                     QStringLiteral("denying"));
+}
+
+void MeoAccountBackend::clearGeneratedIconImage()
+{
+    if (m_aiBusy) return;
+    m_aiState = QStringLiteral("idle");
+    m_aiImageSource.clear();
+    m_aiTargetDesktopId.clear();
+    m_aiTargetApplicationName.clear();
+    m_aiConsent.clear();
+    m_pendingAiArguments.clear();
+    m_aiBatchItems.clear();
+    m_aiBatchPrepared.clear();
+    m_aiBatchIndex = -1;
+    m_aiBatchPreparing = false;
+    m_aiBatchGenerating = false;
+    m_aiBatchDenying = false;
+    Q_EMIT changed();
+}
+
+void MeoAccountBackend::startAiOperation(const QString &action,
+                                         const QVariantMap &arguments,
+                                         const QString &state)
+{
+    clearError();
+    m_aiBusy = true;
+    m_aiState = state;
+    Q_EMIT changed();
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("StartAccountOperation"), action, arguments), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QString> reply = *completed;
+                completed->deleteLater();
+                if (!reply.isValid() || reply.value().isEmpty()) {
+                    m_aiBusy = false;
+                    m_aiState = QStringLiteral("failed");
+                    setError(tr("The Meo Account AI broker could not start this request."));
+                    Q_EMIT changed();
+                    return;
+                }
+                m_activeAiRequestId = reply.value();
+            });
+}
+
 void MeoAccountBackend::startSignOutOperation()
 {
     clearError();
@@ -345,6 +602,105 @@ void MeoAccountBackend::handleRequestChanged(const QString &requestId, const QSt
                                              const QVariantMap &result)
 {
     if (result.value(QStringLiteral("clientId")).toString() != settingsClientId()) return;
+    const QString operation = result.value(QStringLiteral("operation")).toString();
+    if ((!m_activeAiRequestId.isEmpty() && requestId == m_activeAiRequestId)
+        || (m_aiBusy && operation.startsWith(QStringLiteral("ai_")))) {
+        if (m_activeAiRequestId.isEmpty()) m_activeAiRequestId = requestId;
+        m_aiState = state;
+        const QString requestError = result.value(QStringLiteral("error")).toString();
+        if (!requestError.isEmpty()) setError(requestError);
+        if (operation == QStringLiteral("ai_credentials")) {
+            m_aiCredentials = result.value(QStringLiteral("credentials")).toList();
+            m_aiState = QStringLiteral("credentials_ready");
+        } else if (operation == QStringLiteral("ai_image_consent")) {
+            const QVariantMap consent = result.value(QStringLiteral("consent")).toMap();
+            if (m_aiBatchPreparing) {
+                m_aiBatchPrepared.append(QVariantMap{
+                    {QStringLiteral("desktopId"), m_aiTargetDesktopId},
+                    {QStringLiteral("name"), m_aiTargetApplicationName},
+                    {QStringLiteral("arguments"), m_pendingAiArguments},
+                    {QStringLiteral("consent"), consent},
+                });
+                m_aiConsent.clear();
+                m_aiState = QStringLiteral("preparing_batch_consent");
+            } else {
+                m_aiConsent = consent;
+                m_aiState = QStringLiteral("consent_ready");
+            }
+        } else if (operation == QStringLiteral("ai_image_generated")) {
+            m_aiImageSource = result.value(QStringLiteral("imageSource")).toString();
+            if (m_aiImageSource.startsWith(QStringLiteral("data:image/"))) {
+                m_aiState = m_aiBatchGenerating
+                    ? QStringLiteral("batch_image_ready") : QStringLiteral("image_ready");
+            } else {
+                m_aiState = QStringLiteral("failed");
+            }
+        } else if (operation == QStringLiteral("ai_image_denied")) {
+            if (!m_aiBatchDenying) {
+                m_aiConsent.clear();
+                m_aiState = QStringLiteral("denied");
+            }
+        }
+        const bool terminal = state == QStringLiteral("completed")
+            || state == QStringLiteral("failed") || state == QStringLiteral("denied")
+            || state == QStringLiteral("expired");
+        if (terminal) {
+            m_aiBusy = false;
+            m_activeAiRequestId.clear();
+        }
+        if (terminal && m_aiBatchPreparing && operation == QLatin1String("ai_image_consent")) {
+            if (state != QLatin1String("completed")) {
+                m_aiBatchPreparing = false;
+                m_aiState = QStringLiteral("failed");
+            } else {
+                ++m_aiBatchIndex;
+                if (m_aiBatchIndex < m_aiBatchItems.size()) {
+                    QMetaObject::invokeMethod(this, &MeoAccountBackend::prepareNextIconImageBatchItem,
+                                              Qt::QueuedConnection);
+                } else {
+                    m_aiBatchPreparing = false;
+                    const QVariantMap first = m_aiBatchPrepared.first().toMap()
+                                                  .value(QStringLiteral("consent")).toMap();
+                    QVariantList names;
+                    qsizetype promptCharacters = 0;
+                    for (const QVariant &value : std::as_const(m_aiBatchPrepared)) {
+                        const QVariantMap item = value.toMap();
+                        names.append(item.value(QStringLiteral("name")));
+                        promptCharacters += item.value(QStringLiteral("consent")).toMap()
+                                                .value(QStringLiteral("promptCharacters")).toLongLong();
+                    }
+                    m_aiConsent = first;
+                    m_aiConsent.insert(QStringLiteral("requestId"),
+                                       QStringLiteral("batch:%1").arg(
+                                           QUuid::createUuid().toString(QUuid::WithoutBraces)));
+                    m_aiConsent.insert(QStringLiteral("itemCount"), m_aiBatchPrepared.size());
+                    m_aiConsent.insert(QStringLiteral("applications"), names);
+                    m_aiConsent.insert(QStringLiteral("promptCharacters"), promptCharacters);
+                    m_aiConsent.insert(QStringLiteral("stylePack"), QStringLiteral("easel-monet"));
+                    m_aiState = QStringLiteral("batch_consent_ready");
+                }
+            }
+        } else if (terminal && m_aiBatchDenying
+                   && operation == QLatin1String("ai_image_denied")) {
+            ++m_aiBatchIndex;
+            if (m_aiBatchIndex < m_aiBatchPrepared.size()) {
+                QMetaObject::invokeMethod(this, [this] {
+                    startPreparedIconImageBatchItem(QStringLiteral("deny_ai_image"),
+                                                    QStringLiteral("denying_batch"));
+                }, Qt::QueuedConnection);
+            } else {
+                m_aiBatchDenying = false;
+                m_aiBatchPrepared.clear();
+                m_aiBatchItems.clear();
+                m_aiBatchIndex = -1;
+                m_aiConsent.clear();
+                m_pendingAiArguments.clear();
+                m_aiState = QStringLiteral("denied");
+            }
+        }
+        Q_EMIT changed();
+        return;
+    }
     if (!m_activeRequestId.isEmpty() && requestId != m_activeRequestId) return;
     m_activeRequestId = requestId;
     m_requestState = state;

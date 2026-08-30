@@ -13,6 +13,7 @@ private Q_SLOTS:
     void readsOnlyActiveRepositorySections();
     void detectsChannelFromResolvedRepositoryOrder();
     void classifiesMeoKdeCustomAndSystemUpdates();
+    void parsesSharedOrchestratorState();
 };
 
 void UpdatesBackendTest::parsesNativeUpdateLine()
@@ -88,6 +89,18 @@ void UpdatesBackendTest::classifiesMeoKdeCustomAndSystemUpdates()
     QCOMPARE(SystemUpdatesContract::updateFamily(QStringLiteral("foreign-tool"), QString(),
                                                   {QStringLiteral("foreign-tool")}, configured),
              QStringLiteral("aur"));
+}
+
+void UpdatesBackendTest::parsesSharedOrchestratorState()
+{
+    const auto state = SystemUpdatesContract::parseSharedUpdateState(R"({
+        "schema":"org.meo.update-state","version":1,"count":2,
+        "checked_at":"2026-08-30T01:02:03+00:00",
+        "sources":{"pacman":1,"flatpak":1},"updates":[{},{}]
+    })");
+    QCOMPARE(state.value(QStringLiteral("count")).toInt(), 2);
+    QCOMPARE(state.value(QStringLiteral("sources")).toList().size(), 2);
+    QVERIFY(SystemUpdatesContract::parseSharedUpdateState(R"({"schema":"wrong"})").isEmpty());
 }
 
 QTEST_GUILESS_MAIN(UpdatesBackendTest)

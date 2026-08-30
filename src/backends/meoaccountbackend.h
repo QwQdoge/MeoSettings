@@ -42,6 +42,13 @@ class MeoAccountBackend final : public BackendBase
     Q_PROPERTY(QString cloudId READ cloudId NOTIFY changed)
     Q_PROPERTY(QString cloudAvatarSource READ cloudAvatarSource NOTIFY changed)
     Q_PROPERTY(QString summary READ summary NOTIFY changed)
+    Q_PROPERTY(bool aiBusy READ aiBusy NOTIFY changed)
+    Q_PROPERTY(QString aiState READ aiState NOTIFY changed)
+    Q_PROPERTY(QVariantList aiCredentials READ aiCredentials NOTIFY changed)
+    Q_PROPERTY(QVariantMap aiConsent READ aiConsent NOTIFY changed)
+    Q_PROPERTY(QString aiImageSource READ aiImageSource NOTIFY changed)
+    Q_PROPERTY(QString aiTargetDesktopId READ aiTargetDesktopId NOTIFY changed)
+    Q_PROPERTY(QString aiTargetApplicationName READ aiTargetApplicationName NOTIFY changed)
 
 public:
     explicit MeoAccountBackend(QObject *parent = nullptr);
@@ -65,6 +72,13 @@ public:
     QString cloudId() const;
     QString cloudAvatarSource() const;
     QString summary() const;
+    bool aiBusy() const;
+    QString aiState() const;
+    QVariantList aiCredentials() const;
+    QVariantMap aiConsent() const;
+    QString aiImageSource() const;
+    QString aiTargetDesktopId() const;
+    QString aiTargetApplicationName() const;
 
 public Q_SLOTS:
     /// Refreshes only the current session-bus broker status. It never starts
@@ -79,6 +93,20 @@ public:
     Q_INVOKABLE void openHostedAction(const QString &action);
     Q_INVOKABLE void signOutAll();
     Q_INVOKABLE void revokeClient(const QString &clientId);
+    Q_INVOKABLE void refreshAiCredentials();
+    Q_INVOKABLE void prepareIconImage(const QString &desktopId, const QString &applicationName,
+                                      const QString &credentialId, const QString &model,
+                                      const QString &prompt);
+    Q_INVOKABLE void generatePreparedIconImage();
+    Q_INVOKABLE void denyPreparedIconImage();
+    Q_INVOKABLE void clearGeneratedIconImage();
+    Q_INVOKABLE void prepareIconImageBatch(const QVariantList &applications,
+                                            const QString &credentialId,
+                                            const QString &model,
+                                            const QString &prompt);
+    Q_INVOKABLE void generatePreparedIconImageBatch();
+    Q_INVOKABLE void continuePreparedIconImageBatch();
+    Q_INVOKABLE void denyPreparedIconImageBatch();
 
 Q_SIGNALS:
     void changed();
@@ -90,6 +118,13 @@ private:
     void setBusy(bool busy);
     void startSignOutOperation();
     void startClientRevocation(const QString &clientId);
+    void startAiOperation(const QString &action, const QVariantMap &arguments,
+                          const QString &state);
+    QVariantMap iconImageArguments(const QString &desktopId, const QString &applicationName,
+                                   const QString &credentialId, const QString &model,
+                                   const QString &prompt) const;
+    void prepareNextIconImageBatchItem();
+    void startPreparedIconImageBatchItem(const QString &action, const QString &state);
 
 private Q_SLOTS:
     void handleRequestChanged(const QString &requestId, const QString &state,
@@ -115,6 +150,21 @@ private:
     QString m_cloudName;
     QString m_cloudId;
     QString m_cloudAvatarSource;
+    bool m_aiBusy = false;
+    QString m_aiState = QStringLiteral("idle");
+    QVariantList m_aiCredentials;
+    QVariantMap m_aiConsent;
+    QVariantMap m_pendingAiArguments;
+    QString m_aiImageSource;
+    QString m_aiTargetDesktopId;
+    QString m_aiTargetApplicationName;
+    QString m_activeAiRequestId;
+    QVariantList m_aiBatchItems;
+    QVariantList m_aiBatchPrepared;
+    int m_aiBatchIndex = -1;
+    bool m_aiBatchPreparing = false;
+    bool m_aiBatchGenerating = false;
+    bool m_aiBatchDenying = false;
     bool m_signOutAfterReauth = false;
     QString m_clientToRevokeAfterReauth;
 };

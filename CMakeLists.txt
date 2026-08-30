@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(MeoSettings VERSION 0.1.0 LANGUAGES CXX)
+project(MeoSettings VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 20)
@@ -72,6 +72,8 @@ qt_add_executable(meo-settings
     src/backends/bluetoothpairingagent.h
     src/backends/audiobackend.cpp
     src/backends/audiobackend.h
+    src/backends/applicationiconbackend.cpp
+    src/backends/applicationiconbackend.h
     src/backends/apppermissionsbackend.cpp
     src/backends/apppermissionsbackend.h
     src/backends/displaybackend.cpp
@@ -112,6 +114,7 @@ qt_add_qml_module(meo-settings
         qml/pages/PowerPage.qml
         qml/pages/AppearancePage.qml
         qml/pages/ControlCenterPage.qml
+        qml/pages/DesktopIntegrationPage.qml
         qml/pages/NotificationsPage.qml
         qml/pages/AccountsPage.qml
         qml/pages/PrivacyPage.qml
@@ -251,6 +254,16 @@ add_executable(meo-settings-dynamiccolorbackend-test
 )
 target_link_libraries(meo-settings-dynamiccolorbackend-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
 add_test(NAME meo-settings-dynamiccolorbackend COMMAND meo-settings-dynamiccolorbackend-test)
+
+add_executable(meo-settings-applicationiconbackend-test
+    tests/tst_applicationiconbackend.cpp
+    src/core/backendbase.cpp
+    src/core/backendbase.h
+    src/backends/applicationiconbackend.cpp
+    src/backends/applicationiconbackend.h
+)
+target_link_libraries(meo-settings-applicationiconbackend-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
+add_test(NAME meo-settings-applicationiconbackend COMMAND meo-settings-applicationiconbackend-test)
 
 add_executable(meo-settings-apppermissionsbackend-test
     tests/tst_apppermissionsbackend.cpp

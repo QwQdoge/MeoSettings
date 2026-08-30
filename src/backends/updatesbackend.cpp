@@ -6,6 +6,9 @@
 #include <QFileInfo>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTimer>
@@ -254,6 +257,40 @@ bool SystemUpdatesContract::isCustomRepository(const QString &repository)
         && !isMeoRepository(repository);
 }
 
+QVariantMap SystemUpdatesContract::parseSharedUpdateState(const QByteArray &payload)
+{
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        return {};
+    }
+    const QJsonObject object = document.object();
+    if (object.value(QStringLiteral("schema")).toString() != QLatin1String("org.meo.update-state")
+        || object.value(QStringLiteral("version")).toInt() != 1
+        || !object.value(QStringLiteral("sources")).isObject()
+        || !object.value(QStringLiteral("updates")).isArray()) {
+        return {};
+    }
+    const int count = object.value(QStringLiteral("count")).toInt(-1);
+    if (count < 0 || count != object.value(QStringLiteral("updates")).toArray().size()) {
+        return {};
+    }
+    QVariantList sources;
+    const QJsonObject sourceCounts = object.value(QStringLiteral("sources")).toObject();
+    for (auto iterator = sourceCounts.constBegin(); iterator != sourceCounts.constEnd(); ++iterator) {
+        const QString sourceId = safeText(iterator.key(), 128);
+        const int sourceCount = iterator.value().toInt(-1);
+        if (sourceId.isEmpty() || sourceCount < 0) {
+            return {};
+        }
+        sources.push_back(QVariantMap{{QStringLiteral("id"), sourceId},
+                                      {QStringLiteral("count"), sourceCount}});
+    }
+    return {{QStringLiteral("count"), count},
+            {QStringLiteral("checkedAt"), safeText(object.value(QStringLiteral("checked_at")).toString(), 128)},
+            {QStringLiteral("sources"), sources}};
+}
+
 UpdatesBackend::UpdatesBackend(QObject *parent)
     : BackendBase(parent)
     , m_process(new QProcess(this))
@@ -323,6 +360,10 @@ int UpdatesBackend::aurUpdateCount() const { return m_aurUpdates.size(); }
 bool UpdatesBackend::pacmanAvailable() const { return !m_pacmanPath.isEmpty(); }
 bool UpdatesBackend::aurHelperAvailable() const { return !m_aurHelperPath.isEmpty(); }
 bool UpdatesBackend::checkingAur() const { return m_checkingAur; }
+bool UpdatesBackend::orchestratorAvailable() const { return !m_orchestratorPath.isEmpty(); }
+int UpdatesBackend::orchestratedUpdateCount() const { return m_orchestratedUpdateCount; }
+QString UpdatesBackend::orchestratorCheckedAt() const { return m_orchestratorCheckedAt; }
+QVariantList UpdatesBackend::orchestratorSources() const { return m_orchestratorSources; }
 
 void UpdatesBackend::refresh()
 {
@@ -345,7 +386,14 @@ void UpdatesBackend::refresh()
     m_kdeUpdateCount = 0;
     m_systemUpdateCount = 0;
     m_customRepositoryUpdateCount = 0;
+    m_orchestratedUpdateCount = 0;
+    m_orchestratorCheckedAt.clear();
+    m_orchestratorSources.clear();
     setAvailable(true);
+    if (orchestratorAvailable()) {
+        startStage(Stage::SharedState, m_orchestratorPath, {QStringLiteral("status")});
+        return;
+    }
     // pacman-conf is pacman's own parser, including Include files.  Keep the
     // old header-only reader solely as a safe fallback for minimal systems.
     if (!m_pacmanConfPath.isEmpty()) {
@@ -381,12 +429,15 @@ void UpdatesBackend::updateRuntimeAvailability()
     const QString paru = QStandardPaths::findExecutable(QStringLiteral("paru"));
     const QString yay = QStandardPaths::findExecutable(QStringLiteral("yay"));
     const QString aurHelper = !paru.isEmpty() ? paru : yay;
-    if (m_pacmanPath == pacman && m_pacmanConfPath == pacmanConf && m_aurHelperPath == aurHelper) {
+    const QString orchestrator = QStandardPaths::findExecutable(QStringLiteral("meo-update"));
+    if (m_pacmanPath == pacman && m_pacmanConfPath == pacmanConf && m_aurHelperPath == aurHelper
+        && m_orchestratorPath == orchestrator) {
         return;
     }
     m_pacmanPath = pacman;
     m_pacmanConfPath = pacmanConf;
     m_aurHelperPath = aurHelper;
+    m_orchestratorPath = orchestrator;
     Q_EMIT changed();
 }
 
@@ -471,6 +522,25 @@ void UpdatesBackend::finishStage(const int exitCode, const QProcess::ExitStatus 
     }
 
     const QByteArray output = m_standardOutput;
+    if (m_stage == Stage::SharedState) {
+        if (exitCode == 0) {
+            const QVariantMap shared = SystemUpdatesContract::parseSharedUpdateState(output);
+            if (!shared.isEmpty()) {
+                m_orchestratedUpdateCount = shared.value(QStringLiteral("count")).toInt();
+                m_orchestratorCheckedAt = shared.value(QStringLiteral("checkedAt")).toString();
+                m_orchestratorSources = shared.value(QStringLiteral("sources")).toList();
+                Q_EMIT changed();
+            }
+        }
+        if (!m_pacmanConfPath.isEmpty()) {
+            startStage(Stage::ConfiguredRepositories, m_pacmanConfPath,
+                       {QStringLiteral("--repo-list")});
+        } else {
+            updateConfiguredRepositories();
+            startStage(Stage::NativeUpdates, m_pacmanPath, {QStringLiteral("-Qu")});
+        }
+        return;
+    }
     if (m_stage == Stage::ConfiguredRepositories) {
         if (exitCode != 0) {
             // This fallback does not modify configuration; it only preserves

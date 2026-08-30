@@ -1,4 +1,5 @@
 #include "backends/audiobackend.h"
+#include "backends/applicationiconbackend.h"
 #include "backends/apppermissionsbackend.h"
 #include "backends/bluetoothbackend.h"
 #include "backends/controlcenterbackend.h"
@@ -77,6 +78,7 @@ int main(int argc, char *argv[])
     NetworkBackend networkBackend;
     BluetoothBackend bluetoothBackend;
     AudioBackend audioBackend;
+    ApplicationIconBackend applicationIconBackend;
     AppPermissionsBackend appPermissionsBackend;
     DisplayBackend displayBackend;
     DynamicColorBackend dynamicColorBackend;
@@ -114,6 +116,7 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("NetworkBackend"), &networkBackend);
     context->setContextProperty(QStringLiteral("BluetoothBackend"), &bluetoothBackend);
     context->setContextProperty(QStringLiteral("AudioBackend"), &audioBackend);
+    context->setContextProperty(QStringLiteral("ApplicationIconBackend"), &applicationIconBackend);
     context->setContextProperty(QStringLiteral("AppPermissionsBackend"), &appPermissionsBackend);
     context->setContextProperty(QStringLiteral("DisplayBackend"), &displayBackend);
     context->setContextProperty(QStringLiteral("DynamicColorBackend"), &dynamicColorBackend);
@@ -200,6 +203,7 @@ int main(int argc, char *argv[])
             QStringLiteral("category:apps"),
             QStringLiteral("notifications"),
             QStringLiteral("control-center"),
+            QStringLiteral("desktop-integration"),
             QStringLiteral("kcm:kcm_componentchooser"),
             QStringLiteral("category:accounts"),
             QStringLiteral("accounts"),

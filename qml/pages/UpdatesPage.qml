@@ -164,6 +164,20 @@ Item {
 
                 MeoText {
                     width: parent.width
+                    visible: UpdatesBackend.orchestratorAvailable
+                    text: UpdatesBackend.orchestratorCheckedAt !== ""
+                          ? qsTr("Unified background status: %1 resource package(s), checked %2")
+                                .arg(UpdatesBackend.orchestratedUpdateCount)
+                                .arg(UpdatesBackend.orchestratorCheckedAt)
+                          : qsTr("Unified updater is installed; no background snapshot is available yet.")
+                    typeRole: "body"
+                    typeSize: "small"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+
+                MeoText {
+                    width: parent.width
                     text: UpdatesBackend.updateChannel === "beta"
                           ? qsTr("Meo update channel: Beta — meo-beta overlays stable Meo packages.")
                           : (UpdatesBackend.updateChannel === "stable"
@@ -187,7 +201,7 @@ Item {
 
                 Flow {
                     width: parent.width
-                    implicitHeight: childrenRect.height
+                    height: childrenRect.height
                     spacing: 8 * MeoTheme.globalScale
                     MeoButton {
                         text: qsTr("Refresh local metadata")

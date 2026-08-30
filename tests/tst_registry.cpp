@@ -21,6 +21,7 @@ private Q_SLOTS:
     void resolvesKcmRoutes();
     void exposesStorageAndSafetyMetadata();
     void exposesNativeAccountAndUpdateRoutes();
+    void exposesCompleteAppearanceAndIntegrationRoutes();
     void unknownEntryIsEmpty();
 };
 
@@ -217,6 +218,36 @@ void SettingsRegistryTest::exposesNativeAccountAndUpdateRoutes()
     const auto advancedUpdater = registry.entry(QStringLiteral("kcm:kcm_updates"));
     QCOMPARE(advancedUpdater.value(QStringLiteral("id")).toString(), QStringLiteral("system-updates-advanced"));
     QVERIFY(!advancedUpdater.value(QStringLiteral("direct")).toBool());
+}
+
+void SettingsRegistryTest::exposesCompleteAppearanceAndIntegrationRoutes()
+{
+    SettingsRegistry registry;
+    const QStringList appearanceEntries{
+        QStringLiteral("application-style"),
+        QStringLiteral("plasma-style"),
+        QStringLiteral("cursors"),
+        QStringLiteral("window-decorations"),
+        QStringLiteral("welcome-screen"),
+        QStringLiteral("sound-theme"),
+    };
+    for (const auto &id : appearanceEntries) {
+        const auto entry = registry.entry(id);
+        QVERIFY2(!entry.isEmpty(), qPrintable(id));
+        QCOMPARE(entry.value(QStringLiteral("categoryId")).toString(), QStringLiteral("personalization"));
+        QCOMPARE(entry.value(QStringLiteral("authority")).toString(), QStringLiteral("kde"));
+    }
+
+    const auto integration = registry.entry(QStringLiteral("desktop-integration"));
+    QCOMPARE(integration.value(QStringLiteral("route")).toString(), QStringLiteral("desktop-integration"));
+    QCOMPARE(integration.value(QStringLiteral("pageKind")).toString(), QStringLiteral("inspector"));
+    QCOMPARE(integration.value(QStringLiteral("risk")).toString(), QStringLiteral("read-only"));
+    QVERIFY(integration.value(QStringLiteral("direct")).toBool());
+
+    const auto kdeSearch = registry.search(QStringLiteral("kde service connection"));
+    QVERIFY(std::any_of(kdeSearch.cbegin(), kdeSearch.cend(), [](const QVariant &item) {
+        return item.toMap().value(QStringLiteral("id")).toString() == QStringLiteral("desktop-integration");
+    }));
 }
 
 void SettingsRegistryTest::unknownEntryIsEmpty()

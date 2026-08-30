@@ -27,6 +27,7 @@ public:
                                 const QStringList &foreignPackages,
                                 const QStringList &configuredRepositories);
     static bool isCustomRepository(const QString &repository);
+    static QVariantMap parseSharedUpdateState(const QByteArray &payload);
 };
 
 /**
@@ -57,6 +58,10 @@ class UpdatesBackend final : public BackendBase
     Q_PROPERTY(bool pacmanAvailable READ pacmanAvailable NOTIFY changed)
     Q_PROPERTY(bool aurHelperAvailable READ aurHelperAvailable NOTIFY changed)
     Q_PROPERTY(bool checkingAur READ checkingAur NOTIFY changed)
+    Q_PROPERTY(bool orchestratorAvailable READ orchestratorAvailable NOTIFY changed)
+    Q_PROPERTY(int orchestratedUpdateCount READ orchestratedUpdateCount NOTIFY changed)
+    Q_PROPERTY(QString orchestratorCheckedAt READ orchestratorCheckedAt NOTIFY changed)
+    Q_PROPERTY(QVariantList orchestratorSources READ orchestratorSources NOTIFY changed)
 
 public:
     explicit UpdatesBackend(QObject *parent = nullptr);
@@ -77,6 +82,10 @@ public:
     bool pacmanAvailable() const;
     bool aurHelperAvailable() const;
     bool checkingAur() const;
+    bool orchestratorAvailable() const;
+    int orchestratedUpdateCount() const;
+    QString orchestratorCheckedAt() const;
+    QVariantList orchestratorSources() const;
 
     /// Reads the local package and sync databases only.
     Q_INVOKABLE void refresh();
@@ -91,6 +100,7 @@ Q_SIGNALS:
 private:
     enum class Stage {
         Idle,
+        SharedState,
         ConfiguredRepositories,
         NativeUpdates,
         ForeignPackages,
@@ -119,6 +129,7 @@ private:
     QString m_pacmanPath;
     QString m_pacmanConfPath;
     QString m_aurHelperPath;
+    QString m_orchestratorPath;
     Stage m_stage = Stage::Idle;
     bool m_operationActive = false;
     bool m_checkingAur = false;
@@ -135,4 +146,7 @@ private:
     int m_kdeUpdateCount = 0;
     int m_systemUpdateCount = 0;
     int m_customRepositoryUpdateCount = 0;
+    int m_orchestratedUpdateCount = 0;
+    QString m_orchestratorCheckedAt;
+    QVariantList m_orchestratorSources;
 };
