@@ -139,6 +139,20 @@ Item {
     }
 
     readonly property var systemRows: [{
+        "title": qsTr("System health"),
+        "subtitle": SystemTransactionBackend.serviceAvailable
+                    ? qsTr("Recovery-aware transactions are ready")
+                    : qsTr("Transaction protection needs attention"),
+        "icon": SystemTransactionBackend.serviceAvailable ? "health_and_safety" : "warning",
+        "tone": SystemTransactionBackend.serviceAvailable ? "primary" : "tertiary",
+        "route": "recovery", "trailingKind": "navigation"
+    },
+    {
+        "title": qsTr("Hardware & drivers"),
+        "subtitle": HardwareCapabilities.summary,
+        "icon": "memory", "tone": "primary", "route": "hardware", "trailingKind": "navigation"
+    },
+    {
         "title": qsTr("Storage"),
         "subtitle": root.storageSummary(),
         "icon": "storage", "tone": "secondary", "route": "storage", "trailingKind": "navigation"
@@ -262,6 +276,40 @@ Item {
             subtitle: ""
             model: root.systemRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
+        }
+
+        MeoCard {
+            width: parent.width
+            visible: !root.searching
+            type: "outlined"
+
+            Column {
+                width: parent.width
+                spacing: 10 * MeoTheme.globalScale
+                MeoText {
+                    text: qsTr("Welcome to Meo")
+                    typeRole: "title"
+                    typeSize: "small"
+                    emphasized: true
+                }
+                MeoText {
+                    width: parent.width
+                    text: WelcomeBackend.launcherAvailable
+                          ? qsTr("Reopen the six-step first-login guide at any time.")
+                          : qsTr("Meo Welcome is not installed on this system.")
+                    typeRole: "body"
+                    typeSize: "small"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+                MeoButton {
+                    text: qsTr("Open Meo Welcome")
+                    type: "outlined"
+                    enabled: WelcomeBackend.launcherAvailable
+                    Accessible.description: qsTr("Opens the independent first-login guide without changing its completion state")
+                    onClicked: WelcomeBackend.open()
+                }
+            }
         }
     }
 }

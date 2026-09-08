@@ -327,6 +327,40 @@ void NetworkBackend::disconnectCurrent()
             });
 }
 
+void NetworkBackend::forgetNetwork(const QString &ssid)
+{
+    clearError();
+    if (ssid.isEmpty()) {
+        return;
+    }
+    if (busy()) {
+        setError(tr("Another network operation is still in progress."));
+        return;
+    }
+
+    // Deliberately resolve only an existing NetworkManager profile.  The UI
+    // never deletes a visible access point or writes a credential itself.
+    const auto saved = savedConnectionForSsid(ssid);
+    if (!saved) {
+        setError(tr("This saved Wi-Fi network is no longer available."));
+        return;
+    }
+
+    setBusy(true);
+    const auto reply = saved->remove();
+    auto *watcher = new QDBusPendingCallWatcher(reply, this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this, watcher](QDBusPendingCallWatcher *) {
+                const QDBusPendingReply<> result = *watcher;
+                if (result.isError()) {
+                    setError(result.error().message());
+                }
+                setBusy(false);
+                publishChanged();
+                watcher->deleteLater();
+            });
+}
+
 void NetworkBackend::refreshDevice()
 {
     const auto nextDevice = firstWirelessDevice();

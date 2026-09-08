@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Displays
+Comment=Manage displays in Meo Settings
+Exec=meo-settings --route display
+Icon=video-display
+Categories=Settings;Qt;KDE;
+StartupNotify=true
+NoDisplay=true

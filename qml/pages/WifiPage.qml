@@ -151,6 +151,19 @@ Item {
                                         + qsTr(" · %1%").arg(modelData.strength)
                         leadingIcon: modelData.connected ? "wifi" : (modelData.secured ? "wifi_lock" : "wifi")
                         enabled: !NetworkBackend.busy
+                        trailingComponent: Component {
+                            MeoIconButton {
+                                visible: modelData.saved && !modelData.connected
+                                icon.name: "delete"
+                                type: "standard"
+                                size: "s"
+                                Accessible.name: qsTr("Forget %1").arg(modelData.ssid)
+                                onClicked: {
+                                    forgetPrompt.ssid = modelData.ssid
+                                    forgetPrompt.open()
+                                }
+                            }
+                        }
                         onClicked: root.activateNetwork(modelData)
                     }
                 }
@@ -246,6 +259,56 @@ Item {
                     text: qsTr("Cancel")
                     type: "text"
                     onClicked: passwordPrompt.close()
+                }
+            }
+        }
+    }
+
+    MeoMotionPopup {
+        id: forgetPrompt
+        property string ssid: ""
+        parent: Overlay.overlay
+        presentation: MeoMotionPopup.Dialog
+        width: Math.min(parent ? parent.width - 48 * MeoTheme.globalScale : 440 * MeoTheme.globalScale,
+                        440 * MeoTheme.globalScale)
+        padding: 24 * MeoTheme.globalScale
+        x: parent ? Math.max(viewportMargin, (parent.width - width) / 2) : 0
+        y: parent ? Math.max(viewportMargin, (parent.height - height) / 2) : 0
+
+        contentItem: Column {
+            spacing: 16 * MeoTheme.globalScale
+
+            MeoText {
+                width: parent.width
+                text: qsTr("Forget this network?")
+                typeRole: "title"
+                typeSize: "small"
+                emphasized: true
+                color: MeoTheme.contentOnSurface
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("NetworkManager will remove the saved profile and credentials for %1.").arg(forgetPrompt.ssid)
+                typeRole: "body"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
+            }
+            Flow {
+                width: parent.width
+                spacing: 8 * MeoTheme.globalScale
+                MeoButton {
+                    text: qsTr("Forget network")
+                    type: "filled"
+                    onClicked: {
+                        NetworkBackend.forgetNetwork(forgetPrompt.ssid)
+                        forgetPrompt.close()
+                    }
+                }
+                MeoButton {
+                    text: qsTr("Cancel")
+                    type: "text"
+                    onClicked: forgetPrompt.close()
                 }
             }
         }

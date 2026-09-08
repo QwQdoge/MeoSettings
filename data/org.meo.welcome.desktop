@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome to Meo
+Comment=Set up your MeoArch experience
+Exec=meo-welcome
+Icon=meoarch-logo
+Categories=Settings;Qt;KDE;
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=2
+X-systemd-skip=true
+NoDisplay=true

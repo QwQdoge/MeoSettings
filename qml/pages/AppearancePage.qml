@@ -15,7 +15,7 @@ Item {
         switch (source) {
         case "wallpaper": return qsTr("Wallpaper")
         case "manual": return qsTr("Manual color")
-        default: return qsTr("KDE accent")
+        default: return qsTr("System accent")
         }
     }
 
@@ -26,7 +26,7 @@ Item {
         case "manual":
             return qsTr("Use a selected seed color, then generate one complete MD3 scheme")
         default:
-            return qsTr("Use KDE’s active accent, then generate one complete MD3 scheme")
+            return qsTr("Use the active system accent, then generate one complete MD3 scheme")
         }
     }
 
@@ -94,9 +94,9 @@ Item {
             "id": "dynamic-color",
             "title": qsTr("Dynamic color"),
             "subtitle": MeoShellTheme.ready
-                        ? qsTr("Complete Material colors are supplied by the active KDE session from %1")
+                        ? qsTr("Complete Material colors are supplied by the active desktop session from %1")
                               .arg(root.dynamicSourceTitle(MeoTheme.dynamicColorSourceId))
-                        : qsTr("The active KDE session has not supplied a complete dynamic color scheme"),
+                        : qsTr("The active desktop session has not supplied a complete dynamic color scheme"),
             "icon": "colors",
             "tone": "tertiary",
             "trailingKind": "choice",
@@ -107,7 +107,7 @@ Item {
         },
         {
             "title": qsTr("System appearance"),
-            "subtitle": qsTr("%1 mode from the KDE session").arg(root.appearanceMode),
+            "subtitle": qsTr("%1 mode from the active desktop session").arg(root.appearanceMode),
             "icon": MeoTheme.isDarkMode ? "dark_mode" : "light_mode",
             "tone": "primary",
             "trailingKind": "status",
@@ -183,16 +183,15 @@ Item {
         }
     ]
 
-    // Keep every supported Plasma 6 appearance surface discoverable here.
-    // Meo owns the shared dynamic palette and application-icon workflow;
-    // specialized KDE modules retain authority for their mature theme editors.
+    // Meo owns the daily appearance workflow.  Specialized, platform-owned
+    // editors remain available as an explicit compatibility escape hatch.
     readonly property var kdeAppearanceRows: [
-        root.moduleRow("kcm_lookandfeel", qsTr("Global theme"), qsTr("Apply a complete KDE look-and-feel package"), "palette"),
-        root.moduleRow("kcm_colors", qsTr("Color scheme & contrast"), qsTr("Inspect installed color schemes and compatibility colors"), "contrast"),
+        root.moduleRow("kcm_lookandfeel", qsTr("Global theme"), qsTr("Apply a complete platform look-and-feel package"), "palette"),
+        root.moduleRow("kcm_colors", qsTr("Color scheme & contrast"), qsTr("Inspect installed platform color schemes and compatibility colors"), "contrast"),
         root.moduleRow("kcm_wallpaper", qsTr("Wallpaper"), qsTr("Desktop backgrounds, positioning, slideshows, and plugins"), "wallpaper"),
         root.moduleRow("kcm_style", qsTr("Application style"), qsTr("Widget style, toolbar labels, and application behavior"), "web_asset"),
         root.moduleRow("kcm_desktoptheme", qsTr("Plasma style"), qsTr("Panel, widget, popup, and notification appearance"), "dashboard"),
-        root.moduleRow("kcm_icons", qsTr("System icon theme"), qsTr("Installed KDE icon themes for apps and the workspace"), "apps"),
+        root.moduleRow("kcm_icons", qsTr("System icon theme"), qsTr("Installed platform icon themes for apps and the workspace"), "apps"),
         root.moduleRow("kcm_cursortheme", qsTr("Cursors"), qsTr("Pointer theme, size, and animation"), "mouse"),
         root.moduleRow("kcm_fonts", qsTr("Fonts"), qsTr("Font families, rendering, hinting, and system-wide sizing"), "format_size"),
         root.moduleRow("kcm_kwindecoration", qsTr("Window decorations"), qsTr("Title bars, borders, buttons, and decoration themes"), "select_window"),
@@ -208,7 +207,7 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : qsTr("Appearance")
-        subtitle: qsTr("Choose a wallpaper, KDE accent, or manual seed once; Meo generates one shared HCT/Material scheme for every Meo surface.")
+        subtitle: qsTr("Choose a wallpaper, system accent, or manual seed once; Meo generates one shared HCT/Material scheme for every Meo surface.")
 
         MeoSettingsGroup {
             width: parent.width
@@ -224,7 +223,7 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Meo appearance")
-            subtitle: qsTr("A source selection is explicit and confirmation-gated. Broader KDE compatibility controls remain available when their workflow is more complex.")
+            subtitle: qsTr("A source selection is explicit and confirmation-gated. Meo applies one shared appearance language across the desktop.")
             model: root.meoConfigurationRows
             onRowActivated: (index, row) => {
                 if (row.id === "dynamic-color-source")
@@ -244,8 +243,8 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
-            title: qsTr("KDE desktop details")
-            subtitle: qsTr("Every installed Plasma 6 appearance editor stays connected to Meo Settings. Changes made there are read back by the shared Meo dynamic-color bridge.")
+            title: qsTr("Advanced compatibility")
+            subtitle: qsTr("Use these only when a specialized system editor is required. Meo reads the resulting appearance state back into its shared color bridge.")
             model: root.kdeAppearanceRows
             onRowActivated: (index, row) => {
                 if (row.enabled && row.route)

@@ -79,6 +79,9 @@ ApplicationWindow {
         case "desktop-integration": return Qt.resolvedUrl("pages/DesktopIntegrationPage.qml")
         case "storage": return Qt.resolvedUrl("pages/StoragePage.qml")
         case "updates": return Qt.resolvedUrl("pages/UpdatesPage.qml")
+        case "hardware": return Qt.resolvedUrl("pages/HardwarePage.qml")
+        case "recovery": return Qt.resolvedUrl("pages/RecoveryPage.qml")
+        case "system-center": return Qt.resolvedUrl("pages/SystemCenterPage.qml")
         case "about": return Qt.resolvedUrl("pages/AboutPage.qml")
         default:
             return route.startsWith("kcm:")

@@ -33,6 +33,7 @@ public:
     Q_INVOKABLE void requestScan();
     Q_INVOKABLE void connectNetwork(const QString &ssid, const QString &password = {}, bool persist = true);
     Q_INVOKABLE void disconnectCurrent();
+    Q_INVOKABLE void forgetNetwork(const QString &ssid);
 
 Q_SIGNALS:
     void changed();

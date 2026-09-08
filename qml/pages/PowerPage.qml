@@ -80,6 +80,16 @@ Item {
         "actionText": qsTr("Lock")
     }]
 
+    readonly property var scheduledLogoutRows: [{
+        "id": "schedule-logout",
+        "title": qsTr("Sign out in 30 seconds"),
+        "subtitle": qsTr("Shows a countdown notification. You can cancel or sign out immediately."),
+        "icon": "logout",
+        "tone": "tertiary",
+        "trailingKind": "action",
+        "actionText": qsTr("Schedule")
+    }]
+
     MeoPageLayout {
         id: page
         anchors.fill: parent
@@ -147,6 +157,92 @@ Item {
             title: qsTr("Battery")
             subtitle: qsTr("Live primary-battery state from the device service")
             model: root.batteryRows
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: !SessionActions.scheduled
+            title: qsTr("Session exit")
+            subtitle: qsTr("A deliberate session-only action; it does not shut down the computer")
+            model: root.scheduledLogoutRows
+            onRowActionTriggered: (index, row) => {
+                if (row.id === "schedule-logout")
+                    SessionActions.scheduleLogout(30)
+            }
+        }
+
+        MeoCard {
+            width: parent.width
+            visible: SessionActions.scheduled
+            type: "outlined"
+
+            Column {
+                width: parent.width
+                spacing: 12 * MeoTheme.globalScale
+
+                Row {
+                    width: parent.width
+                    spacing: 12 * MeoTheme.globalScale
+                    MeoIcon { icon: "logout"; size: 24; color: MeoTheme.tertiary }
+                    MeoText {
+                        width: parent.width - 36 * MeoTheme.globalScale
+                        text: qsTr("Signing out in %1 seconds").arg(SessionActions.remainingSeconds)
+                        typeRole: "title"
+                        typeSize: "medium"
+                        wrapMode: Text.WordWrap
+                    }
+                }
+
+                MeoProgressBar {
+                    width: parent.width
+                    value: Math.max(0, Math.min(1, SessionActions.remainingSeconds / 30))
+                    type: "linear"
+                    Accessible.name: qsTr("Sign-out countdown")
+                }
+
+                MeoText {
+                    width: parent.width
+                    text: qsTr("Your applications may still ask you to save work before the session closes.")
+                    typeRole: "body"
+                    typeSize: "medium"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+
+                Row {
+                    spacing: 8 * MeoTheme.globalScale
+                    MeoButton {
+                        text: qsTr("Cancel")
+                        type: "tonal"
+                        onClicked: SessionActions.cancel()
+                    }
+                    MeoButton {
+                        text: qsTr("Sign out now")
+                        type: "filled"
+                        icon.name: "logout"
+                        onClicked: SessionActions.executeNow()
+                    }
+                }
+            }
+        }
+
+        MeoCard {
+            width: parent.width
+            visible: !SessionActions.available && SessionActions.error !== ""
+            type: "outlined"
+            Row {
+                width: parent.width
+                spacing: 12 * MeoTheme.globalScale
+                MeoIcon { icon: "info"; size: 24; color: MeoTheme.primary }
+                MeoText {
+                    width: parent.width - 36 * MeoTheme.globalScale
+                    text: qsTr("Scheduled sign-out is unavailable: %1").arg(SessionActions.error)
+                    typeRole: "body"
+                    typeSize: "medium"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+            }
         }
 
         MeoSettingsGroup {

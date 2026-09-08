@@ -78,6 +78,20 @@ qt_add_executable(meo-settings
     src/backends/apppermissionsbackend.h
     src/backends/displaybackend.cpp
     src/backends/displaybackend.h
+    src/backends/hardwarecapabilityregistry.cpp
+    src/backends/hardwarecapabilityregistry.h
+    src/backends/loginauthbackend.cpp
+    src/backends/loginauthbackend.h
+    src/backends/recoverybackend.cpp
+    src/backends/recoverybackend.h
+    src/backends/configbackend.cpp
+    src/backends/configbackend.h
+    src/backends/fingerprintbackend.cpp
+    src/backends/fingerprintbackend.h
+    src/backends/documentationprovider.cpp
+    src/backends/documentationprovider.h
+    src/backends/systemtransactionbackend.cpp
+    src/backends/systemtransactionbackend.h
     src/backends/dynamiccolorbackend.cpp
     src/backends/dynamiccolorbackend.h
     src/backends/meoaccountbackend.cpp
@@ -98,6 +112,8 @@ qt_add_executable(meo-settings
     src/backends/controlcenterbackend.h
     src/backends/kcmbridge.cpp
     src/backends/kcmbridge.h
+    src/backends/welcomebackend.cpp
+    src/backends/welcomebackend.h
 )
 
 qt_add_qml_module(meo-settings
@@ -120,8 +136,23 @@ qt_add_qml_module(meo-settings
         qml/pages/PrivacyPage.qml
         qml/pages/StoragePage.qml
         qml/pages/UpdatesPage.qml
+        qml/pages/HardwarePage.qml
+        qml/pages/RecoveryPage.qml
+        qml/pages/SystemCenterPage.qml
         qml/pages/AboutPage.qml
         qml/pages/KcmPage.qml
+)
+
+qt_add_executable(meo-welcome
+    src/welcome-main.cpp
+    src/backends/fingerprintbackend.cpp
+    src/backends/fingerprintbackend.h
+)
+
+qt_add_qml_module(meo-welcome
+    URI org.meo.welcome
+    VERSION 1.0
+    QML_FILES qml/Welcome.qml
 )
 
 target_link_libraries(meo-settings PRIVATE
@@ -140,6 +171,14 @@ target_link_libraries(meo-settings PRIVATE
     KF6::Screen
 )
 
+target_link_libraries(meo-welcome PRIVATE
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Qml
+    Qt6::Quick
+    Qt6::QuickControls2
+)
+
 target_compile_definitions(meo-settings PRIVATE
     MEO_SETTINGS_VERSION="${PROJECT_VERSION}"
 )
@@ -149,6 +188,8 @@ if(MEOUI_IMPORT_ROOT)
         MEOUI_IMPORT_ROOT_PATH="${MEOUI_IMPORT_ROOT}"
     )
     set_property(TARGET meo-settings APPEND PROPERTY QT_QML_IMPORT_PATH "${MEOUI_IMPORT_ROOT}")
+    target_compile_definitions(meo-welcome PRIVATE MEOUI_IMPORT_ROOT_PATH="${MEOUI_IMPORT_ROOT}")
+    set_property(TARGET meo-welcome APPEND PROPERTY QT_QML_IMPORT_PATH "${MEOUI_IMPORT_ROOT}")
 endif()
 
 if(MEO_KDE_QML_IMPORT_ROOT)
@@ -285,6 +326,16 @@ add_executable(meo-settings-updatesbackend-test
 target_link_libraries(meo-settings-updatesbackend-test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME meo-settings-updatesbackend COMMAND meo-settings-updatesbackend-test)
 
+add_executable(meo-settings-configbackend-test
+    tests/tst_configbackend.cpp
+    src/core/backendbase.cpp
+    src/core/backendbase.h
+    src/backends/configbackend.cpp
+    src/backends/configbackend.h
+)
+target_link_libraries(meo-settings-configbackend-test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME meo-settings-configbackend COMMAND meo-settings-configbackend-test)
+
 add_executable(meo-settings-meoaccountbackend-test
     tests/tst_meoaccountbackend.cpp
     src/core/backendbase.cpp
@@ -295,12 +346,28 @@ add_executable(meo-settings-meoaccountbackend-test
 target_link_libraries(meo-settings-meoaccountbackend-test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
 add_test(NAME meo-settings-meoaccountbackend COMMAND meo-settings-meoaccountbackend-test)
 
+add_executable(meo-settings-fingerprintbackend-test
+    tests/tst_fingerprintbackend.cpp
+    src/backends/fingerprintbackend.cpp
+    src/backends/fingerprintbackend.h
+)
+target_link_libraries(meo-settings-fingerprintbackend-test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME meo-settings-fingerprintbackend COMMAND meo-settings-fingerprintbackend-test)
+
 if(MEOUI_IMPORT_ROOT AND MEO_KDE_QML_IMPORT_ROOT AND MEO_SYSTEM_IMPORT_ROOT)
     # --smoke walks every first-milestone route without performing a hardware
     # action or launching a KCM. Keep this in CTest so type collisions and
     # lazy page creation failures cannot hide behind the initial home page.
     add_test(NAME meo-settings-qml-smoke COMMAND $<TARGET_FILE:meo-settings> --smoke)
     set_property(TEST meo-settings-qml-smoke APPEND PROPERTY ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen"
+        "QT_QUICK_BACKEND=software"
+        "QML_IMPORT_PATH=${MEOUI_IMPORT_ROOT}:${MEO_KDE_QML_IMPORT_ROOT}:${MEO_SYSTEM_IMPORT_ROOT}"
+        "QT_FORCE_STDERR_LOGGING=1"
+    )
+
+    add_test(NAME meo-welcome-qml-smoke COMMAND $<TARGET_FILE:meo-welcome> --show --smoke)
+    set_property(TEST meo-welcome-qml-smoke APPEND PROPERTY ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen"
         "QT_QUICK_BACKEND=software"
         "QML_IMPORT_PATH=${MEOUI_IMPORT_ROOT}:${MEO_KDE_QML_IMPORT_ROOT}:${MEO_SYSTEM_IMPORT_ROOT}"
@@ -347,9 +414,19 @@ install(TARGETS meo-settings
     BUNDLE DESTINATION .
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
+install(TARGETS meo-welcome
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
 install(FILES
     data/org.meo.settings.desktop
     data/org.meo.settings.bluetooth.desktop
+    data/org.meo.settings.wifi.desktop
+    data/org.meo.settings.sound.desktop
+    data/org.meo.settings.display.desktop
+    data/org.meo.settings.notifications.desktop
+    data/org.meo.settings.power.desktop
+    data/org.meo.welcome.desktop
     DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
 )
 install(FILES data/meo-account/clients/org.meo.Settings.json

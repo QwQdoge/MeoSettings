@@ -36,7 +36,7 @@ Item {
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("Advanced system tool")
+                    text: qsTr("Advanced compatibility tool")
                     typeRole: "title"
                     typeSize: "small"
                     emphasized: true
@@ -44,7 +44,7 @@ Item {
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("This specialized workflow opens in KDE’s supported configuration shell. It is not embedded because some installed modules are QWidget-based or need their own privilege, recovery, or authentication surface.")
+                    text: qsTr("This specialized workflow opens in the system’s supported configuration tool. It stays separate because it may need its own privilege, recovery, or authentication surface.")
                     typeRole: "body"
                     typeSize: "medium"
                     color: MeoTheme.contentOnSurfaceVariant

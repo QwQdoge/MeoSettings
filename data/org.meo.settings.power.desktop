@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Power
+Comment=Manage power and sleep in Meo Settings
+Exec=meo-settings --route power
+Icon=battery
+Categories=Settings;Qt;KDE;
+StartupNotify=true
+NoDisplay=true

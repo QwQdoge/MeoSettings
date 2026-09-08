@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Sound
+Comment=Manage sound devices in Meo Settings
+Exec=meo-settings --route sound
+Icon=audio-volume-high
+Categories=Settings;Qt;KDE;
+StartupNotify=true
+NoDisplay=true

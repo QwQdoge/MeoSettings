@@ -1,8 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Meo Settings
-Comment=Configure MeoArch and KDE settings
+Comment=Configure your MeoArch system
 Exec=meo-settings
 Icon=preferences-system
 Categories=Settings;Qt;KDE;
+Keywords=settings;system;wifi;network;bluetooth;sound;display;power;updates;recovery;
 StartupNotify=true

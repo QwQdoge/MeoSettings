@@ -15,17 +15,17 @@ Item {
 
     readonly property var desktopRows: [
         {
-            "title": qsTr("KDE settings modules"),
+            "title": qsTr("Advanced compatibility"),
             "subtitle": KcmBridge.launcherAvailable
-                        ? qsTr("%1 installed modules are available through the protected KDE bridge").arg(KcmBridge.modules.length)
-                        : qsTr("The Plasma settings-module launcher is unavailable"),
+                        ? qsTr("%1 specialized system tools are available when a Meo page cannot safely own the workflow").arg(KcmBridge.modules.length)
+                        : qsTr("No supported advanced system tools are available"),
             "icon": "settings", "tone": "neutral", "route": "kcm:kcm_landingpage",
             "enabled": KcmBridge.isAvailable("kcm_landingpage"), "trailingKind": "navigation"
         },
         {
             "title": qsTr("Material theme pipeline"),
             "subtitle": root.stateText(MeoShellTheme.ready && DynamicColorBackend.available,
-                                        qsTr("KDE palette → Meo HCT roles → MeoUI, shell, and application icons")),
+                                        qsTr("System palette → Meo HCT roles → MeoUI, shell, and application icons")),
             "icon": "palette", "tone": "tertiary", "route": "appearance",
             "enabled": true, "trailingKind": "navigation"
         },
@@ -105,12 +105,12 @@ Item {
         compactWidth: 680 * MeoTheme.globalScale
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
-        title: root.isCompact ? "" : qsTr("Desktop integration")
-        subtitle: qsTr("Live, read-only status for the KDE and Meo services behind every Settings page.")
+        title: root.isCompact ? "" : qsTr("System integration")
+        subtitle: qsTr("Live, read-only status for the services behind every Meo Settings page.")
 
         MeoSettingsGroup {
             width: parent.width
-            title: qsTr("KDE & hardware services")
+            title: qsTr("System & hardware services")
             subtitle: qsTr("Rows are shown only from real backend state. Opening a row never claims support that the service did not report.")
             model: root.desktopRows
             onRowActivated: (index, row) => { if (row.enabled) root.navigateTo(row.route) }
@@ -137,7 +137,7 @@ Item {
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("Meo Settings owns the unified interface. KDE modules own specialized configuration, Meo Account owns credentials and consent, and OmniStore owns privileged package transactions. This page verifies those connections without moving authority into the UI.")
+                    text: qsTr("Meo Settings owns the unified interface. Platform services retain specialized configuration, Meo Account owns credentials and consent, and OmniStore owns privileged package transactions. This page verifies those connections without moving authority into the UI.")
                     typeRole: "body"; typeSize: "small"
                     color: MeoTheme.contentOnSurfaceVariant
                     wrapMode: Text.WordWrap

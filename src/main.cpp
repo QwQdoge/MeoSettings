@@ -5,15 +5,23 @@
 #include "backends/controlcenterbackend.h"
 #include "backends/dynamiccolorbackend.h"
 #include "backends/displaybackend.h"
+#include "backends/documentationprovider.h"
+#include "backends/fingerprintbackend.h"
+#include "backends/hardwarecapabilityregistry.h"
 #include "backends/kcmbridge.h"
+#include "backends/loginauthbackend.h"
 #include "backends/meoaccountbackend.h"
 #include "backends/networkbackend.h"
 #include "backends/omnistoreappsbackend.h"
 #include "backends/packageinventorybackend.h"
 #include "backends/powerbackend.h"
+#include "backends/recoverybackend.h"
 #include "backends/storagebackend.h"
 #include "backends/systeminfobackend.h"
+#include "backends/systemtransactionbackend.h"
+#include "backends/configbackend.h"
 #include "backends/updatesbackend.h"
+#include "backends/welcomebackend.h"
 #include "core/capabilitymanager.h"
 #include "core/settingsregistry.h"
 
@@ -81,6 +89,13 @@ int main(int argc, char *argv[])
     ApplicationIconBackend applicationIconBackend;
     AppPermissionsBackend appPermissionsBackend;
     DisplayBackend displayBackend;
+    HardwareCapabilityRegistry hardwareCapabilityRegistry;
+    LoginAuthBackend loginAuthBackend;
+    RecoveryBackend recoveryBackend;
+    ConfigBackend configBackend;
+    FingerprintBackend fingerprintBackend;
+    DocumentationProvider documentationProvider;
+    SystemTransactionBackend systemTransactionBackend;
     DynamicColorBackend dynamicColorBackend;
     MeoAccountBackend meoAccountBackend;
     PowerBackend powerBackend;
@@ -91,6 +106,7 @@ int main(int argc, char *argv[])
     UpdatesBackend updatesBackend;
     ControlCenterBackend controlCenterBackend;
     KcmBridge kcmBridge;
+    WelcomeBackend welcomeBackend;
     CapabilityManager capabilities(&networkBackend, &bluetoothBackend, &audioBackend, &displayBackend, &powerBackend);
 
     QQmlApplicationEngine engine;
@@ -119,6 +135,13 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("ApplicationIconBackend"), &applicationIconBackend);
     context->setContextProperty(QStringLiteral("AppPermissionsBackend"), &appPermissionsBackend);
     context->setContextProperty(QStringLiteral("DisplayBackend"), &displayBackend);
+    context->setContextProperty(QStringLiteral("HardwareCapabilities"), &hardwareCapabilityRegistry);
+    context->setContextProperty(QStringLiteral("LoginAuthBackend"), &loginAuthBackend);
+    context->setContextProperty(QStringLiteral("RecoveryBackend"), &recoveryBackend);
+    context->setContextProperty(QStringLiteral("ConfigBackend"), &configBackend);
+    context->setContextProperty(QStringLiteral("FingerprintBackend"), &fingerprintBackend);
+    context->setContextProperty(QStringLiteral("DocumentationProvider"), &documentationProvider);
+    context->setContextProperty(QStringLiteral("SystemTransactionBackend"), &systemTransactionBackend);
     context->setContextProperty(QStringLiteral("DynamicColorBackend"), &dynamicColorBackend);
     context->setContextProperty(QStringLiteral("AccountBackend"), &meoAccountBackend);
     context->setContextProperty(QStringLiteral("PowerBackend"), &powerBackend);
@@ -129,6 +152,9 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("UpdatesBackend"), &updatesBackend);
     context->setContextProperty(QStringLiteral("ControlCenterBackend"), &controlCenterBackend);
     context->setContextProperty(QStringLiteral("KcmBridge"), &kcmBridge);
+    context->setContextProperty(QStringLiteral("WelcomeBackend"), &welcomeBackend);
+    QObject::connect(&configBackend, &ConfigBackend::transactionRequested,
+                     &systemTransactionBackend, &SystemTransactionBackend::submitConfigurationRequest);
 
     QObject::connect(&engine, &QQmlApplicationEngine::warnings, &app,
                      [](const QList<QQmlError> &warnings) {
@@ -210,6 +236,9 @@ int main(int argc, char *argv[])
             QStringLiteral("category:storage"),
             QStringLiteral("storage"),
             QStringLiteral("category:system"),
+            QStringLiteral("hardware"),
+            QStringLiteral("recovery"),
+            QStringLiteral("system-center"),
             QStringLiteral("kcm:kcm_kscreen"),
             QStringLiteral("category:privacy"),
             QStringLiteral("privacy"),
