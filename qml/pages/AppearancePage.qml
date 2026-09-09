@@ -734,7 +734,7 @@ Item {
                                 color: MeoTheme.contentOnSurfaceVariant
                                 wrapMode: Text.WordWrap
                             }
-                            ComboBox {
+                            MeoExposedDropdown {
                                 width: parent.width
                                 visible: AccountBackend.aiCredentials.length > 0
                                 model: AccountBackend.aiCredentials

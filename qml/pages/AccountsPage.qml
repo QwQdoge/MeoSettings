@@ -283,18 +283,12 @@ Item {
         }
     }
 
-    Dialog {
+    MeoDialog {
         id: signOutDialog
-        modal: true
-        anchors.centerIn: parent
         title: qsTr("Sign out all Meo applications?")
-        standardButtons: Dialog.Cancel | Dialog.Ok
-        onAccepted: AccountBackend.signOutAll()
-        contentItem: Label {
-            width: 360 * MeoTheme.globalScale
-            padding: 18 * MeoTheme.globalScale
-            text: qsTr("OmniStore and every registered Meo application on this device will lose its local session. This does not sign out other devices.")
-            wrapMode: Text.WordWrap
-        }
+        message: qsTr("OmniStore and every registered Meo application on this device will lose its local session. This does not sign out other devices.")
+        confirmText: qsTr("Sign out all")
+        cancelText: qsTr("Cancel")
+        onConfirmed: AccountBackend.signOutAll()
     }
 }
