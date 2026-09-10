@@ -11,6 +11,10 @@ Item {
     property var rootMetrics: null
     readonly property bool searching: searchBar.text.trim().length > 0
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
+    readonly property bool hasPersistentSettingsIndex: rootMetrics
+                                                        && (rootMetrics.isExpandedWidth
+                                                            || rootMetrics.isLargeWidth
+                                                            || rootMetrics.isExtraLargeWidth)
     readonly property bool doNotDisturbEnabled: {
         const until = notificationSettings.notificationsInhibitedUntil
         const timestamp = until instanceof Date ? until.getTime() : new Date(until).getTime()
@@ -173,6 +177,49 @@ Item {
         "icon": "info", "tone": "neutral", "route": "about", "trailingKind": "navigation"
     }]
 
+    readonly property var connectedOverviewRows: [{
+        "title": qsTr("Wi-Fi"),
+        "subtitle": NetworkBackend.connectionName
+                    || (NetworkBackend.wifiEnabled ? qsTr("On, not connected") : qsTr("Off or unavailable")),
+        "icon": "wifi", "tone": "primary", "route": "wifi", "trailingKind": "navigation"
+    }, {
+        "title": qsTr("Bluetooth"),
+        "subtitle": BluetoothBackend.enabled ? qsTr("On") : qsTr("Off or unavailable"),
+        "icon": "bluetooth", "tone": "secondary", "route": "bluetooth", "trailingKind": "navigation"
+    }, {
+        "title": qsTr("Sound"),
+        "subtitle": AudioBackend.outputName || qsTr("Choose an output device"),
+        "icon": "volume_up", "tone": "primary", "route": "sound", "trailingKind": "navigation"
+    }, {
+        "title": qsTr("Notifications"),
+        "subtitle": root.doNotDisturbEnabled ? qsTr("Do Not Disturb is on") : qsTr("Popups and focus are available"),
+        "icon": root.doNotDisturbEnabled ? "do_not_disturb_on" : "notifications",
+        "tone": "secondary", "route": "notifications", "trailingKind": "navigation"
+    }]
+
+    readonly property var deviceOverviewRows: [{
+        "title": qsTr("Power & battery"),
+        "subtitle": root.powerSummary(),
+        "icon": PowerBackend.charging ? "battery_charging_full" : "battery_full",
+        "tone": "primary", "route": "power", "trailingKind": "navigation"
+    }, {
+        "title": qsTr("Storage"),
+        "subtitle": root.storageSummary(),
+        "icon": "storage", "tone": "tertiary", "route": "storage", "trailingKind": "navigation"
+    }, {
+        "title": qsTr("Updates"),
+        "subtitle": qsTr("Review available system and application updates"),
+        "icon": "system_update", "tone": "primary", "route": "updates", "trailingKind": "navigation"
+    }, {
+        "title": qsTr("System health"),
+        "subtitle": SystemTransactionBackend.serviceAvailable
+                    ? qsTr("Recovery-aware transactions are ready")
+                    : qsTr("Transaction protection needs attention"),
+        "icon": SystemTransactionBackend.serviceAvailable ? "health_and_safety" : "warning",
+        "tone": SystemTransactionBackend.serviceAvailable ? "primary" : "tertiary",
+        "route": "recovery", "trailingKind": "navigation"
+    }]
+
     readonly property var searchRows: {
         const rows = []
         const results = SettingsRegistry.search(searchBar.text)
@@ -210,16 +257,18 @@ Item {
         compactWidth: Math.min(680 * MeoTheme.globalScale, MeoTheme.settingsContentMaxWidth)
         mediumWidth: MeoTheme.settingsContentMaxWidth
         expandedWidth: MeoTheme.settingsContentMaxWidth
-        // The desktop product and Pixel reference are search-first.  A second
-        // in-page title duplicated the window title and shifted every measured
-        // surface downward, so Home starts directly with the 64 dp search.
-        title: ""
-        subtitle: ""
-        topPadding: 0
+        title: root.hasPersistentSettingsIndex ? qsTr("Overview") : ""
+        subtitle: root.hasPersistentSettingsIndex
+                  ? (SystemInfoBackend.deviceName !== ""
+                     ? qsTr("%1 at a glance").arg(SystemInfoBackend.deviceName)
+                     : qsTr("Account, connected devices, and system status"))
+                  : ""
+        topPadding: root.hasPersistentSettingsIndex ? MeoTheme.space24 : 0
 
         MeoSearchBar {
             id: searchBar
             width: parent.width
+            visible: !root.hasPersistentSettingsIndex
             placeholder: qsTr("Search settings")
             trailingIcon: ""
             visualStyle: "settings"
@@ -244,7 +293,7 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
-            visible: root.searching && root.searchRows.length > 0
+            visible: !root.hasPersistentSettingsIndex && root.searching && root.searchRows.length > 0
             title: qsTr("Search results")
             subtitle: ""
             model: root.searchRows
@@ -254,7 +303,7 @@ Item {
         MeoEmptyState {
             width: parent.width
             height: 220 * MeoTheme.globalScale
-            visible: root.searching && root.searchRows.length === 0
+            visible: !root.hasPersistentSettingsIndex && root.searching && root.searchRows.length === 0
             icon: "search_off"
             title: qsTr("No settings found")
             description: qsTr("Try a device, feature, or system term such as Wi-Fi, storage, display, or notifications.")
@@ -262,7 +311,7 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
-            visible: !root.searching
+            visible: !root.hasPersistentSettingsIndex && !root.searching
             title: ""
             subtitle: ""
             model: root.referenceRows
@@ -271,10 +320,28 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
-            visible: !root.searching
+            visible: !root.hasPersistentSettingsIndex && !root.searching
             title: ""
             subtitle: ""
             model: root.systemRows
+            onRowActivated: (index, row) => root.navigateTo(row.route)
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: root.hasPersistentSettingsIndex
+            title: qsTr("Connected now")
+            subtitle: qsTr("Live status from NetworkManager, BlueZ, the audio service, and Plasma notifications.")
+            model: root.connectedOverviewRows
+            onRowActivated: (index, row) => root.navigateTo(row.route)
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: root.hasPersistentSettingsIndex
+            title: qsTr("Device")
+            subtitle: qsTr("The most useful system facts and maintenance entry points.")
+            model: root.deviceOverviewRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }
 

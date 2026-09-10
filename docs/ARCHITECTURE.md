@@ -44,8 +44,9 @@ missing local image instead of sampling a different file.
 
 Settings has two persistent route levels and one temporary task surface:
 
-1. **Level 1 — index/category.** Home search and the category sidebar point
-   to stable categories from `SettingsRegistry`.
+1. **Level 1 — index/category.** The desktop search-first category index and
+   the compact category drawer point to stable categories from
+   `SettingsRegistry`.
 2. **Level 2 — complete page.** A native page, a category page, or the
    explicit KDE handoff page owns a full task. These are the only persistent
    destinations.
@@ -67,9 +68,17 @@ to navigation as follows:
 | --- | --- |
 | Compact | Top app bar plus a temporary category drawer. |
 | Medium | Icon rail. |
-| Expanded | Expanded rail. |
-| Large | Persistent drawer. |
-| Extra large | Persistent drawer with the widest content allowance. |
+| Expanded | Persistent search-first Settings index beside the page. |
+| Large | Persistent search-first Settings index beside the page. |
+| Extra large | Persistent search-first Settings index with the widest content allowance. |
+
+The desktop index is `MeoSettingsSidebar`, owned by MeoUI. Search remains at
+the top, route rows are connected into semantic groups, and the selected route
+is automatically scrolled into view. The index uses the shared 360dp Settings
+width, dynamic Material roles, and `MeoSettingsGroup` row geometry; Meo
+Settings supplies only its registry-derived labels, icons, capability state,
+and routes. The right pane always owns the current task, so changing pages does
+not replace or duplicate the category index.
 
 `MeoPageHost` owns route transitions. Motion follows the shared MeoUI motion
 tokens and is disabled when the active accessibility/reduced-motion setting

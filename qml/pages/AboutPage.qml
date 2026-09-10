@@ -8,6 +8,40 @@ Item {
     property var navigateTo: function(route) {}
     property var rootMetrics: null
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
+    function iconForFact(label) {
+        if (label === qsTr("Operating system")) return "computer"
+        if (label === qsTr("Kernel")) return "developer_board"
+        if (label === qsTr("Architecture")) return "memory"
+        if (label === qsTr("Memory")) return "memory_alt"
+        if (label === qsTr("Host name")) return "dns"
+        if (label === qsTr("User") || label === qsTr("Meo Account")) return "account_circle"
+        if (label === qsTr("KDE platform")) return "desktop_windows"
+        if (label === qsTr("Qt")) return "code"
+        if (label === qsTr("Meo Settings")) return "settings"
+        return "info"
+    }
+
+    function factRows(fromIndex, toIndex) {
+        const rows = []
+        const facts = root.displayFacts
+        const end = Math.min(toIndex, facts.length)
+        for (let index = fromIndex; index < end; ++index) {
+            const fact = facts[index]
+            rows.push({
+                "title": fact.label,
+                "subtitle": fact.value,
+                "leadingIcon": root.iconForFact(fact.label),
+                "leadingTone": index < 5 ? "primary" : "neutral",
+                "leadingStyle": "tonal",
+                "trailingKind": "none",
+                "interactive": false
+            })
+        }
+        return rows
+    }
+
+    readonly property var systemRows: factRows(0, Math.min(6, displayFacts.length))
+    readonly property var runtimeRows: factRows(Math.min(6, displayFacts.length), displayFacts.length)
     readonly property var displayFacts: {
         const facts = []
         const systemFacts = SystemInfoBackend.facts
@@ -33,66 +67,81 @@ Item {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
         title: root.isCompact ? "" : qsTr("About")
-        subtitle: qsTr("Live information from the operating system and Qt/KDE runtime.")
+        subtitle: qsTr("Device, operating system, and runtime information.")
 
         MeoCard {
             width: parent.width
-            type: "elevated"
+            type: "filled"
 
             Column {
                 width: parent.width
-                spacing: 0
+                spacing: MeoTheme.space8
 
-                Repeater {
-                    model: root.displayFacts
-                    delegate: MeoListItem {
-                        required property var modelData
-                        width: parent.width
-                        headline: modelData.label
-                        supportingText: modelData.value
-                        leadingIcon: modelData.label === qsTr("Operating system") ? "computer"
-                                     : (modelData.label === qsTr("Memory") ? "memory" : "info")
-                        interactive: false
-                    }
+                MeoIcon {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    icon: "computer"
+                    size: 56 * MeoTheme.globalScale
+                    color: MeoTheme.primary
                 }
-            }
-        }
-
-        MeoButton {
-            text: qsTr("Refresh information")
-            type: "tonal"
-            onClicked: SystemInfoBackend.refresh()
-        }
-
-        MeoButton {
-            text: qsTr("Advanced system information")
-            type: "text"
-            enabled: KcmBridge.isAvailable("kcm_about-distro")
-            onClicked: root.navigateTo("kcm:kcm_about-distro")
-        }
-
-        MeoCard {
-            width: parent.width
-            type: "outlined"
-
-            Column {
-                width: parent.width
-                spacing: 8 * MeoTheme.globalScale
                 MeoText {
-                    text: qsTr("Architecture boundary")
-                    typeRole: "title"
-                    typeSize: "small"
+                    width: parent.width
+                    text: SystemInfoBackend.operatingSystemName || qsTr("MeoArch")
+                    typeRole: "headline"
+                    typeSize: "medium"
                     emphasized: true
+                    horizontalAlignment: Text.AlignHCenter
                     color: MeoTheme.contentOnSurface
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("Meo Settings provides MeoUI presentation and thin adapters. NetworkManager, BlueZ, the audio service, KScreen, and KDE configuration modules remain the system authorities.")
+                    text: SystemInfoBackend.deviceName || qsTr("This device")
                     typeRole: "body"
-                    typeSize: "small"
+                    typeSize: "medium"
+                    horizontalAlignment: Text.AlignHCenter
                     color: MeoTheme.contentOnSurfaceVariant
-                    wrapMode: Text.WordWrap
                 }
+            }
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("System")
+            model: root.systemRows
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("Software")
+            model: root.runtimeRows
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("More")
+            model: [{
+                "title": qsTr("Refresh information"),
+                "subtitle": qsTr("Read the latest device and runtime facts"),
+                "leadingIcon": "refresh",
+                "leadingStyle": "tonal",
+                "trailingKind": "button",
+                "actionText": qsTr("Refresh")
+            }, {
+                "title": qsTr("Advanced system information"),
+                "subtitle": KcmBridge.isAvailable("kcm_about-distro")
+                            ? qsTr("Open the maintained KDE information tool")
+                            : qsTr("The advanced system information tool is not installed"),
+                "leadingIcon": "info",
+                "leadingStyle": "tonal",
+                "trailingKind": "navigation",
+                "enabled": KcmBridge.isAvailable("kcm_about-distro")
+            }]
+            onRowActionTriggered: (index, row) => {
+                if (index === 0)
+                    SystemInfoBackend.refresh()
+            }
+            onRowActivated: (index, row) => {
+                if (index === 1 && row.enabled)
+                    root.navigateTo("kcm:kcm_about-distro")
             }
         }
     }

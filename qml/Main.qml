@@ -26,6 +26,9 @@ ApplicationWindow {
     readonly property bool pageContentReady: pageHost.initialized
                                             && pageHost.currentItem !== null
                                             && lastLoadedRoute === currentRoute
+    readonly property bool usesDesktopSettingsIndex: rootMetrics.isExpandedWidth
+                                                     || rootMetrics.isLargeWidth
+                                                     || rootMetrics.isExtraLargeWidth
     signal pageReady(string route)
 
     MeoWindowMetrics {
@@ -58,6 +61,102 @@ ApplicationWindow {
                 return index
         }
         return 0
+    }
+
+    function capabilityAvailable(capability) {
+        switch (capability || "") {
+        case "wifi": return Capabilities.wifi
+        case "bluetooth": return Capabilities.bluetooth
+        case "audio": return Capabilities.audio
+        case "display": return Capabilities.display
+        default: return true
+        }
+    }
+
+    function navigationRouteFor(route) {
+        if (route === "home" || route === "about")
+            return route
+        const categoryId = categoryIdForRoute(route)
+        return categoryId !== "" ? "category:" + categoryId : "home"
+    }
+
+    function sidebarCategoryRow(categoryId) {
+        const category = SettingsRegistry.category(categoryId)
+        return {
+            "title": category.title || "",
+            "subtitle": category.description || "",
+            "leadingIcon": category.icon || "settings",
+            "leadingTone": category.tone || "primary",
+            "leadingStyle": "tonal",
+            "route": category.route || "home",
+            "trailingKind": "navigation"
+        }
+    }
+
+    readonly property var desktopSidebarGroups: [
+        {
+            "title": qsTr("Overview"),
+            "rows": [{
+                "title": qsTr("Home"),
+                "subtitle": qsTr("Account, connected devices, and system status"),
+                "leadingIcon": "home",
+                "leadingTone": "primary",
+                "leadingStyle": "tonal",
+                "route": "home",
+                "trailingKind": "navigation"
+            }]
+        },
+        {
+            "title": qsTr("Connections"),
+            "rows": [sidebarCategoryRow("network"), sidebarCategoryRow("devices"),
+                     sidebarCategoryRow("display-sound")]
+        },
+        {
+            "title": qsTr("Personal"),
+            "rows": [sidebarCategoryRow("personalization"), sidebarCategoryRow("apps"),
+                     sidebarCategoryRow("accounts")]
+        },
+        {
+            "title": qsTr("System"),
+            "rows": [sidebarCategoryRow("storage"), sidebarCategoryRow("system"),
+                     sidebarCategoryRow("privacy"), sidebarCategoryRow("accessibility"),
+                     sidebarCategoryRow("updates"), {
+                         "title": qsTr("About"),
+                         "subtitle": qsTr("MeoArch, hardware, and runtime information"),
+                         "leadingIcon": "info",
+                         "leadingTone": "neutral",
+                         "leadingStyle": "tonal",
+                         "route": "about",
+                         "trailingKind": "navigation"
+                     }]
+        }
+    ]
+
+    readonly property var desktopSearchRows: {
+        if (!desktopSidebar || desktopSidebar.searchText.trim() === "")
+            return []
+        const rows = []
+        const results = SettingsRegistry.search(desktopSidebar.searchText)
+        for (let index = 0; index < results.length; ++index) {
+            const entry = results[index]
+            if (!root.capabilityAvailable(entry.capability))
+                continue
+            const kcmRoute = String(entry.route || "").startsWith("kcm:")
+            const available = !kcmRoute || KcmBridge.isAvailable(String(entry.route).slice(4))
+            rows.push({
+                "title": entry.title,
+                "subtitle": available ? entry.category + " · " + entry.description
+                                      : qsTr("Advanced system tool is not installed"),
+                "leadingIcon": entry.icon,
+                "leadingTone": entry.tone || "primary",
+                "leadingStyle": "tonal",
+                "route": entry.route,
+                "enabled": available,
+                "trailingKind": kcmRoute ? "choice" : "navigation",
+                "trailingText": kcmRoute ? qsTr("Advanced") : ""
+            })
+        }
+        return rows
     }
 
     function pageSource(route) {
@@ -155,8 +254,9 @@ ApplicationWindow {
         id: navigation
         anchors.left: parent.left
         anchors.top: parent.top
-        width: isCompact ? parent.width : implicitWidth
+        width: root.usesDesktopSettingsIndex ? 0 : (isCompact ? parent.width : implicitWidth)
         height: parent.height
+        visible: !root.usesDesktopSettingsIndex
         availableWidth: root.width
         model: SettingsRegistry.sidebarEntries
         currentIndex: root.sidebarIndexForRoute(root.currentRoute)
@@ -171,10 +271,30 @@ ApplicationWindow {
         onClicked: (index) => root.navigate(SettingsRegistry.sidebarEntries[index].route)
     }
 
+    MeoSettingsSidebar {
+        id: desktopSidebar
+        objectName: "meoSettingsDesktopSidebar"
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: root.usesDesktopSettingsIndex ? MeoTheme.settingsSidebarWidth : 0
+        visible: root.usesDesktopSettingsIndex
+        showTitle: false
+        groups: root.desktopSidebarGroups
+        searchResults: root.desktopSearchRows
+        selectedRoute: root.navigationRouteFor(root.currentRoute)
+        onRouteActivated: (route, row) => {
+            root.navigate(route)
+            if (searching)
+                searchText = ""
+        }
+    }
+
     Item {
         id: contentHost
         anchors.left: parent.left
-        anchors.leftMargin: navigation.isCompact ? 0 : navigation.width
+        anchors.leftMargin: root.usesDesktopSettingsIndex ? desktopSidebar.width
+                                                         : (navigation.isCompact ? 0 : navigation.width)
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.bottom: parent.bottom

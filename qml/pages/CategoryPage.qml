@@ -67,8 +67,8 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             visible: root.categoryRows.length > 0
-            title: qsTr("Settings")
-            subtitle: qsTr("Daily controls stay in Meo Settings. Advanced tools appear only where their workflow needs extra system protection.")
+            title: ""
+            subtitle: ""
             model: root.categoryRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }
@@ -84,31 +84,5 @@ Item {
             onActionClicked: root.navigateTo("home")
         }
 
-        MeoCard {
-            width: parent.width
-            type: "outlined"
-
-            Column {
-                width: parent.width
-                spacing: 6 * MeoTheme.globalScale
-
-                MeoText {
-                    width: parent.width
-                    text: qsTr("System ownership")
-                    typeRole: "title"
-                    typeSize: "small"
-                    emphasized: true
-                    color: MeoTheme.contentOnSurface
-                }
-                MeoText {
-                    width: parent.width
-                    text: qsTr("Meo Settings is the primary place for everyday system changes. A protected advanced tool appears only for workflows that require special privileges, recovery, or an authentication flow that Meo has not safely implemented yet.")
-                    typeRole: "body"
-                    typeSize: "small"
-                    color: MeoTheme.contentOnSurfaceVariant
-                    wrapMode: Text.WordWrap
-                }
-            }
-        }
     }
 }
