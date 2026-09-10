@@ -519,70 +519,66 @@ Item {
                                 { "id": "rounded", "label": qsTr("Rounded square") }
                             ]
 
-                            delegate: Item {
+                            delegate: MeoCard {
+                                id: shapeChoice
+                                required property int index
                                 required property var modelData
-                                readonly property bool selected: applicationIconStudio.selectedShape === modelData.id
+                                objectName: "applicationIconShapeChoice_" + index
                                 width: 132 * MeoTheme.globalScale
                                 height: 116 * MeoTheme.globalScale
+                                padding: 0
+                                radius: MeoTheme.shapeLarge
+                                type: "outlined"
+                                interactive: true
+                                selected: applicationIconStudio.selectedShape === modelData.id
+                                onClicked: applicationIconStudio.selectedShape = modelData.id
 
                                 Rectangle {
-                                    anchors.fill: parent
-                                    radius: 16 * MeoTheme.globalScale
-                                    color: selected ? MeoTheme.primaryContainer : MeoTheme.surfaceContainerLow
-                                    border.width: selected ? 2 * MeoTheme.globalScale : 1 * MeoTheme.globalScale
-                                    border.color: selected ? MeoTheme.primary : MeoTheme.outlineVariant
+                                    id: shapeCore
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    y: MeoTheme.space16
+                                    width: 58 * MeoTheme.globalScale
+                                    height: width
+                                    radius: modelData.id === "circle" || modelData.id === "pixel"
+                                            ? width / 2
+                                            : (modelData.id === "squircle" ? width * 0.31 : width * 0.19)
+                                    color: shapeChoice.selected ? MeoTheme.primary : MeoTheme.surface
 
-                                    Rectangle {
-                                        id: shapeCore
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        y: 16 * MeoTheme.globalScale
-                                        width: 58 * MeoTheme.globalScale
-                                        height: width
-                                        radius: modelData.id === "circle" || modelData.id === "pixel"
-                                                ? width / 2
-                                                : (modelData.id === "squircle" ? width * 0.31 : width * 0.19)
-                                        color: selected ? MeoTheme.primary : MeoTheme.surface
-
-                                        Repeater {
-                                            model: modelData.id === "pixel" ? 8 : 0
-                                            delegate: Rectangle {
-                                                required property int index
-                                                readonly property real angle: index * Math.PI / 4
-                                                width: 22 * MeoTheme.globalScale
-                                                height: width
-                                                radius: width / 2
-                                                x: shapeCore.width / 2 + Math.cos(angle) * 18 * MeoTheme.globalScale - width / 2
-                                                y: shapeCore.height / 2 + Math.sin(angle) * 18 * MeoTheme.globalScale - height / 2
-                                                color: shapeCore.color
-                                            }
-                                        }
-
-                                        Kirigami.Icon {
-                                            anchors.centerIn: parent
-                                            width: 30 * MeoTheme.globalScale
+                                    Repeater {
+                                        model: modelData.id === "pixel" ? 8 : 0
+                                        delegate: Rectangle {
+                                            required property int index
+                                            readonly property real angle: index * Math.PI / 4
+                                            width: 22 * MeoTheme.globalScale
                                             height: width
-                                            source: applicationIconStudio.previewIconSource
+                                            radius: width / 2
+                                            x: shapeCore.width / 2 + Math.cos(angle) * 18 * MeoTheme.globalScale - width / 2
+                                            y: shapeCore.height / 2 + Math.sin(angle) * 18 * MeoTheme.globalScale - height / 2
+                                            color: shapeCore.color
                                         }
                                     }
 
-                                    MeoText {
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        anchors.bottom: parent.bottom
-                                        anchors.bottomMargin: 12 * MeoTheme.globalScale
-                                        horizontalAlignment: Text.AlignHCenter
-                                        text: modelData.label
-                                        typeRole: "label"
-                                        typeSize: "small"
-                                        emphasized: selected
-                                        color: MeoTheme.contentOnSurface
+                                    Kirigami.Icon {
+                                        anchors.centerIn: parent
+                                        width: 30 * MeoTheme.globalScale
+                                        height: width
+                                        source: applicationIconStudio.previewIconSource
                                     }
                                 }
 
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: applicationIconStudio.selectedShape = modelData.id
+                                MeoText {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: MeoTheme.space12
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: modelData.label
+                                    typeRole: "label"
+                                    typeSize: "small"
+                                    emphasized: shapeChoice.selected
+                                    color: shapeChoice.selected
+                                           ? MeoTheme.contentOnPrimaryContainer
+                                           : MeoTheme.contentOnSurface
                                 }
                             }
                         }
@@ -633,68 +629,39 @@ Item {
                         ListView {
                             anchors.fill: parent
                             clip: true
-                            spacing: 4 * MeoTheme.globalScale
+                            spacing: MeoTheme.space4
                             model: ApplicationIconBackend.applications
 
-                            delegate: Item {
+                            delegate: MeoListItem {
                                 id: appChoice
+                                required property int index
                                 required property var modelData
-                                readonly property bool selected:
-                                    applicationIconStudio.isApplicationSelected(modelData.desktopId)
+                                objectName: "applicationIconAppChoice_" + index
                                 width: ListView.view.width
-                                height: 52 * MeoTheme.globalScale
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: 14 * MeoTheme.globalScale
-                                    color: appChoice.selected
-                                           ? MeoTheme.secondaryContainer
-                                           : "transparent"
-
+                                isDense: true
+                                isSegmented: true
+                                roundingStrategy: "all"
+                                outerCornerRadius: MeoTheme.shapeLarge
+                                selected: applicationIconStudio.isApplicationSelected(modelData.desktopId)
+                                headline: modelData.name
+                                leadingComponentSize: 36
+                                leadingComponent: Component {
                                     Kirigami.Icon {
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 10 * MeoTheme.globalScale
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 34 * MeoTheme.globalScale
+                                        width: 36 * MeoTheme.globalScale
                                         height: width
                                         source: appChoice.modelData.icon
                                     }
-
-                                    MeoText {
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 56 * MeoTheme.globalScale
-                                        anchors.right: selectionMark.left
-                                        anchors.rightMargin: 8 * MeoTheme.globalScale
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: appChoice.modelData.name
-                                        typeRole: "body"
-                                        typeSize: "medium"
-                                        emphasized: appChoice.selected
-                                        elide: Text.ElideRight
-                                        color: appChoice.selected
-                                               ? MeoTheme.onSecondaryContainer
-                                               : MeoTheme.contentOnSurface
-                                    }
-
+                                }
+                                trailingComponent: Component {
                                     MeoIcon {
-                                        id: selectionMark
-                                        anchors.right: parent.right
-                                        anchors.rightMargin: 12 * MeoTheme.globalScale
-                                        anchors.verticalCenter: parent.verticalCenter
                                         icon: appChoice.selected ? "check_circle" : "circle"
-                                        size: 22 * MeoTheme.globalScale
+                                        size: 22
                                         color: appChoice.selected
                                                ? MeoTheme.primary
                                                : MeoTheme.outline
                                     }
                                 }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: applicationIconStudio.toggleApplication(
-                                        appChoice.modelData.desktopId)
-                                }
+                                onClicked: applicationIconStudio.toggleApplication(modelData.desktopId)
                             }
                         }
                     }
