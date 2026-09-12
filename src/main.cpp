@@ -23,6 +23,7 @@
 #include "backends/updatesbackend.h"
 #include "backends/welcomebackend.h"
 #include "core/capabilitymanager.h"
+#include "core/qmlimportpolicy.h"
 #include "core/settingsregistry.h"
 
 #include <QGuiApplication>
@@ -111,10 +112,9 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
 #ifdef MEOUI_IMPORT_ROOT_PATH
-    // In a sibling-tree build, keep the configured MeoUI artifact ahead of a
-    // user-local Plasma development import. Packaged builds intentionally use
-    // the system module because this definition is omitted there.
-    engine.addImportPath(QStringLiteral(MEOUI_IMPORT_ROOT_PATH));
+    MeoQmlImportPolicy::prioritizeMeoUi(engine, QStringLiteral(MEOUI_IMPORT_ROOT_PATH));
+#else
+    MeoQmlImportPolicy::prioritizeMeoUi(engine);
 #endif
 #ifdef MEO_KDE_QML_IMPORT_ROOT_PATH
     // MeoShellTheme is the KDE-side dynamic HCT bridge.  MeoUI consumes its

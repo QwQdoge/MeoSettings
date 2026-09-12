@@ -29,6 +29,15 @@ complete dynamic role table before the app considers a page ready. MeoUI,
 MeoKDE, and `Meo.System` are runtime dependencies, not source trees copied
 into this repository.
 
+Installed Meo Settings and Meo Welcome builds prepend Qt's package-managed QML
+import root before inherited `QML_IMPORT_PATH` and `QML2_IMPORT_PATH` entries.
+This prevents an obsolete user-local MeoUI development deployment from
+shadowing the version installed by Pacman. Sibling-tree development builds
+instead prepend the explicit `MEOUI_IMPORT_ROOT`, so current source artifacts
+remain authoritative while developing. Release acceptance must exercise an
+isolated package-style build with a deliberately stale import root as well as
+the normal sibling-tree QML smoke.
+
 Most pages observe the active platform theme, but Appearance has one explicit
 Meo-owned, confirmation-gated action: `DynamicColorBackend` invokes the
 installed `meo-dynamic-colors` generator with exactly one validated source:

@@ -8,6 +8,7 @@
 #include <QTimer>
 
 #include "backends/fingerprintbackend.h"
+#include "core/qmlimportpolicy.h"
 
 class WelcomeState final : public QObject
 {
@@ -83,7 +84,9 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
 #ifdef MEOUI_IMPORT_ROOT_PATH
-    engine.addImportPath(QStringLiteral(MEOUI_IMPORT_ROOT_PATH));
+    MeoQmlImportPolicy::prioritizeMeoUi(engine, QStringLiteral(MEOUI_IMPORT_ROOT_PATH));
+#else
+    MeoQmlImportPolicy::prioritizeMeoUi(engine);
 #endif
     engine.rootContext()->setContextProperty(QStringLiteral("WelcomeState"), &state);
     // The welcome flow receives only the privacy-safe fprintd projection. It

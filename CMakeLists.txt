@@ -62,6 +62,8 @@ qt_add_executable(meo-settings
     src/core/backendbase.h
     src/core/capabilitymanager.cpp
     src/core/capabilitymanager.h
+    src/core/qmlimportpolicy.cpp
+    src/core/qmlimportpolicy.h
     src/core/settingsregistry.cpp
     src/core/settingsregistry.h
     src/backends/networkbackend.cpp
@@ -147,6 +149,8 @@ qt_add_executable(meo-welcome
     src/welcome-main.cpp
     src/backends/fingerprintbackend.cpp
     src/backends/fingerprintbackend.h
+    src/core/qmlimportpolicy.cpp
+    src/core/qmlimportpolicy.h
 )
 
 qt_add_qml_module(meo-welcome
@@ -353,6 +357,15 @@ add_executable(meo-settings-fingerprintbackend-test
 )
 target_link_libraries(meo-settings-fingerprintbackend-test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME meo-settings-fingerprintbackend COMMAND meo-settings-fingerprintbackend-test)
+
+add_executable(meo-settings-qmlimportpolicy-test
+    tests/tst_qmlimportpolicy.cpp
+    src/core/qmlimportpolicy.cpp
+    src/core/qmlimportpolicy.h
+)
+target_include_directories(meo-settings-qmlimportpolicy-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(meo-settings-qmlimportpolicy-test PRIVATE Qt6::Core Qt6::Qml Qt6::Test)
+add_test(NAME meo-settings-qmlimportpolicy COMMAND meo-settings-qmlimportpolicy-test)
 
 if(MEOUI_IMPORT_ROOT AND MEO_KDE_QML_IMPORT_ROOT AND MEO_SYSTEM_IMPORT_ROOT)
     # --smoke walks every first-milestone route without performing a hardware
