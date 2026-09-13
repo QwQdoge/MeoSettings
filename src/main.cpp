@@ -62,10 +62,14 @@ int main(int argc, char *argv[])
     const QCommandLineOption screenshotOption(QStringLiteral("screenshot"),
                                                QStringLiteral("Save a non-interactive application screenshot, then exit."),
                                                QStringLiteral("file"));
+    const QCommandLineOption sessionEntryLayoutEditorOption(
+        QStringLiteral("session-entry-layout-editor"),
+        QStringLiteral("Open the non-persistent lock-screen layout editor for validation."));
     parser.addOption(smokeOption);
     parser.addOption(routeOption);
     parser.addOption(sizeOption);
     parser.addOption(screenshotOption);
+    parser.addOption(sessionEntryLayoutEditorOption);
     parser.process(app);
 
     QSize requestedSize;
@@ -153,6 +157,10 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("ControlCenterBackend"), &controlCenterBackend);
     context->setContextProperty(QStringLiteral("KcmBridge"), &kcmBridge);
     context->setContextProperty(QStringLiteral("WelcomeBackend"), &welcomeBackend);
+    // This mode exists solely for isolated CTest and screenshot validation of
+    // the data-only editor. It exposes no system writer or lock-screen state.
+    context->setContextProperty(QStringLiteral("sessionEntryLayoutEditorMode"),
+                                parser.isSet(sessionEntryLayoutEditorOption));
     QObject::connect(&configBackend, &ConfigBackend::transactionRequested,
                      &systemTransactionBackend, &SystemTransactionBackend::submitConfigurationRequest);
 
@@ -179,10 +187,14 @@ int main(int argc, char *argv[])
     if (!requestedSize.isEmpty() && window) {
         window->resize(requestedSize);
     }
-    if (parser.isSet(routeOption)
+    const QString startupRoute = parser.isSet(routeOption)
+                                   ? parser.value(routeOption)
+                                   : (parser.isSet(sessionEntryLayoutEditorOption)
+                                      ? QStringLiteral("session-entry") : QString());
+    if (!startupRoute.isEmpty()
         && !QMetaObject::invokeMethod(root, "navigate",
-                                      Q_ARG(QVariant, QVariant(parser.value(routeOption))))) {
-        qCritical() << "Meo Settings could not navigate to" << parser.value(routeOption);
+                                      Q_ARG(QVariant, QVariant(startupRoute)))) {
+        qCritical() << "Meo Settings could not navigate to" << startupRoute;
         return EXIT_FAILURE;
     }
 
@@ -242,6 +254,7 @@ int main(int argc, char *argv[])
             QStringLiteral("kcm:kcm_kscreen"),
             QStringLiteral("category:privacy"),
             QStringLiteral("privacy"),
+            QStringLiteral("session-entry"),
             QStringLiteral("category:accessibility"),
             QStringLiteral("category:updates"),
             QStringLiteral("updates"),

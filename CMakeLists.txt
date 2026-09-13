@@ -136,6 +136,8 @@ qt_add_qml_module(meo-settings
         qml/pages/NotificationsPage.qml
         qml/pages/AccountsPage.qml
         qml/pages/PrivacyPage.qml
+        qml/pages/SessionEntryPage.qml
+        qml/pages/MeoLockScreenLayoutEditor.qml
         qml/pages/StoragePage.qml
         qml/pages/UpdatesPage.qml
         qml/pages/HardwarePage.qml
@@ -373,6 +375,17 @@ if(MEOUI_IMPORT_ROOT AND MEO_KDE_QML_IMPORT_ROOT AND MEO_SYSTEM_IMPORT_ROOT)
     # lazy page creation failures cannot hide behind the initial home page.
     add_test(NAME meo-settings-qml-smoke COMMAND $<TARGET_FILE:meo-settings> --smoke)
     set_property(TEST meo-settings-qml-smoke APPEND PROPERTY ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen"
+        "QT_QUICK_BACKEND=software"
+        "QML_IMPORT_PATH=${MEOUI_IMPORT_ROOT}:${MEO_KDE_QML_IMPORT_ROOT}:${MEO_SYSTEM_IMPORT_ROOT}"
+        "QT_FORCE_STDERR_LOGGING=1"
+    )
+
+    # Keep the editor reachable in CTest independently of a pointer-driven
+    # manual check. It remains in-session and never invokes a config writer.
+    add_test(NAME meo-settings-lockscreen-layout-editor-smoke
+             COMMAND $<TARGET_FILE:meo-settings> --session-entry-layout-editor --smoke)
+    set_property(TEST meo-settings-lockscreen-layout-editor-smoke APPEND PROPERTY ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen"
         "QT_QUICK_BACKEND=software"
         "QML_IMPORT_PATH=${MEOUI_IMPORT_ROOT}:${MEO_KDE_QML_IMPORT_ROOT}:${MEO_SYSTEM_IMPORT_ROOT}"

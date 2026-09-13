@@ -629,6 +629,7 @@ Item {
                         ListView {
                             anchors.fill: parent
                             clip: true
+                            visible: !ApplicationIconBackend.applicationsLoading
                             spacing: MeoTheme.space4
                             model: ApplicationIconBackend.applications
 
@@ -662,6 +663,42 @@ Item {
                                     }
                                 }
                                 onClicked: applicationIconStudio.toggleApplication(modelData.desktopId)
+                            }
+                        }
+
+                        MeoLoadingFeedback {
+                            anchors.fill: parent
+                            active: ApplicationIconBackend.applicationsLoading
+                            minimumVisibleDuration: 0
+                            accessibleName: qsTr("Loading applications")
+                            placeholder: Component {
+                                Column {
+                                    anchors.fill: parent
+                                    spacing: MeoTheme.space4
+
+                                    Repeater {
+                                        model: 4
+                                        delegate: Row {
+                                            required property int index
+                                            width: parent.width
+                                            height: 56 * MeoTheme.globalScale
+                                            spacing: MeoTheme.space12
+
+                                            MeoSkeleton {
+                                                type: "avatar"
+                                                width: 36 * MeoTheme.globalScale
+                                                height: width
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+                                            MeoSkeleton {
+                                                type: "text"
+                                                width: Math.max(80 * MeoTheme.globalScale,
+                                                                parent.width * (0.52 + (index % 2) * 0.16))
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

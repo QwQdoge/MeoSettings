@@ -75,6 +75,47 @@ ApplicationIconBackend::ApplicationIconBackend(QObject *parent)
                 setBusy(false);
                 Q_EMIT changed();
             });
+
+    // Application discovery is intentionally separate from the mutation
+    // process.  The previous implementation waited up to five seconds in
+    // refresh(), which could block the Qt Quick GUI thread before the first
+    // frame of Settings was presented.
+    m_listingProcess.setProcessChannelMode(QProcess::SeparateChannels);
+    connect(&m_listingProcess, &QProcess::errorOccurred, this,
+            [this](const QProcess::ProcessError) {
+                m_applicationsLoading = false;
+                Q_EMIT changed();
+                if (m_listingRefreshQueued) {
+                    m_listingRefreshQueued = false;
+                    requestApplicationListing();
+                }
+            });
+    connect(&m_listingProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [this](const int exitCode, const QProcess::ExitStatus exitStatus) {
+                QVariantList nextApplications;
+                const bool resultMatchesCurrentTool = m_listingToolPath == m_toolPath;
+                if (resultMatchesCurrentTool && exitStatus == QProcess::NormalExit && exitCode == 0) {
+                    const QJsonArray array = QJsonDocument::fromJson(
+                        m_listingProcess.readAllStandardOutput()).array();
+                    for (const QJsonValue &value : array) {
+                        const QJsonObject object = value.toObject();
+                        nextApplications.append(QVariantMap{
+                            {QStringLiteral("desktopId"), object.value(QStringLiteral("desktop_id")).toString()},
+                            {QStringLiteral("name"), object.value(QStringLiteral("name")).toString()},
+                            {QStringLiteral("icon"), object.value(QStringLiteral("icon")).toString()},
+                        });
+                    }
+                }
+                if (resultMatchesCurrentTool && nextApplications != m_applications) {
+                    m_applications = nextApplications;
+                }
+                m_applicationsLoading = false;
+                Q_EMIT changed();
+                if (m_listingRefreshQueued || !resultMatchesCurrentTool) {
+                    m_listingRefreshQueued = false;
+                    requestApplicationListing();
+                }
+            });
     refresh();
 }
 
@@ -85,6 +126,7 @@ QString ApplicationIconBackend::style() const { return m_style; }
 QString ApplicationIconBackend::shape() const { return m_shape; }
 QString ApplicationIconBackend::prompt() const { return m_prompt; }
 QVariantList ApplicationIconBackend::applications() const { return m_applications; }
+bool ApplicationIconBackend::applicationsLoading() const { return m_applicationsLoading; }
 QString ApplicationIconBackend::lastResult() const { return m_lastResult; }
 QString ApplicationIconBackend::aiBatchId() const { return m_aiBatchId; }
 QVariantList ApplicationIconBackend::aiBatchPreviews() const { return m_aiBatchPreviews; }
@@ -184,31 +226,34 @@ void ApplicationIconBackend::refresh()
     m_style = nextStyle;
     m_shape = nextShape;
     m_prompt = nextPrompt;
-    QVariantList nextApplications;
-    if (!nextPath.isEmpty()) {
-        QProcess listing;
-        listing.start(nextPath, {QStringLiteral("--list")});
-        if (listing.waitForFinished(5000) && listing.exitStatus() == QProcess::NormalExit
-            && listing.exitCode() == 0) {
-            const QJsonArray array = QJsonDocument::fromJson(listing.readAllStandardOutput()).array();
-            for (const QJsonValue &value : array) {
-                const QJsonObject object = value.toObject();
-                nextApplications.append(QVariantMap{
-                    {QStringLiteral("desktopId"), object.value(QStringLiteral("desktop_id")).toString()},
-                    {QStringLiteral("name"), object.value(QStringLiteral("name")).toString()},
-                    {QStringLiteral("icon"), object.value(QStringLiteral("icon")).toString()},
-                });
-            }
-        }
-    }
-    if (nextApplications != m_applications) {
-        m_applications = nextApplications;
+    if (nextPath.isEmpty() && !m_applications.isEmpty()) {
+        m_applications.clear();
         stateChanged = true;
     }
     setAvailable(!m_toolPath.isEmpty());
     if (stateChanged) {
         Q_EMIT changed();
     }
+    requestApplicationListing();
+}
+
+void ApplicationIconBackend::requestApplicationListing()
+{
+    if (m_toolPath.isEmpty()) {
+        if (m_applicationsLoading) {
+            m_applicationsLoading = false;
+            Q_EMIT changed();
+        }
+        return;
+    }
+    if (m_listingProcess.state() != QProcess::NotRunning) {
+        m_listingRefreshQueued = true;
+        return;
+    }
+    m_listingToolPath = m_toolPath;
+    m_applicationsLoading = true;
+    Q_EMIT changed();
+    m_listingProcess.start(m_listingToolPath, {QStringLiteral("--list")});
 }
 
 void ApplicationIconBackend::start(const QStringList &arguments, const QString &successMessage)

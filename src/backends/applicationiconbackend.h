@@ -21,6 +21,7 @@ class ApplicationIconBackend final : public BackendBase
     Q_PROPERTY(QString shape READ shape NOTIFY changed)
     Q_PROPERTY(QString prompt READ prompt NOTIFY changed)
     Q_PROPERTY(QVariantList applications READ applications NOTIFY changed)
+    Q_PROPERTY(bool applicationsLoading READ applicationsLoading NOTIFY changed)
     Q_PROPERTY(QString lastResult READ lastResult NOTIFY changed)
     Q_PROPERTY(QString aiBatchId READ aiBatchId NOTIFY changed)
     Q_PROPERTY(QVariantList aiBatchPreviews READ aiBatchPreviews NOTIFY changed)
@@ -34,6 +35,7 @@ public:
     QString shape() const;
     QString prompt() const;
     QVariantList applications() const;
+    bool applicationsLoading() const;
     QString lastResult() const;
     QString aiBatchId() const;
     QVariantList aiBatchPreviews() const;
@@ -63,6 +65,7 @@ Q_SIGNALS:
 
 private:
     void start(const QStringList &arguments, const QString &successMessage);
+    void requestApplicationListing();
 
     QString m_toolPath;
     QString m_style = QStringLiteral("monet");
@@ -70,9 +73,13 @@ private:
     QString m_prompt;
     QString m_lastResult;
     QVariantList m_applications;
+    bool m_applicationsLoading = false;
+    bool m_listingRefreshQueued = false;
+    QString m_listingToolPath;
     QString m_aiBatchId;
     QVariantList m_aiBatchPreviews;
     QProcess m_process;
+    QProcess m_listingProcess;
     std::unique_ptr<QTemporaryFile> m_aiImageFile;
     std::unique_ptr<QTemporaryDir> m_aiBatchDirectory;
     bool m_applyingAiBatch = false;

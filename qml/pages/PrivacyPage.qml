@@ -106,6 +106,21 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
+            title: qsTr("Meo session entry")
+            subtitle: qsTr("Preview Meo lock-screen presentation without changing KDE authentication")
+            model: [{
+                "title": qsTr("Lock screen & login"),
+                "subtitle": qsTr("Preview visual and privacy choices"),
+                "icon": "lock",
+                "tone": "neutral",
+                "route": "session-entry",
+                "trailingKind": "navigation"
+            }]
+            onRowActivated: (index, row) => root.navigateTo(row.route)
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
             title: qsTr("Security controls")
             subtitle: qsTr("These protected workflows retain their established system owner")
             model: [

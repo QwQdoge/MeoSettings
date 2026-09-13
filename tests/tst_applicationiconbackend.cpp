@@ -1,5 +1,8 @@
 #include "../src/backends/applicationiconbackend.h"
 
+#include <QElapsedTimer>
+#include <QFile>
+#include <QTemporaryDir>
 #include <QtTest>
 
 class ApplicationIconBackendTest final : public QObject
@@ -9,6 +12,7 @@ class ApplicationIconBackendTest final : public QObject
 private Q_SLOTS:
     void argumentsAreStrictAndArgumentSafe();
     void rejectsUntrustedGeneratedImageData();
+    void applicationDiscoveryDoesNotBlockTheGuiThread();
 };
 
 void ApplicationIconBackendTest::argumentsAreStrictAndArgumentSafe()
@@ -52,6 +56,33 @@ void ApplicationIconBackendTest::rejectsUntrustedGeneratedImageData()
                          QStringLiteral("data:image/png;base64,bm90LWEtcG5n"),
                          QStringLiteral("pixel"), QStringLiteral("Keep identity"));
     QVERIFY(!backend.error().isEmpty());
+}
+
+void ApplicationIconBackendTest::applicationDiscoveryDoesNotBlockTheGuiThread()
+{
+    QTemporaryDir toolsDirectory;
+    QVERIFY(toolsDirectory.isValid());
+    const QString toolPath = toolsDirectory.filePath(QStringLiteral("meo-app-icon-studio"));
+    QFile tool(toolPath);
+    QVERIFY(tool.open(QIODevice::WriteOnly | QIODevice::Text));
+    QVERIFY(tool.write("#!/bin/sh\nsleep 1\nprintf '[]'\n") > 0);
+    tool.close();
+    QVERIFY(tool.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                | QFileDevice::ExeOwner));
+
+    const QByteArray originalPath = qgetenv("PATH");
+    qputenv("PATH", toolsDirectory.path().toUtf8() + ':' + originalPath);
+    QElapsedTimer constructionTimer;
+    constructionTimer.start();
+    ApplicationIconBackend backend;
+    const qint64 constructionElapsed = constructionTimer.elapsed();
+    QTRY_VERIFY_WITH_TIMEOUT(!backend.applicationsLoading(), 2500);
+    qputenv("PATH", originalPath);
+
+    // The fake discovery tool deliberately runs for one second. Construction
+    // must return promptly so QML can present its first frame and skeleton.
+    QVERIFY2(constructionElapsed < 250,
+             qPrintable(QStringLiteral("Construction blocked for %1 ms").arg(constructionElapsed)));
 }
 
 QTEST_MAIN(ApplicationIconBackendTest)

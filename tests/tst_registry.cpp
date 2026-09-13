@@ -15,6 +15,7 @@ private Q_SLOTS:
     void separatesDisplayAndSoundFromDevices();
     void retainsDirectRoutes();
     void exposesNativeNotificationsRoute();
+    void exposesSessionEntryPreviewRoute();
     void exposesControlCenterRoute();
     void exposesNativePowerAndNightLightRoutes();
     void exposesCuratedCategoryEntries();
@@ -123,6 +124,15 @@ void SettingsRegistryTest::exposesNativeNotificationsRoute()
     QVERIFY(std::any_of(focusResults.cbegin(), focusResults.cend(), [](const QVariant &item) {
         return item.toMap().value(QStringLiteral("id")).toString() == QStringLiteral("notifications");
     }));
+}
+
+void SettingsRegistryTest::exposesSessionEntryPreviewRoute()
+{
+    SettingsRegistry registry;
+    const auto sessionEntry = registry.entry(QStringLiteral("session-entry"));
+    QCOMPARE(sessionEntry.value(QStringLiteral("route")).toString(), QStringLiteral("session-entry"));
+    QCOMPARE(sessionEntry.value(QStringLiteral("categoryId")).toString(), QStringLiteral("privacy"));
+    QCOMPARE(sessionEntry.value(QStringLiteral("risk")).toString(), QStringLiteral("read-only"));
 }
 
 void SettingsRegistryTest::exposesControlCenterRoute()

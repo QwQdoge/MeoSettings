@@ -174,6 +174,7 @@ ApplicationWindow {
         case "appearance": return Qt.resolvedUrl("pages/AppearancePage.qml")
         case "notifications": return Qt.resolvedUrl("pages/NotificationsPage.qml")
         case "accounts": return Qt.resolvedUrl("pages/AccountsPage.qml")
+        case "session-entry": return Qt.resolvedUrl("pages/SessionEntryPage.qml")
         case "control-center": return Qt.resolvedUrl("pages/ControlCenterPage.qml")
         case "desktop-integration": return Qt.resolvedUrl("pages/DesktopIntegrationPage.qml")
         case "storage": return Qt.resolvedUrl("pages/StoragePage.qml")
@@ -248,6 +249,34 @@ ApplicationWindow {
         currentRoute = targetRoute
         pageHost.showPage(pageSource(targetRoute), pageProperties(targetRoute),
                           nextIndex >= previousIndex ? 1 : -1, targetRoute)
+    }
+
+    // Settings pages share a predictable title-and-groups frame. Declaring
+    // those positions lets MeoPageHost acknowledge navigation immediately
+    // without showing an empty viewport while an asynchronous page compiles.
+    Component {
+        id: settingsPageLoadingPlaceholder
+
+        Rectangle {
+            color: MeoTheme.surface
+
+            Column {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.leftMargin: rootMetrics.isCompactWidth ? MeoTheme.space24 : MeoTheme.space48
+                anchors.rightMargin: anchors.leftMargin
+                anchors.topMargin: MeoTheme.space40
+                spacing: MeoTheme.space16
+
+                MeoSkeleton { type: "text"; width: Math.min(parent.width * 0.42, 280 * MeoTheme.globalScale); height: 28 * MeoTheme.globalScale }
+                MeoSkeleton { type: "text"; width: Math.min(parent.width * 0.72, 520 * MeoTheme.globalScale) }
+                Item { width: 1; height: MeoTheme.space8 }
+                MeoSkeleton { type: "card"; width: parent.width; height: 104 * MeoTheme.globalScale; radius: MeoTheme.shapeExtraLarge }
+                MeoSkeleton { type: "card"; width: parent.width; height: 168 * MeoTheme.globalScale; radius: MeoTheme.shapeExtraLarge }
+                MeoSkeleton { type: "card"; width: parent.width; height: 104 * MeoTheme.globalScale; radius: MeoTheme.shapeExtraLarge }
+            }
+        }
     }
 
     MeoNavigationSuite {
@@ -334,9 +363,14 @@ ApplicationWindow {
             anchors.top: navigation.isCompact ? compactTopBar.bottom : parent.top
             anchors.bottom: parent.bottom
             transitionDistance: 32 * MeoTheme.globalScale
+            loadingPlaceholder: settingsPageLoadingPlaceholder
             onPageLoaded: (item) => {
-                root.lastLoadedRoute = root.currentRoute
-                root.pageReady(root.currentRoute)
+                // Rapid navigation can change currentRoute while the previous
+                // asynchronous page is still completing. Acknowledge the
+                // exact route constructed by MeoPageHost instead of labelling
+                // that page with the newest sidebar selection.
+                root.lastLoadedRoute = pageHost.readyPageKey
+                root.pageReady(pageHost.readyPageKey)
             }
         }
     }
