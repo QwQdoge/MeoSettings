@@ -458,3 +458,6 @@ install(FILES
 install(FILES data/meo-account/clients/org.meo.Settings.json
     DESTINATION "${CMAKE_INSTALL_DATADIR}/meo-account/clients"
 )
+install(FILES LICENSE
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/meo-settings"
+)

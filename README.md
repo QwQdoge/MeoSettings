@@ -2,6 +2,12 @@
 
 Meo Settings 是 MeoArch 的日常系统设置应用。它以 MeoUI 提供的通用界面为基础，通过稳定的 Qt/KDE API、已安装的 MeoKDE 运行时和明确的 KCM 交接提供真实设置流程；它不取代 NetworkManager、BlueZ、PipeWire、KScreen、PowerDevil、KWin 或 System Settings。
 
+## License
+
+除另有文件级声明或第三方说明外，本仓库原创代码以 GNU General Public
+License v3.0 或更高版本（`GPL-3.0-or-later`）授权。完整条款见
+[LICENSE](LICENSE)；依赖项与第三方资源保留各自的上游许可证。
+
 ## 目录 / Layout
 
 - `qml/`：应用页面、导航和 MeoUI 组合。
