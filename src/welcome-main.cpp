@@ -1,14 +1,90 @@
 #include <QCommandLineParser>
+#include <QCoreApplication>
+#include <QDir>
 #include <QGuiApplication>
+#include <QLocale>
 #include <QProcess>
 #include <QQmlApplicationEngine>
-#include <QQmlContext>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QStringList>
 #include <QTimer>
+#include <QTranslator>
+#include <QVariant>
 
 #include "backends/fingerprintbackend.h"
 #include "core/qmlimportpolicy.h"
+
+#ifndef MEO_WELCOME_TRANSLATIONS_BUILD_DIR
+#define MEO_WELCOME_TRANSLATIONS_BUILD_DIR ""
+#endif
+
+#ifndef MEO_WELCOME_TRANSLATIONS_INSTALL_DIR
+#define MEO_WELCOME_TRANSLATIONS_INSTALL_DIR ""
+#endif
+
+#ifndef MEOUI_TRANSLATIONS_DEVELOPMENT_DIR
+#define MEOUI_TRANSLATIONS_DEVELOPMENT_DIR ""
+#endif
+
+#ifndef MEOUI_TRANSLATIONS_INSTALL_DIR
+#define MEOUI_TRANSLATIONS_INSTALL_DIR ""
+#endif
+
+namespace
+{
+QString normalizedUiLanguage(const QString &requestedLanguage)
+{
+    const QLocale locale(requestedLanguage.trimmed().isEmpty()
+                             ? QLocale::system()
+                             : QLocale(requestedLanguage));
+    if (locale.language() == QLocale::Chinese) {
+        // Welcome currently ships a Simplified Chinese catalog. Do not fall
+        // back to English merely because the system uses another Chinese
+        // regional locale.
+        return QStringLiteral("zh_CN");
+    }
+    const QString language = locale.name();
+    return language == QStringLiteral("C") ? QStringLiteral("en_US") : language;
+}
+
+QString bundledTranslationDirectory(const QString &moduleName)
+{
+    return QDir::cleanPath(
+        QDir(QCoreApplication::applicationDirPath())
+            .filePath(QStringLiteral("../share/%1/translations").arg(moduleName)));
+}
+
+QStringList translationPaths(const char *environmentVariable,
+                             const QStringList &fallbackDirectories)
+{
+    QStringList paths;
+    const QString environmentDirectory = qEnvironmentVariable(environmentVariable).trimmed();
+    if (!environmentDirectory.isEmpty()) {
+        paths.append(environmentDirectory);
+    }
+    for (const QString &directory : fallbackDirectories) {
+        if (!directory.isEmpty() && !paths.contains(directory)) {
+            paths.append(directory);
+        }
+    }
+    return paths;
+}
+
+bool installCatalog(QGuiApplication &app,
+                    QTranslator &translator,
+                    const QString &catalog,
+                    const QStringList &paths)
+{
+    for (const QString &path : paths) {
+        if (translator.load(catalog, path)) {
+            app.installTranslator(&translator);
+            return true;
+        }
+    }
+    return false;
+}
+}
 
 class WelcomeState final : public QObject
 {
@@ -63,7 +139,6 @@ int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Meo Welcome"));
-    app.setApplicationDisplayName(QStringLiteral("Welcome to Meo"));
     app.setOrganizationName(QStringLiteral("MeoArch"));
 
     QCommandLineParser parser;
@@ -72,9 +147,49 @@ int main(int argc, char *argv[])
                                         QStringLiteral("Show the welcome flow even after completion."));
     const QCommandLineOption smokeOption(QStringLiteral("smoke"),
                                          QStringLiteral("Load the welcome flow, then exit after the startup event loop."));
+    const QCommandLineOption uiLanguageOption(
+        QStringLiteral("ui-language"),
+        QStringLiteral("Use an explicit UI language for development and validation."),
+        QStringLiteral("locale"));
     parser.addOption(showOption);
     parser.addOption(smokeOption);
+    parser.addOption(uiLanguageOption);
     parser.process(app);
+
+    // This affects only the Welcome process. It never writes a Plasma/session
+    // setting, and the command-line override is intentionally non-persistent.
+    const QString uiLanguage = normalizedUiLanguage(parser.value(uiLanguageOption));
+    const QLocale locale(uiLanguage);
+    QLocale::setDefault(locale);
+
+    QTranslator meoUiTranslator;
+    QTranslator welcomeTranslator;
+    bool meoUiCatalogLoaded = false;
+    bool welcomeCatalogLoaded = false;
+    if (locale.name() == QStringLiteral("zh_CN")) {
+        meoUiCatalogLoaded = installCatalog(
+            app,
+            meoUiTranslator,
+            QStringLiteral("meoui_zh_CN"),
+            translationPaths(
+                "MEOUI_TRANSLATIONS",
+                {bundledTranslationDirectory(QStringLiteral("meoui-qml")),
+                 QString::fromUtf8(MEOUI_TRANSLATIONS_DEVELOPMENT_DIR),
+                 QString::fromUtf8(MEOUI_TRANSLATIONS_INSTALL_DIR)}));
+        welcomeCatalogLoaded = installCatalog(
+            app,
+            welcomeTranslator,
+            QStringLiteral("meo_welcome_zh_CN"),
+            translationPaths(
+                "MEO_WELCOME_TRANSLATIONS",
+                {bundledTranslationDirectory(QStringLiteral("meo-settings")),
+                 QString::fromUtf8(MEO_WELCOME_TRANSLATIONS_BUILD_DIR),
+                 QString::fromUtf8(MEO_WELCOME_TRANSLATIONS_INSTALL_DIR)}));
+    }
+    app.setApplicationDisplayName(QCoreApplication::translate("WelcomeApplication", "Welcome to Meo"));
+    qInfo().nospace() << "Meo Welcome UI language=" << locale.name()
+                      << ", MeoUI zh_CN catalog=" << meoUiCatalogLoaded
+                      << ", Welcome zh_CN catalog=" << welcomeCatalogLoaded;
 
     WelcomeState state;
     FingerprintBackend fingerprintBackend;
@@ -83,15 +198,18 @@ int main(int argc, char *argv[])
     }
 
     QQmlApplicationEngine engine;
+    engine.setUiLanguage(locale.bcp47Name());
 #ifdef MEOUI_IMPORT_ROOT_PATH
     MeoQmlImportPolicy::prioritizeMeoUi(engine, QStringLiteral(MEOUI_IMPORT_ROOT_PATH));
 #else
     MeoQmlImportPolicy::prioritizeMeoUi(engine);
 #endif
-    engine.rootContext()->setContextProperty(QStringLiteral("WelcomeState"), &state);
     // The welcome flow receives only the privacy-safe fprintd projection. It
     // cannot read, enroll, export, or otherwise handle biometric data.
-    engine.rootContext()->setContextProperty(QStringLiteral("FingerprintBackend"), &fingerprintBackend);
+    engine.setInitialProperties({
+        {QStringLiteral("welcomeState"), QVariant::fromValue(&state)},
+        {QStringLiteral("fingerprintBackend"), QVariant::fromValue(&fingerprintBackend)}
+    });
     engine.loadFromModule(QStringLiteral("org.meo.welcome"), QStringLiteral("Welcome"));
     if (engine.rootObjects().isEmpty()) {
         return EXIT_FAILURE;

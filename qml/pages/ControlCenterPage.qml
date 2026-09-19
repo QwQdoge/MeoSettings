@@ -174,20 +174,25 @@ Item {
         title: root.isCompact ? "" : qsTr("Control Center")
         subtitle: qsTr("Choose which Meo Quick Settings tiles appear, how they are arranged, and how dense the surface feels.")
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: ControlCenterBackend.error !== ""
-            Row {
+            spacing: MeoTheme.space4
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: ControlCenterBackend.error
-                    typeRole: "body"; typeSize: "medium"; color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Control Center needs attention")
+                text: qsTr("Try saving the layout again. Your current setup remains unchanged.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(ControlCenterBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -195,6 +200,9 @@ Item {
             width: parent.width
             type: "filled"
             visible: ControlCenterBackend.available
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: qsTr("Meo Control Center status")
+            Accessible.description: ControlCenterBackend.summary
             Column {
                 width: parent.width
                 spacing: 4 * MeoTheme.globalScale
@@ -218,7 +226,7 @@ Item {
             width: parent.width
             visible: ControlCenterBackend.available
             title: qsTr("Edit tiles")
-            subtitle: qsTr("Select tiles to rearrange and resize")
+            subtitle: qsTr("Choose which tiles appear, then rearrange or resize them.")
             tiles: root.visibleEditorTiles
             availableTiles: root.availableEditorTiles
             columns: 4
@@ -258,7 +266,7 @@ Item {
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("Density changes only the Meo Quick Settings tiles. It does not change text scale or the rest of Plasma.")
+                    text: qsTr("Choose how much space Quick Settings tiles use. It does not change text size elsewhere.")
                     typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant
                     wrapMode: Text.WordWrap
                 }
@@ -318,13 +326,13 @@ Item {
                 spacing: 6 * MeoTheme.globalScale
                 MeoText {
                     width: parent.width
-                    text: qsTr("Direct Meo configuration")
+                    text: qsTr("Your Control Center")
                     typeRole: "title"; typeSize: "small"; emphasized: true
                     color: MeoTheme.contentOnSurface
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("Changes are written to the active Meo top-bar applet through Plasma Shell and reloaded immediately. This page never edits Plasma configuration files directly or redirects this task to a KDE settings module.")
+                    text: qsTr("Changes are saved to the Meo top-bar and take effect right away. Meo does not edit Plasma configuration files directly.")
                     typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant
                     wrapMode: Text.WordWrap
                 }
@@ -337,7 +345,7 @@ Item {
             visible: !ControlCenterBackend.available && !ControlCenterBackend.busy
             icon: "settings"
             title: qsTr("Meo Control Center is unavailable")
-            description: qsTr("Keep the Meo top-bar applet in the active Plasma layout, then refresh this page. No fallback writes are made to an arbitrary Plasma configuration file.")
+            description: qsTr("Add the Meo top-bar to the active Plasma layout, then refresh this page. Meo will not write to a different Plasma configuration file.")
             actionText: qsTr("Refresh")
             onActionClicked: ControlCenterBackend.refresh()
         }

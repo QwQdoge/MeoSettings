@@ -22,6 +22,13 @@ Item {
     readonly property bool pairingNeedsConfirmation: pairingKind === "confirmation"
                                                  || pairingKind === "authorization"
                                                  || pairingKind === "service-authorization"
+    readonly property string bluetoothStatusAccessible: !BluetoothBackend.available
+                                                     ? qsTr("Bluetooth unavailable")
+                                                     : (BluetoothBackend.rfkillBlocked
+                                                        ? qsTr("Bluetooth blocked by device controls")
+                                                        : (BluetoothBackend.enabled
+                                                           ? qsTr("Bluetooth on")
+                                                           : qsTr("Bluetooth off")))
 
     function deviceGroup(device) {
         if (device.blocked)
@@ -88,14 +95,14 @@ Item {
                            ? pairingRequest.deviceName
                            : BluetoothBackend.pairingDeviceName
         switch (pairingKind) {
-        case "pin": return qsTr("Enter the PIN requested by %1. The PIN is sent only to BlueZ for this pairing.").arg(deviceName)
+        case "pin": return qsTr("Enter the PIN requested by %1. The PIN is used only for this pairing.").arg(deviceName)
         case "passkey": return qsTr("Enter the numeric passkey requested by %1.").arg(deviceName)
         case "confirmation": return qsTr("Make sure this code is also shown on %1 before confirming.").arg(deviceName)
         case "authorization": return qsTr("%1 is requesting authorization to pair. Only continue if this is the device you chose.").arg(deviceName)
-        case "service-authorization": return qsTr("%1 is requesting access to a Bluetooth service. Review the service identifier before allowing it.").arg(deviceName)
+        case "service-authorization": return qsTr("%1 is requesting access to a Bluetooth service. Review the service details before allowing it.").arg(deviceName)
         case "display-pin": return qsTr("Enter this PIN on %1. Pairing continues automatically after the device accepts it.").arg(deviceName)
         case "display-passkey": return qsTr("Enter this passkey on %1. Pairing continues automatically after the device accepts it.").arg(deviceName)
-        default: return qsTr("Preparing a private BlueZ authentication channel. This page never becomes the system default pairing agent.")
+        default: return qsTr("Waiting for the device to begin verification. You can cancel safely at any time.")
         }
     }
 
@@ -133,11 +140,13 @@ Item {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
         title: root.isCompact ? "" : qsTr("Bluetooth")
-        subtitle: qsTr("Scan, pair, and manage Bluetooth devices through BlueZ. Every PIN, passkey, code comparison, and authorization is confirmed in Meo Settings.")
+        subtitle: qsTr("Find, pair, and manage nearby Bluetooth devices. You will always confirm a PIN, passkey, code, or permission before continuing.")
 
         MeoCard {
             width: parent.width
             type: "filled"
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: root.bluetoothStatusAccessible
 
             RowLayout {
                 anchors.fill: parent
@@ -157,7 +166,7 @@ Item {
                     MeoText {
                         Layout.fillWidth: true
                         text: !BluetoothBackend.available ? qsTr("No adapter found")
-                              : (BluetoothBackend.rfkillBlocked ? qsTr("Blocked by hardware or rfkill")
+                              : (BluetoothBackend.rfkillBlocked ? qsTr("Blocked by device controls")
                                  : (BluetoothBackend.enabled
                                     ? qsTr("On · %1").arg(root.activeAdapter.name || qsTr("Default adapter"))
                                     : qsTr("Off")))
@@ -181,6 +190,8 @@ Item {
             width: parent.width
             type: "outlined"
             visible: BluetoothBackend.rfkillBlocked
+            Accessible.role: Accessible.AlertMessage
+            Accessible.name: qsTr("Bluetooth is blocked")
 
             Row {
                 width: parent.width
@@ -188,7 +199,7 @@ Item {
                 MeoIcon { icon: "block"; size: 24; color: MeoTheme.error }
                 MeoText {
                     width: parent.width - 36 * MeoTheme.globalScale
-                    text: qsTr("Bluetooth is blocked by rfkill or a hardware switch. Turn it back on from the device hardware controls before pairing.")
+                    text: qsTr("Bluetooth is turned off by a physical switch or your device’s wireless controls. Turn it on there before pairing.")
                     typeRole: "body"
                     typeSize: "medium"
                     color: MeoTheme.contentOnSurfaceVariant
@@ -197,23 +208,26 @@ Item {
             }
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: BluetoothBackend.error !== ""
+            spacing: MeoTheme.space4
 
-            Row {
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: BluetoothBackend.error
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Bluetooth needs attention")
+                text: qsTr("Check that Bluetooth is turned on and the device is nearby, then scan again.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(BluetoothBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -380,7 +394,7 @@ Item {
             visible: !BluetoothBackend.available
             icon: "bluetooth_disabled"
             title: qsTr("Bluetooth is unavailable")
-            description: qsTr("No Bluetooth adapter is currently available through the system BlueZ service.")
+            description: qsTr("No Bluetooth adapter is available right now.")
             actionText: KcmBridge.isAvailable("kcm_bluetooth") ? qsTr("Open advanced settings") : ""
             onActionClicked: root.navigateTo("kcm:kcm_bluetooth")
         }
@@ -535,7 +549,7 @@ Item {
         property var device: ({})
         popupParent: Overlay.overlay
         title: device.name || qsTr("Bluetooth device")
-        subtitle: qsTr("Manage one device explicitly. Trust, block, rename, connection, and removal never happen automatically after pairing.")
+        subtitle: qsTr("Choose how this device connects. It will not be trusted, blocked, renamed, or removed automatically.")
         rejectText: qsTr("Close")
 
         content: Component {
@@ -563,13 +577,13 @@ Item {
                             MeoText {
                                 width: parent.width
                                 visible: deviceDetails.device.rssi !== undefined && deviceDetails.device.rssi < 0
-                                text: qsTr("Signal: %1 dBm").arg(deviceDetails.device.rssi)
+                                text: qsTr("Signal strength: %1 dBm").arg(deviceDetails.device.rssi)
                                 typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant
                             }
                             MeoText {
                                 width: parent.width
                                 text: deviceDetails.device.legacyPairing ? qsTr("Uses legacy pairing")
-                                      : (deviceDetails.device.servicesResolved ? qsTr("Services resolved") : qsTr("Services resolve after connection"))
+                                      : (deviceDetails.device.servicesResolved ? qsTr("Device services are ready") : qsTr("Device services become available after connection"))
                                 typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant
                             }
                         }
@@ -579,7 +593,7 @@ Item {
                         id: renameField
                         width: parent.width
                         label: qsTr("Device name")
-                        helperText: qsTr("This changes the local BlueZ alias, not the device hardware name.")
+                        helperText: qsTr("This only changes how the device is named on this computer.")
                         text: deviceDetails.device.name || ""
                     }
                     MeoButton {
@@ -666,7 +680,7 @@ Item {
         id: adapterOptions
         popupParent: Overlay.overlay
         title: qsTr("Bluetooth adapter")
-        subtitle: qsTr("Choose the adapter used for scanning. Visibility and pairability affect how other devices can find this computer.")
+        subtitle: qsTr("Choose the adapter used for scanning. You can decide whether nearby devices can find this computer or request pairing.")
         rejectText: qsTr("Close")
 
         content: Component {
@@ -709,20 +723,24 @@ Item {
                                 MeoSwitch {
                                     checked: root.activeAdapter.discoverable || false
                                     enabled: !!root.activeAdapter.powered && !BluetoothBackend.busy
+                                    Accessible.name: qsTr("Let nearby devices find this computer")
+                                    Accessible.description: qsTr("Turn this on only when you want another device to discover this computer.")
                                     onToggled: BluetoothBackend.setAdapterDiscoverable(root.activeAdapter.ubi, checked)
                                 }
                             }
-                            MeoText { width: parent.width; text: qsTr("Other devices can see this computer for %1 seconds (0 means no timeout).").arg(root.activeAdapter.discoverableTimeout || 0); typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant; wrapMode: Text.WordWrap }
+                            MeoText { width: parent.width; text: qsTr("Nearby devices can find this computer for %1 seconds. Set 0 to keep it visible until you turn it off.").arg(root.activeAdapter.discoverableTimeout || 0); typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant; wrapMode: Text.WordWrap }
                             RowLayout {
                                 width: parent.width
                                 MeoText { Layout.fillWidth: true; text: qsTr("Pairable"); typeRole: "title"; typeSize: "small"; emphasized: true; color: MeoTheme.contentOnSurface }
                                 MeoSwitch {
                                     checked: root.activeAdapter.pairable || false
                                     enabled: !!root.activeAdapter.powered && !BluetoothBackend.busy
+                                    Accessible.name: qsTr("Allow nearby devices to request pairing")
+                                    Accessible.description: qsTr("Meo will still ask before accepting a pairing request.")
                                     onToggled: BluetoothBackend.setAdapterPairable(root.activeAdapter.ubi, checked)
                                 }
                             }
-                            MeoText { width: parent.width; text: qsTr("Other devices may request pairing for %1 seconds (0 means no timeout). Meo still asks before accepting.").arg(root.activeAdapter.pairableTimeout || 0); typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant; wrapMode: Text.WordWrap }
+                            MeoText { width: parent.width; text: qsTr("Nearby devices can request pairing for %1 seconds. Set 0 to keep it available until you turn it off.").arg(root.activeAdapter.pairableTimeout || 0); typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant; wrapMode: Text.WordWrap }
                             Flow {
                                 width: parent.width
                                 spacing: 8 * MeoTheme.globalScale
@@ -746,9 +764,12 @@ Item {
         padding: 24 * MeoTheme.globalScale
         x: parent ? Math.max(viewportMargin, (parent.width - width) / 2) : 0
         y: parent ? Math.max(viewportMargin, (parent.height - height) / 2) : 0
+        initialFocusItem: forgetDeviceButton
 
         contentItem: Column {
             spacing: 16 * MeoTheme.globalScale
+            Accessible.role: Accessible.Dialog
+            Accessible.name: qsTr("Forget %1?").arg(forgetPrompt.device.name || qsTr("device"))
             MeoText {
                 width: parent.width
                 text: qsTr("Forget %1?").arg(forgetPrompt.device.name || qsTr("device"))
@@ -763,6 +784,7 @@ Item {
                 width: parent.width
                 spacing: 8 * MeoTheme.globalScale
                 MeoButton {
+                    id: forgetDeviceButton
                     text: qsTr("Forget device")
                     type: "filled"
                     onClicked: {

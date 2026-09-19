@@ -322,11 +322,18 @@ Item {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
         title: root.isCompact ? "" : qsTr("Notifications")
-        subtitle: qsTr("Control global behavior and per-app rules directly through Plasma’s real notification settings.")
+        subtitle: qsTr("Choose how notifications appear and set rules for each app. Changes take effect in your current Plasma session.")
 
         MeoCard {
             width: parent.width
             type: "outlined"
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: root.manualDndEnabled
+                             ? qsTr("Do Not Disturb is on")
+                             : qsTr("Notifications are available")
+            Accessible.description: root.manualDndEnabled
+                                    ? qsTr("Notification history stays available in the Meo status center.")
+                                    : qsTr("Your notification preferences apply to the Meo status center, quick settings, and Plasma popups.")
 
             Row {
                 width: parent.width
@@ -387,7 +394,7 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Automatic Do Not Disturb")
-            subtitle: qsTr("Presentation and fullscreen behavior controlled by the active Plasma session")
+            subtitle: qsTr("Keep notifications quiet automatically while you present or use a full-screen app")
             model: root.automaticDndRows
             onRowToggled: (index, checked, row) => root.setSetting(row.id, checked)
         }
@@ -395,7 +402,7 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Background tasks")
-            subtitle: qsTr("Keep long-running work visible without leaving Meo Settings")
+            subtitle: qsTr("Choose how file transfers and other ongoing tasks notify you")
             model: root.backgroundRows
             onRowToggled: (index, checked, row) => root.setSetting(row.id, checked)
         }
@@ -404,7 +411,7 @@ Item {
             width: parent.width
             visible: root.applicationRows.length > 0
             title: qsTr("By application")
-            subtitle: qsTr("Rules apply to applications Plasma has actually seen; open an app to manage its popups, history, Do Not Disturb exception, and taskbar badge")
+            subtitle: qsTr("Choose which apps can show popups, stay in history, bypass Do Not Disturb, or show a taskbar badge")
             model: root.applicationRows
             onRowActivated: (index, row) => root.openApplicationRules(row.id)
         }
@@ -431,7 +438,7 @@ Item {
         popupParent: Overlay.overlay
         property string applicationId: ""
         title: applicationId || qsTr("Application notifications")
-        subtitle: qsTr("These are Plasma’s stored notification behaviors for this application. They do not delete notification history or change the application itself.")
+        subtitle: qsTr("Choose how this app notifies you. These settings do not change the app itself.")
         rejectText: qsTr("Close")
 
         content: Component {
@@ -446,7 +453,7 @@ Item {
                     x: 16 * MeoTheme.globalScale
                     y: 16 * MeoTheme.globalScale
                     title: qsTr("Notification behavior")
-                    subtitle: qsTr("Changes are saved to Plasma immediately")
+                    subtitle: qsTr("Changes take effect right away")
                     model: [
                         {
                             "id": "popups",

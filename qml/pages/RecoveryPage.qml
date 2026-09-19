@@ -48,5 +48,10 @@ Item {
                 MeoText { Layout.fillWidth: true; text: SystemTransactionBackend.serviceAvailable ? qsTr("The Meo transaction service is available for inspect, preview, authorization, recovery point, apply, validation, and commit.") : qsTr("The privileged Meo transaction service is not installed yet. Settings will not pretend that it can apply or recover a protected change."); wrapMode: Text.WordWrap; typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant }
             }
         }
+
+        RepairEntry {
+            category: "boot"
+            entryTitle: qsTr("Troubleshoot startup and boot")
+        }
     }
 }

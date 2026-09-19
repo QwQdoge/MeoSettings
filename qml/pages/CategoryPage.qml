@@ -41,7 +41,7 @@ Item {
             rows.push({
                 "title": entry.title,
                 "subtitle": handoff && !available
-                            ? qsTr("This advanced system tool is not installed")
+                            ? qsTr("This advanced setting is not available on this device")
                             : entry.description,
                 "icon": entry.icon,
                 "tone": entry.tone || "primary",
@@ -62,7 +62,7 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : (root.categoryInfo.title || qsTr("Settings"))
-        subtitle: root.categoryInfo.description || qsTr("Browse available settings")
+        subtitle: root.categoryInfo.description || qsTr("Browse settings available on this device")
 
         MeoSettingsGroup {
             width: parent.width
@@ -79,7 +79,7 @@ Item {
             visible: root.categoryRows.length === 0
             icon: "settings"
             title: qsTr("No settings in this category")
-            description: qsTr("The settings registry does not currently expose an entry here.")
+            description: qsTr("No settings are available here yet.")
             actionText: qsTr("Back to Home")
             onActionClicked: root.navigateTo("home")
         }

@@ -15,27 +15,28 @@ Item {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
         title: root.isCompact ? "" : qsTr("Sound")
-        subtitle: AudioBackend.pipeWire
-                  ? qsTr("Audio is provided by PipeWire through KDE’s PulseAudioQt backend.")
-                  : qsTr("Choose audio devices and adjust volume through KDE’s PulseAudioQt backend.")
+        subtitle: qsTr("Choose where audio plays and which microphone to use.")
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: AudioBackend.error !== ""
+            spacing: MeoTheme.space4
 
-            Row {
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: AudioBackend.error
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Sound needs attention")
+                text: qsTr("Check that your audio device is connected, then refresh or choose an output.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(AudioBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -52,6 +53,10 @@ Item {
             width: parent.width
             type: "filled"
             visible: AudioBackend.available
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: AudioBackend.outputMuted
+                             ? qsTr("Output is muted")
+                             : qsTr("Current output: %1").arg(AudioBackend.outputName)
 
             Column {
                 width: parent.width
@@ -83,6 +88,7 @@ Item {
                         Component.onCompleted: value = AudioBackend.outputVolume
                         onMoved: (currentValue) => AudioBackend.outputVolume = Math.round(currentValue)
                         Accessible.name: qsTr("Output volume")
+                        Accessible.description: qsTr("%1 percent").arg(Math.round(outputVolumeSlider.value))
                         Connections {
                             target: AudioBackend
                             function onChanged() { outputVolumeSlider.value = AudioBackend.outputVolume }
@@ -145,6 +151,10 @@ Item {
             width: parent.width
             type: "filled"
             visible: AudioBackend.microphoneAvailable
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: AudioBackend.inputMuted
+                             ? qsTr("Microphone is muted")
+                             : qsTr("Current input: %1").arg(AudioBackend.inputName)
 
             Column {
                 width: parent.width
@@ -176,6 +186,7 @@ Item {
                         Component.onCompleted: value = AudioBackend.inputVolume
                         onMoved: (currentValue) => AudioBackend.inputVolume = Math.round(currentValue)
                         Accessible.name: qsTr("Microphone volume")
+                        Accessible.description: qsTr("%1 percent").arg(Math.round(inputVolumeSlider.value))
                         Connections {
                             target: AudioBackend
                             function onChanged() { inputVolumeSlider.value = AudioBackend.inputVolume }
@@ -238,9 +249,14 @@ Item {
             visible: !AudioBackend.available
             icon: "volume_off"
             title: qsTr("Audio service is unavailable")
-            description: qsTr("No default output is available from the audio service.")
+            description: qsTr("No audio output is available right now.")
             actionText: KcmBridge.isAvailable("kcm_pulseaudio") ? qsTr("Open KDE sound settings") : ""
             onActionClicked: root.navigateTo("kcm:kcm_pulseaudio")
+        }
+
+        RepairEntry {
+            category: "audio"
+            entryTitle: qsTr("Troubleshoot sound")
         }
     }
 }

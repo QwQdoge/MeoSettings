@@ -23,9 +23,17 @@ ApplicationWindow {
                                              && MeoTheme.colorSchemeMode === "dynamic"
                                              && MeoTheme.hasCompleteColorScheme(MeoTheme.dynamicColorScheme)
     readonly property string dynamicThemeMode: MeoTheme.colorSchemeMode
+    // A page is ready for route-by-route validation only once its visual
+    // handoff has committed. `readyPageKey` is intentionally earlier: it
+    // acknowledges that a Loader constructed an item while the old page may
+    // still be animating out. Advancing a smoke navigator at that point can
+    // coalesce a new request into the active handoff and make the result
+    // depend on frame timing rather than route correctness.
     readonly property bool pageContentReady: pageHost.initialized
                                             && pageHost.currentItem !== null
-                                            && lastLoadedRoute === currentRoute
+                                            && pageHost.currentPageKey === currentRoute
+                                            && !pageHost.loading
+                                            && !pageHost.transitioning
     readonly property bool usesDesktopSettingsIndex: rootMetrics.isExpandedWidth
                                                      || rootMetrics.isLargeWidth
                                                      || rootMetrics.isExtraLargeWidth

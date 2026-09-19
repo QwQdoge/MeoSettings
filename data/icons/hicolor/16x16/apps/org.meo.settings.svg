@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="Meo Settings 16 pixel optical master">
+  <path fill="#7661C9" d="M1 1H15V3H1Z"/>
+  <circle cx="5" cy="2" r="2" fill="#B69DF8"/>
+  <path fill="#4B2B82" d="M1 7H15V9H1Z"/>
+  <circle cx="11" cy="8" r="2" fill="#8BE0CF"/>
+  <path fill="#7661C9" d="M1 13H15V15H1Z"/>
+  <circle cx="7" cy="14" r="2" fill="#FFB4AB"/>
+</svg>

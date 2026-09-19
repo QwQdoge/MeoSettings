@@ -29,7 +29,7 @@ Item {
         if (KcmBridge.isAvailable("kcm_screenlocker")) {
             rows.push({
                 "title": qsTr("Lock screen"),
-                "subtitle": qsTr("Open verified screen lock controls"),
+                "subtitle": qsTr("Open screen lock settings"),
                 "icon": "lock",
                 "tone": "secondary",
                 "route": "kcm:kcm_screenlocker",
@@ -38,8 +38,8 @@ Item {
             })
         }
         rows.push({
-            "title": qsTr("Screen timeout"),
-            "subtitle": qsTr("Open power and display timeout controls"),
+                "title": qsTr("Screen timeout"),
+                "subtitle": qsTr("Choose when the display turns off"),
             "icon": "timer",
             "tone": "secondary",
             "route": "power",
@@ -64,7 +64,7 @@ Item {
     // verified Appearance/KCM workflow.
     readonly property var textAppearanceRows: [{
         "title": qsTr("Display size & text"),
-        "subtitle": qsTr("Preview text, interface appearance, and open verified system font controls"),
+        "subtitle": qsTr("Adjust text and interface appearance"),
         "icon": "format_size",
         "tone": "secondary",
         "route": "appearance",
@@ -113,43 +113,49 @@ Item {
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: DisplayBackend.error !== ""
+            spacing: MeoTheme.space4
 
-            Row {
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: DisplayBackend.error
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Display needs attention")
+                text: qsTr("Check that the display is connected, then refresh the display list.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(DisplayBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: Platform.lastError !== ""
+            spacing: MeoTheme.space4
 
-            Row {
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: Platform.lastError
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("This display setting could not be applied")
+                text: qsTr("Check the current display state, then try the setting again.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(Platform.lastError)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -238,7 +244,7 @@ Item {
                 MeoIcon { icon: "info"; size: 24; color: MeoTheme.primary }
                 MeoText {
                     width: parent.width - 36 * MeoTheme.globalScale
-                    text: qsTr("The current session does not expose direct brightness or Night Light controls. Advanced KDE display tools remain available below when installed.")
+                    text: qsTr("This device does not make brightness or Night Light available here. More display settings are available below when installed.")
                     typeRole: "body"
                     typeSize: "medium"
                     color: MeoTheme.contentOnSurfaceVariant
@@ -346,7 +352,7 @@ Item {
             visible: DisplayBackend.available && DisplayBackend.outputs.length === 0
             icon: "monitor_off"
             title: qsTr("No connected displays")
-            description: qsTr("KScreen did not report a connected display configuration.")
+            description: qsTr("No display configuration was reported by this session.")
             actionText: qsTr("Refresh")
             onActionClicked: DisplayBackend.refresh()
         }
@@ -355,9 +361,14 @@ Item {
             width: parent.width
             visible: root.advancedRows.length > 0
             title: qsTr("Advanced display configuration")
-            subtitle: qsTr("These maintained KDE modules cover configuration that needs hardware-specific recovery or scheduling.")
+            subtitle: qsTr("Use these tools for display options that need device-specific recovery or scheduling.")
             model: root.advancedRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
+        }
+
+        RepairEntry {
+            category: "display"
+            entryTitle: qsTr("Troubleshoot displays")
         }
     }
 }

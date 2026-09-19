@@ -22,11 +22,11 @@ Item {
     function dynamicSourceDescription(source) {
         switch (source) {
         case "wallpaper":
-            return qsTr("Sample the configured local desktop image, then generate one complete MD3 scheme")
+            return qsTr("Use the configured desktop wallpaper to create one shared color scheme")
         case "manual":
-            return qsTr("Use a selected seed color, then generate one complete MD3 scheme")
+            return qsTr("Use a color you choose to create one shared color scheme")
         default:
-            return qsTr("Use the active system accent, then generate one complete MD3 scheme")
+            return qsTr("Use the current system accent to create one shared color scheme")
         }
     }
 
@@ -43,7 +43,7 @@ Item {
         const available = KcmBridge.isAvailable(id)
         return {
             "title": title,
-            "subtitle": available ? subtitle : qsTr("This advanced system tool is not installed"),
+            "subtitle": available ? subtitle : qsTr("This advanced system setting is not available"),
             "icon": icon,
             "tone": "tertiary",
             "route": "kcm:" + id,
@@ -74,10 +74,9 @@ Item {
         applicationIconStudio.promptText = ApplicationIconBackend.prompt
         applicationIconStudio.applyScope = "all"
         applicationIconStudio.selectedApplicationIds = []
-        applicationIconStudio.selectedCredentialId = ""
-        applicationIconStudio.aiModel = ""
+        applicationIconStudio.resetAiPackForOpen()
         if (AccountBackend.signedIn)
-            AccountBackend.refreshAiCredentials()
+            AccountBackend.refreshAiIconStyles()
         applicationIconStudio.open()
     }
 
@@ -94,9 +93,9 @@ Item {
             "id": "dynamic-color",
             "title": qsTr("Dynamic color"),
             "subtitle": MeoShellTheme.ready
-                        ? qsTr("Complete Material colors are supplied by the active desktop session from %1")
+                        ? qsTr("Colors come from %1 in this desktop session")
                               .arg(root.dynamicSourceTitle(MeoTheme.dynamicColorSourceId))
-                        : qsTr("The active desktop session has not supplied a complete dynamic color scheme"),
+                        : qsTr("A complete Meo color scheme is not available in this session"),
             "icon": "colors",
             "tone": "tertiary",
             "trailingKind": "choice",
@@ -107,7 +106,7 @@ Item {
         },
         {
             "title": qsTr("System appearance"),
-            "subtitle": qsTr("%1 mode from the active desktop session").arg(root.appearanceMode),
+            "subtitle": qsTr("The current desktop is using %1 mode").arg(root.appearanceMode),
             "icon": MeoTheme.isDarkMode ? "dark_mode" : "light_mode",
             "tone": "primary",
             "trailingKind": "status",
@@ -139,7 +138,7 @@ Item {
             "id": "dynamic-color-source",
             "title": qsTr("Dynamic color source"),
             "subtitle": DynamicColorBackend.busy
-                        ? qsTr("Applying a complete Material color scheme…")
+                        ? qsTr("Applying your color scheme…")
                         : root.dynamicSourceDescription(DynamicColorBackend.sourceMode),
             "icon": DynamicColorBackend.sourceMode === "wallpaper" ? "wallpaper"
                     : (DynamicColorBackend.sourceMode === "manual" ? "colorize" : "palette"),
@@ -150,13 +149,13 @@ Item {
         },
         {
             "id": "apply-dynamic-color",
-            "title": qsTr("Reapply dynamic color"),
+            "title": qsTr("Reapply colors"),
             "subtitle": DynamicColorBackend.busy
-                        ? qsTr("Applying the selected source and appearance mode…")
+                        ? qsTr("Applying the selected colors…")
                         : (DynamicColorBackend.available
-                           ? qsTr("Regenerate the complete Meo HCT/Material scheme from %1")
+                           ? qsTr("Apply a fresh color scheme from %1")
                                  .arg(root.dynamicSourceTitle(DynamicColorBackend.sourceMode))
-                           : qsTr("Install the Meo dynamic-color generator to apply a desktop scheme")),
+                           : qsTr("Install the Meo color service to apply a desktop color scheme")),
             "icon": "auto_awesome",
             "tone": "tertiary",
             "enabled": DynamicColorBackend.available && !DynamicColorBackend.busy,
@@ -169,12 +168,12 @@ Item {
             "subtitle": ApplicationIconBackend.busy
                         ? qsTr("Updating application icons without changing system status icons…")
                         : (ApplicationIconBackend.available
-                           ? qsTr("%1 · %2 · active Material light/dark palette")
+                           ? qsTr("%1 · %2 · colors match the active light or dark mode")
                                  .arg(root.applicationIconShapeTitle(ApplicationIconBackend.shape))
                                  .arg(ApplicationIconBackend.style === "monet" || ApplicationIconBackend.style === "pure"
-                                      ? qsTr("Monet")
-                                      : (ApplicationIconBackend.style === "mono" ? qsTr("Black & white") : qsTr("Original")))
-                           : qsTr("Install the Meo application icon studio to create per-app Pixel-style icons")),
+                                      ? qsTr("Meo Color")
+                                      : (ApplicationIconBackend.style === "mono" ? qsTr("Monochrome") : qsTr("Original")))
+                           : qsTr("Install Meo Icon Studio to customize icons for your apps")),
             "icon": "apps",
             "tone": "primary",
             "enabled": ApplicationIconBackend.available && !ApplicationIconBackend.busy,
@@ -207,12 +206,12 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : qsTr("Appearance")
-        subtitle: qsTr("Choose a wallpaper, system accent, or manual seed once; Meo generates one shared HCT/Material scheme for every Meo surface.")
+        subtitle: qsTr("Choose a wallpaper, system accent, or color. Meo uses one consistent color scheme across its apps.")
 
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Current appearance")
-            subtitle: qsTr("These are real session values. MeoUI and Meo shell surfaces share the same generated role table.")
+            subtitle: qsTr("These are the colors, text, and motion settings active in this session.")
             model: root.currentRows
             onRowActivated: (index, row) => {
                 if (row.id === "dynamic-color")
@@ -223,7 +222,7 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Meo appearance")
-            subtitle: qsTr("A source selection is explicit and confirmation-gated. Meo applies one shared appearance language across the desktop.")
+            subtitle: qsTr("Choose where Meo gets its colors. The change is confirmed before it is applied across Meo.")
             model: root.meoConfigurationRows
             onRowActivated: (index, row) => {
                 if (row.id === "dynamic-color-source")
@@ -244,7 +243,7 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Advanced compatibility")
-            subtitle: qsTr("Use these only when a specialized system editor is required. Meo reads the resulting appearance state back into its shared color bridge.")
+            subtitle: qsTr("Open a specialized system setting when it is not available here. Meo reflects the result in its color theme.")
             model: root.kdeAppearanceRows
             onRowActivated: (index, row) => {
                 if (row.enabled && row.route)
@@ -252,30 +251,35 @@ Item {
             }
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: DynamicColorBackend.error !== ""
+            spacing: MeoTheme.space4
 
-            Row {
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: DynamicColorBackend.error
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Appearance needs attention")
+                text: qsTr("Choose a wallpaper or color again, then try updating the appearance.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(DynamicColorBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
         MeoCard {
             width: parent.width
             type: "outlined"
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: qsTr("Color theme overview")
+            Accessible.description: qsTr("Meo uses one trusted color source across its apps")
 
             Column {
                 width: parent.width
@@ -283,7 +287,7 @@ Item {
 
                 MeoText {
                     width: parent.width
-                    text: qsTr("One dynamic scheme, not a parallel palette")
+                    text: qsTr("One color scheme across Meo")
                     typeRole: "title"
                     typeSize: "small"
                     emphasized: true
@@ -291,7 +295,7 @@ Item {
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("Meo does not interpolate colors in QML or copy a theme file. The installed MeoKDE generator resolves one approved source—KDE accent, the configured local wallpaper, or a manual seed—then produces the complete Material role table with HCT/CAM16 and applies it as one KDE scheme update. Every Meo application consumes that same table.")
+                    text: qsTr("Meo uses one trusted source—your system accent, desktop wallpaper, or a color you choose—to create the colors it uses. Every Meo app uses the same color scheme.")
                     typeRole: "body"
                     typeSize: "small"
                     color: MeoTheme.contentOnSurfaceVariant
@@ -305,7 +309,7 @@ Item {
         id: dynamicColorDetails
         popupParent: Overlay.overlay
         title: qsTr("Dynamic color")
-        subtitle: qsTr("Read-only session diagnostics. Color generation remains in the KDE platform bridge, while MeoUI consumes the complete Material role table.")
+        subtitle: qsTr("View the color settings active in this session. The KDE platform service creates the color scheme, and Meo uses it.")
         rejectText: qsTr("Close")
 
         content: Component {
@@ -327,22 +331,22 @@ Item {
                             "trailingKind": "none", "interactive": false
                         },
                         {
-                            "title": qsTr("Color table"),
+                            "title": qsTr("Color scheme"),
                             "subtitle": MeoTheme.hasCompleteColorScheme(MeoTheme.dynamicColorScheme)
-                                        ? qsTr("Complete Material role table")
-                                        : qsTr("No complete table is installed"),
+                                        ? qsTr("A complete color scheme is ready")
+                                        : qsTr("No complete color scheme is ready"),
                             "icon": "check_circle", "tone": "primary",
                             "trailingKind": "none", "interactive": false
                         },
                         {
-                            "title": qsTr("Revision"),
+                            "title": qsTr("Last update"),
                             "subtitle": qsTr("Session revision %1").arg(MeoTheme.colorSchemeRevision),
                             "icon": "refresh", "tone": "secondary",
                             "trailingKind": "none", "interactive": false
                         },
                         {
-                            "title": qsTr("Fallback policy"),
-                            "subtitle": qsTr("Incomplete color tables are rejected instead of mixing dynamic and fixed colors."),
+                            "title": qsTr("When colors are unavailable"),
+                            "subtitle": qsTr("Meo waits for a complete color scheme instead of mixing old and new colors."),
                             "icon": "shield", "tone": "tertiary",
                             "trailingKind": "none", "interactive": false
                         }
@@ -357,15 +361,41 @@ Item {
         popupParent: Overlay.overlay
         property string selectedStyle: "monet"
         property string selectedShape: "circle"
+        readonly property bool originalStyle: selectedStyle === "original"
+        readonly property bool aiStyle: selectedStyle === "ai"
         property string promptText: ""
         property string applyScope: "all"
         property var selectedApplicationIds: []
-        property string selectedCredentialId: ""
-        property string aiModel: ""
-        property string shownConsentRequest: ""
-        property var aiQueue: []
-        property int aiQueueIndex: -1
-        property string stagedAiDesktopId: ""
+        property string selectedAiStyleId: ""
+        property string aiPackPhase: "idle"
+        property string activeAiPackJobId: ""
+        property string activeAiPackManifestKey: ""
+        property string shownAiPackConsentRequest: ""
+        property var activeAiApplicationIds: []
+        property var appliedAiApplicationIds: []
+        property string aiPackSelectionMessage: ""
+        property bool aiPackCleanupStarted: false
+        property bool releaseAfterAiPackCommit: false
+        property bool undoingAiPack: false
+        readonly property bool aiPackBusy: AccountBackend.aiIconPackBusy
+                                           || ApplicationIconBackend.aiPackDescribing
+                                           || ApplicationIconBackend.aiPackPreviewing
+                                           || (aiPackPhase === "applying"
+                                               && ApplicationIconBackend.busy)
+                                           || (undoingAiPack
+                                               && ApplicationIconBackend.busy)
+        // Once identity descriptors leave Studio, scope, shape, and style are
+        // immutable until the Account-owned job is released or discarded. A
+        // terminal failure stays frozen too, so recovery cannot silently
+        // change the request that the user approved.
+        readonly property bool aiPackActive: aiStyle && (aiPackPhase !== "idle"
+                                                          && aiPackPhase !== "styles_ready"
+                                                          && aiPackPhase !== "applied"
+                                                          || undoingAiPack)
+        readonly property bool aiInputsFrozen: aiPackActive
+        readonly property string iconStudioError: aiStyle && AccountBackend.error !== ""
+                                                 ? AccountBackend.error
+                                                 : ApplicationIconBackend.error
         readonly property string previewIconSource:
             ApplicationIconBackend.applications.length > 0
             ? String(ApplicationIconBackend.applications[0].icon || "applications-all-symbolic")
@@ -376,54 +406,205 @@ Item {
         }
 
         function toggleApplication(desktopId) {
+            if (aiInputsFrozen)
+                return
             const next = selectedApplicationIds.slice()
             const position = next.indexOf(desktopId)
-            if (position === -1)
+            if (position === -1) {
+                if (aiStyle && next.length >= 128) {
+                    aiPackSelectionMessage = qsTr("Choose no more than 128 applications for one AI icon pack.")
+                    return
+                }
                 next.push(desktopId)
-            else
+            } else {
                 next.splice(position, 1)
+            }
+            aiPackSelectionMessage = ""
             selectedApplicationIds = next
         }
 
-        function aiApplications() {
+        function selectedAiApplicationIds() {
             const applications = ApplicationIconBackend.applications || []
-            if (applyScope === "all")
-                return applications.slice()
-            const selected = []
+            const ids = []
             for (let index = 0; index < applications.length; ++index) {
-                if (selectedApplicationIds.indexOf(applications[index].desktopId) !== -1)
-                    selected.push(applications[index])
+                const desktopId = String(applications[index].desktopId || "")
+                if (desktopId === "" || ids.indexOf(desktopId) !== -1)
+                    continue
+                if (applyScope === "all"
+                        || selectedApplicationIds.indexOf(desktopId) !== -1)
+                    ids.push(desktopId)
             }
-            return selected
+            return ids
         }
 
-        function startAiQueue() {
-            const applications = aiApplications()
-            if (applications.length === 0)
-                return
-            if (!ApplicationIconBackend.beginAiBatch())
-                return
-            aiQueue = applications
-            aiQueueIndex = 0
-            stagedAiDesktopId = ""
-            AccountBackend.prepareIconImageBatch(
-                applications, selectedCredentialId, aiModel, promptText)
+        function chooseDefaultAiStyle() {
+            const styles = AccountBackend.aiIconStyles || []
+            for (let index = 0; index < styles.length; ++index) {
+                if (styles[index].available !== false
+                        && String(styles[index].id || "") === selectedAiStyleId)
+                    return
+            }
+            selectedAiStyleId = ""
+            for (let index = 0; index < styles.length; ++index) {
+                if (styles[index].available !== false) {
+                    selectedAiStyleId = String(styles[index].id || "")
+                    return
+                }
+            }
         }
 
-        function stopAiQueue(cancelStaging) {
-            aiQueue = []
-            aiQueueIndex = -1
-            stagedAiDesktopId = ""
-            if (cancelStaging)
-                ApplicationIconBackend.cancelAiBatch()
+        function startFormalAiPack() {
+            const ids = selectedAiApplicationIds()
+            if (ids.length < 1 || ids.length > 128) {
+                aiPackSelectionMessage = qsTr("Choose from 1 to 128 applications for one AI icon pack.")
+                return
+            }
+            if (selectedAiStyleId === "") {
+                aiPackSelectionMessage = qsTr("Choose an approved AI icon style first.")
+                return
+            }
+            aiPackSelectionMessage = ""
+            ApplicationIconBackend.discardAttestedAiPack()
+            activeAiApplicationIds = ids
+            activeAiPackJobId = ""
+            activeAiPackManifestKey = ""
+            shownAiPackConsentRequest = ""
+            aiPackCleanupStarted = false
+            releaseAfterAiPackCommit = false
+            appliedAiApplicationIds = []
+            aiPackPhase = "describing"
+            ApplicationIconBackend.describeAiPackApplications(ids)
+        }
+
+        function prepareFormalAiPackFromDescriptors() {
+            if (aiPackPhase !== "describing" || ApplicationIconBackend.aiPackDescribing)
+                return
+            const descriptors = ApplicationIconBackend.aiPackDescriptors || []
+            if (descriptors.length !== activeAiApplicationIds.length || descriptors.length < 1) {
+                aiPackPhase = "failed"
+                return
+            }
+            const items = []
+            for (let index = 0; index < descriptors.length; ++index) {
+                const descriptor = descriptors[index] || {}
+                items.push({
+                    "desktopId": String(descriptor.desktopId || ""),
+                    "sourceIconHash": String(descriptor.canonicalIdentityHash || "")
+                })
+            }
+            aiPackPhase = "preparing"
+            AccountBackend.prepareAiIconMaterialPack({
+                "schema": "org.meo.ai-icon-pack-request/v1",
+                "contractVersion": 1,
+                "styleId": selectedAiStyleId,
+                "shape": selectedShape,
+                "items": items
+            })
+        }
+
+        function startAttestedAiPackPreview() {
+            const jobId = activeAiPackJobId
+            const manifestPath = String(AccountBackend.aiIconPackManifestPath || "")
+            const manifestSha256 = String(AccountBackend.aiIconPackManifestSha256 || "")
+            const manifestKey = jobId + ":" + manifestSha256
+            // Account can emit several changed() notifications for one
+            // ready pack. Preview is deliberately one shot per attested
+            // job/manifest hash; recovery is a new staged pack, not a second
+            // renderer pass over the same private material.
+            if (jobId === "" || manifestPath === "" || manifestSha256 === ""
+                    || activeAiPackManifestKey === manifestKey)
+                return
+            activeAiPackManifestKey = manifestKey
+            aiPackPhase = "previewing"
+            ApplicationIconBackend.previewAttestedAiPack(manifestPath)
+        }
+
+        function discardFormalAiPack() {
+            if (aiPackCleanupStarted || aiPackPhase === "applying")
+                return
+            const jobId = activeAiPackJobId || String(AccountBackend.aiIconPackJobId || "")
+            ApplicationIconBackend.discardAttestedAiPack()
+            activeAiPackManifestKey = ""
+            if (jobId === "") {
+                activeAiApplicationIds = []
+                aiPackPhase = "idle"
+                return
+            }
+            aiPackCleanupStarted = true
+            if (AccountBackend.aiIconPackState === "ready" && !AccountBackend.aiIconPackBusy) {
+                aiPackPhase = "releasing"
+                AccountBackend.releaseAiIconMaterialPack()
+            } else {
+                aiPackPhase = "cancelling"
+                AccountBackend.cancelAiIconMaterialPack()
+            }
+        }
+
+        function finishFormalAiPackCleanup(terminalState) {
+            const wasCommitted = releaseAfterAiPackCommit && terminalState === "released"
+            ApplicationIconBackend.discardAttestedAiPack()
+            activeAiPackJobId = ""
+            activeAiPackManifestKey = ""
+            activeAiApplicationIds = []
+            shownAiPackConsentRequest = ""
+            aiPackCleanupStarted = false
+            releaseAfterAiPackCommit = false
+            aiPackPhase = wasCommitted ? "applied" : "idle"
+        }
+
+        function resetAiPackForOpen() {
+            aiPackSelectionMessage = ""
+            shownAiPackConsentRequest = ""
+            if (!aiPackBusy && activeAiPackJobId === ""
+                    && String(AccountBackend.aiIconPackJobId || "") === "") {
+                ApplicationIconBackend.discardAttestedAiPack()
+                if (appliedAiApplicationIds.length === 0)
+                    aiPackPhase = "idle"
+            }
+        }
+
+        function undoAppliedAiPack() {
+            if (appliedAiApplicationIds.length === 0
+                    || !ApplicationIconBackend.available
+                    || ApplicationIconBackend.busy
+                    || typeof ApplicationIconBackend.resetApplications !== "function")
+                return
+            undoingAiPack = true
+            ApplicationIconBackend.resetApplications(appliedAiApplicationIds)
+        }
+
+        function aiPackStatusText() {
+            switch (aiPackPhase) {
+            case "describing": return qsTr("Checking the selected application identities…")
+            case "preparing": return qsTr("Preparing the Account confirmation…")
+            case "consent_ready": return qsTr("Waiting for your confirmation…")
+            case "generating":
+            case "staging": return qsTr("Generating one shared AI material…")
+            case "previewing": return qsTr("Rendering the final icon pack preview…")
+            case "applying": return qsTr("Applying the complete AI icon pack…")
+            case "releasing": return qsTr("Finishing the private AI staging…")
+            case "cancelling": return qsTr("Discarding the private AI staging…")
+            case "denying": return qsTr("Denying the Account request…")
+            case "preview_failed": return qsTr("The staged preview could not be rendered. Discard it and generate a new pack.")
+            case "failed": return qsTr("The staged AI icon pack needs attention. Discard it before changing the request.")
+            case "expired": return qsTr("The staged AI icon pack expired. Discard this state before creating a new pack.")
+            default: return qsTr("AI icon pack needs attention.")
+            }
         }
         closeOnAccept: false
         title: qsTr("Application Icon Studio")
-        subtitle: qsTr("Creates unique, user-local icons for applications only. They follow Meo's active light/dark dynamic palette. Wi‑Fi, microphone, volume, and every other system icon keep the current KDE theme.")
-        acceptText: ApplicationIconBackend.busy ? qsTr("Applying…") : qsTr("Apply to applications")
+        subtitle: qsTr("Changes application identity only. Wi‑Fi, microphone, volume, battery, and other live KDE system icons always keep their own semantic theme.")
+        acceptText: applicationIconStudio.aiStyle ? ""
+                   : (ApplicationIconBackend.busy ? qsTr("Applying…") : qsTr("Apply to applications"))
         rejectText: qsTr("Close")
+        rejectEnabled: !applicationIconStudio.aiPackBusy
+                       && applicationIconStudio.aiPackPhase !== "applying"
+                       && applicationIconStudio.aiPackPhase !== "consent_ready"
+                       && applicationIconStudio.aiPackPhase !== "denying"
+        dismissible: rejectEnabled
         acceptEnabled: ApplicationIconBackend.available && !ApplicationIconBackend.busy
-                       && promptText.trim().length > 0
+                       && !applicationIconStudio.aiStyle
+                       && (applicationIconStudio.originalStyle || promptText.trim().length > 0)
                        && (applyScope === "all" || selectedApplicationIds.length > 0)
         onAccepted: {
             if (applyScope === "selected")
@@ -432,6 +613,14 @@ Item {
             else
                 ApplicationIconBackend.apply(selectedStyle, selectedShape, promptText)
             close()
+        }
+        onRejected: {
+            if (applicationIconStudio.aiStyle)
+                applicationIconStudio.discardFormalAiPack()
+        }
+        onClosed: {
+            if (applicationIconStudio.aiStyle && applicationIconStudio.aiPackPhase !== "applied")
+                applicationIconStudio.discardFormalAiPack()
         }
 
         content: Component {
@@ -456,27 +645,40 @@ Item {
                         color: MeoTheme.contentOnSurface
                     }
 
-                    Row {
+                    Flow {
                         width: parent.width
                         spacing: 8 * MeoTheme.globalScale
 
                         MeoButton {
-                            text: qsTr("Monet")
+                            text: qsTr("Meo Color")
                             type: "outlined"
+                            enabled: !applicationIconStudio.aiInputsFrozen
                             selected: applicationIconStudio.selectedStyle === "monet"
                             onClicked: applicationIconStudio.selectedStyle = "monet"
                         }
                         MeoButton {
                             text: qsTr("Original")
                             type: "outlined"
+                            enabled: !applicationIconStudio.aiInputsFrozen
                             selected: applicationIconStudio.selectedStyle === "original"
                             onClicked: applicationIconStudio.selectedStyle = "original"
                         }
                         MeoButton {
-                            text: qsTr("Black & white")
+                            text: qsTr("Monochrome")
                             type: "outlined"
+                            enabled: !applicationIconStudio.aiInputsFrozen
                             selected: applicationIconStudio.selectedStyle === "mono"
                             onClicked: applicationIconStudio.selectedStyle = "mono"
+                        }
+                        MeoButton {
+                            text: qsTr("Create with AI")
+                            type: "outlined"
+                            enabled: !applicationIconStudio.aiInputsFrozen
+                            selected: applicationIconStudio.aiStyle
+                            onClicked: {
+                                applicationIconStudio.selectedStyle = "ai"
+                                applicationIconStudio.chooseDefaultAiStyle()
+                            }
                         }
                     }
 
@@ -487,10 +689,12 @@ Item {
                         MeoText {
                             width: parent.width
                             text: applicationIconStudio.selectedStyle === "monet"
-                                  ? qsTr("Default Pixel style: keeps the recognizable silhouette and internal cuts, then recolors them with three wallpaper-derived Material tones inside one container.")
+                                  ? qsTr("Default Meo style: keeps the recognizable silhouette and internal cuts, then applies the current dynamic Material palette inside one container.")
                                   : (applicationIconStudio.selectedStyle === "mono"
-                                     ? qsTr("Uses a high-contrast black or white container while retaining the original mark where possible.")
-                                     : qsTr("Preserves the original application artwork and colors inside the selected single container."))
+                                     ? qsTr("Uses a human-reviewed mono glyph with the current Meo theme color.")
+                                     : (applicationIconStudio.originalStyle
+                                        ? qsTr("Removes the Meo application override and lets the current upstream icon resolve normally. Shape follows the original artwork.")
+                                        : qsTr("Select an approved AI style, preview the complete pack, then apply it atomically.")))
                             typeRole: "body"
                             typeSize: "small"
                             color: MeoTheme.contentOnSurfaceVariant
@@ -500,7 +704,8 @@ Item {
 
                     MeoText {
                         width: parent.width
-                        text: qsTr("Icon shape")
+                        text: applicationIconStudio.originalStyle
+                              ? qsTr("Shape: Follow original") : qsTr("Icon shape")
                         typeRole: "title"
                         typeSize: "small"
                         emphasized: true
@@ -510,6 +715,10 @@ Item {
                     Flow {
                         width: parent.width
                         spacing: 12 * MeoTheme.globalScale
+                        enabled: !applicationIconStudio.originalStyle
+                                 && !applicationIconStudio.aiInputsFrozen
+                        opacity: applicationIconStudio.originalStyle
+                                 || applicationIconStudio.aiInputsFrozen ? 0.48 : 1.0
 
                         Repeater {
                             model: [
@@ -529,9 +738,14 @@ Item {
                                 padding: 0
                                 radius: MeoTheme.shapeLarge
                                 type: "outlined"
-                                interactive: true
+                                interactive: !applicationIconStudio.originalStyle
+                                             && !applicationIconStudio.aiInputsFrozen
                                 selected: applicationIconStudio.selectedShape === modelData.id
-                                onClicked: applicationIconStudio.selectedShape = modelData.id
+                                onClicked: {
+                                    if (!applicationIconStudio.originalStyle
+                                            && !applicationIconStudio.aiInputsFrozen)
+                                        applicationIconStudio.selectedShape = modelData.id
+                                }
 
                                 Rectangle {
                                     id: shapeCore
@@ -586,7 +800,9 @@ Item {
 
                     MeoText {
                         width: parent.width
-                        text: qsTr("The app’s own mark remains visible inside every shape. The Dock does not add a second opaque plate; Circle, Pixel flower, Squircle, and Rounded square are controlled here.")
+                        text: applicationIconStudio.originalStyle
+                              ? qsTr("Original does not redraw, mask, or put the application inside a Meo container.")
+                              : qsTr("The app’s own mark remains visible inside every shape. Circle, Pixel flower, Squircle, and Rounded square are controlled here.")
                         typeRole: "body"
                         typeSize: "small"
                         color: MeoTheme.contentOnSurfaceVariant
@@ -608,12 +824,14 @@ Item {
                         MeoButton {
                             text: qsTr("All applications")
                             type: "outlined"
+                            enabled: !applicationIconStudio.aiInputsFrozen
                             selected: applicationIconStudio.applyScope === "all"
                             onClicked: applicationIconStudio.applyScope = "all"
                         }
                         MeoButton {
                             text: qsTr("Choose applications")
                             type: "outlined"
+                            enabled: !applicationIconStudio.aiInputsFrozen
                             selected: applicationIconStudio.applyScope === "selected"
                             onClicked: applicationIconStudio.applyScope = "selected"
                         }
@@ -629,6 +847,7 @@ Item {
                         ListView {
                             anchors.fill: parent
                             clip: true
+                            enabled: !applicationIconStudio.aiInputsFrozen
                             visible: !ApplicationIconBackend.applicationsLoading
                             spacing: MeoTheme.space4
                             model: ApplicationIconBackend.applications
@@ -703,19 +922,9 @@ Item {
                         }
                     }
 
-                    MeoTextField {
-                        width: parent.width
-                        label: qsTr("AI style prompt")
-                        placeholder: qsTr("Add an optional visual requirement")
-                        helperText: qsTr("Stored locally for deterministic styles. AI generation sends it only after the separate Account provider/model/data consent sheet is confirmed.")
-                        showClearButton: true
-                        maxLength: 4000
-                        text: applicationIconStudio.promptText
-                        onTextEdited: applicationIconStudio.promptText = text
-                    }
-
                     MeoCard {
                         width: parent.width
+                        visible: applicationIconStudio.aiStyle
                         type: "outlined"
 
                         Column {
@@ -732,40 +941,143 @@ Item {
                             }
                             MeoText {
                                 width: parent.width
-                                text: qsTr("AI credentials stay encrypted in Meo Account. Meo prepares payload-bound permission for every selected app, shows one batch confirmation, then stages the complete Easel/Monet pack for preview. Nothing is replaced until you apply the pack.")
+                                text: qsTr("Choose an approved material style. Meo Account generates one shared texture only; Meo Icon Studio preserves each reviewed application identity and previews the complete pack before anything changes.")
                                 typeRole: "body"
                                 typeSize: "small"
                                 color: MeoTheme.contentOnSurfaceVariant
                                 wrapMode: Text.WordWrap
                             }
-                            MeoExposedDropdown {
+
+                            MeoButton {
                                 width: parent.width
-                                visible: AccountBackend.aiCredentials.length > 0
-                                model: AccountBackend.aiCredentials
-                                textRole: "displayName"
-                                valueRole: "id"
-                                onCurrentValueChanged: {
-                                    applicationIconStudio.selectedCredentialId = String(currentValue || "")
-                                    const credentials = AccountBackend.aiCredentials || []
-                                    if (currentIndex >= 0 && currentIndex < credentials.length)
-                                        applicationIconStudio.aiModel = credentials[currentIndex].defaultModel || ""
+                                visible: !AccountBackend.signedIn
+                                text: qsTr("Connect Meo Account")
+                                type: "tonal"
+                                enabled: AccountBackend.available
+                                onClicked: AccountBackend.openHostedAction("ai_providers")
+                            }
+
+                            MeoText {
+                                width: parent.width
+                                visible: AccountBackend.signedIn
+                                         && (AccountBackend.aiIconPackState === "loading_styles"
+                                             || AccountBackend.aiIconPackState === "contacting")
+                                text: qsTr("Loading approved AI styles…")
+                                typeRole: "body"
+                                typeSize: "small"
+                                color: MeoTheme.contentOnSurfaceVariant
+                            }
+
+                            MeoText {
+                                width: parent.width
+                                visible: AccountBackend.signedIn
+                                         && (AccountBackend.aiIconStyles || []).length === 0
+                                         && !AccountBackend.aiIconPackBusy
+                                text: qsTr("No approved AI icon style is available for this Account connection yet.")
+                                typeRole: "body"
+                                typeSize: "small"
+                                color: MeoTheme.contentOnSurfaceVariant
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Flow {
+                                width: parent.width
+                                spacing: 8 * MeoTheme.globalScale
+                                visible: AccountBackend.signedIn
+                                         && (AccountBackend.aiIconStyles || []).length > 0
+
+                                Repeater {
+                                    model: AccountBackend.aiIconStyles
+
+                                    delegate: MeoCard {
+                                        required property var modelData
+                                        width: Math.min(parent.width,
+                                                        214 * MeoTheme.globalScale)
+                                        type: "outlined"
+                                        interactive: modelData.available !== false
+                                                     && !applicationIconStudio.aiInputsFrozen
+                                        selected: applicationIconStudio.selectedAiStyleId
+                                                  === String(modelData.id || "")
+                                        opacity: modelData.available !== false ? 1.0 : 0.56
+                                        onClicked: {
+                                            if (modelData.available !== false
+                                                    && !applicationIconStudio.aiInputsFrozen) {
+                                                applicationIconStudio.selectedAiStyleId = String(modelData.id || "")
+                                                applicationIconStudio.aiPackSelectionMessage = ""
+                                            }
+                                        }
+
+                                        Column {
+                                            width: parent.width
+                                            spacing: MeoTheme.space4
+
+                                            MeoText {
+                                                width: parent.width
+                                                text: String(modelData.displayName || modelData.id || "")
+                                                typeRole: "title"
+                                                typeSize: "small"
+                                                emphasized: true
+                                                color: MeoTheme.contentOnSurface
+                                                wrapMode: Text.WordWrap
+                                            }
+                                            MeoText {
+                                                width: parent.width
+                                                text: modelData.available !== false
+                                                      ? String(modelData.description || "")
+                                                      : String(modelData.unavailableReason
+                                                               || qsTr("Unavailable for this Account connection."))
+                                                typeRole: "body"
+                                                typeSize: "small"
+                                                color: MeoTheme.contentOnSurfaceVariant
+                                                wrapMode: Text.WordWrap
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                            MeoTextField {
+
+                            MeoText {
                                 width: parent.width
-                                visible: AccountBackend.aiCredentials.length > 0
-                                label: qsTr("Image model")
-                                placeholder: qsTr("Model configured for this connection")
-                                text: applicationIconStudio.aiModel
-                                onTextEdited: applicationIconStudio.aiModel = text
+                                visible: applicationIconStudio.aiStyle
+                                         && applicationIconStudio.selectedAiApplicationIds().length > 128
+                                text: qsTr("This selection has %1 applications. Choose up to 128 for one AI icon pack.")
+                                      .arg(applicationIconStudio.selectedAiApplicationIds().length)
+                                typeRole: "body"
+                                typeSize: "small"
+                                color: MeoTheme.error
+                                wrapMode: Text.WordWrap
                             }
+
+                            MeoText {
+                                width: parent.width
+                                visible: applicationIconStudio.aiPackSelectionMessage !== ""
+                                text: applicationIconStudio.aiPackSelectionMessage
+                                typeRole: "body"
+                                typeSize: "small"
+                                color: MeoTheme.error
+                                wrapMode: Text.WordWrap
+                            }
+
+                            MeoText {
+                                width: parent.width
+                                visible: applicationIconStudio.aiPackPhase !== "idle"
+                                         && applicationIconStudio.aiPackPhase !== "styles_ready"
+                                         && applicationIconStudio.aiPackPhase !== "preview_ready"
+                                         && applicationIconStudio.aiPackPhase !== "applied"
+                                text: applicationIconStudio.aiPackStatusText()
+                                typeRole: "body"
+                                typeSize: "small"
+                                color: MeoTheme.contentOnSurfaceVariant
+                                wrapMode: Text.WordWrap
+                            }
+
                             Flow {
                                 width: parent.width
                                 spacing: 10 * MeoTheme.globalScale
-                                visible: ApplicationIconBackend.aiBatchPreviews.length > 0
+                                visible: ApplicationIconBackend.aiPackPreviews.length > 0
 
                                 Repeater {
-                                    model: ApplicationIconBackend.aiBatchPreviews
+                                    model: ApplicationIconBackend.aiPackPreviews
 
                                     delegate: Column {
                                         required property var modelData
@@ -792,58 +1104,67 @@ Item {
                                     }
                                 }
                             }
+
                             MeoButton {
-                                text: AccountBackend.aiBusy
-                                      ? qsTr("Generating…")
+                                text: applicationIconStudio.aiPackPhase === "applied"
+                                      ? qsTr("Generate another AI icon pack")
                                       : (applicationIconStudio.applyScope === "all"
                                          ? qsTr("Generate all with AI")
                                          : qsTr("Generate selected with AI"))
                                 type: "filled"
-                                enabled: !AccountBackend.aiBusy
-                                         && AccountBackend.signedIn
-                                         && AccountBackend.aiCredentials.length > 0
-                                         && applicationIconStudio.aiApplications().length > 0
-                                         && applicationIconStudio.selectedCredentialId !== ""
-                                         && applicationIconStudio.aiModel.trim() !== ""
-                                         && applicationIconStudio.promptText.trim() !== ""
-                                onClicked: {
-                                    applicationIconStudio.startAiQueue()
-                                }
-                            }
-                            MeoText {
-                                width: parent.width
-                                visible: applicationIconStudio.aiQueueIndex >= 0
-                                text: qsTr("AI pack %1 of %2 staged · one batch confirmation")
-                                      .arg(ApplicationIconBackend.aiBatchPreviews.length)
-                                      .arg(applicationIconStudio.aiQueue.length)
-                                typeRole: "body"
-                                typeSize: "small"
-                                color: MeoTheme.contentOnSurfaceVariant
+                                visible: applicationIconStudio.aiPackPhase === "idle"
+                                         || applicationIconStudio.aiPackPhase === "styles_ready"
+                                         || applicationIconStudio.aiPackPhase === "applied"
+                                enabled: AccountBackend.signedIn
+                                         && !applicationIconStudio.aiPackBusy
+                                         && String(AccountBackend.aiIconPackJobId || "") === ""
+                                         && applicationIconStudio.selectedAiStyleId !== ""
+                                         && applicationIconStudio.selectedAiApplicationIds().length >= 1
+                                         && applicationIconStudio.selectedAiApplicationIds().length <= 128
+                                onClicked: applicationIconStudio.startFormalAiPack()
                             }
                             MeoButton {
                                 text: ApplicationIconBackend.busy
                                       ? qsTr("Applying complete pack…")
                                       : qsTr("Apply complete AI icon pack")
                                 type: "tonal"
-                                visible: AccountBackend.aiState === "batch_ready"
-                                         && ApplicationIconBackend.aiBatchPreviews.length > 0
+                                visible: applicationIconStudio.aiPackPhase === "preview_ready"
+                                         && ApplicationIconBackend.aiPackPreviewReady
                                 enabled: !ApplicationIconBackend.busy
+                                         && !applicationIconStudio.aiPackBusy
                                 onClicked: {
-                                    ApplicationIconBackend.applyAiBatch()
-                                    AccountBackend.clearGeneratedIconImage()
-                                    applicationIconStudio.aiQueue = []
-                                    applicationIconStudio.aiQueueIndex = -1
+                                    applicationIconStudio.aiPackPhase = "applying"
+                                    ApplicationIconBackend.applyAttestedAiPack()
                                 }
                             }
                             MeoButton {
                                 text: qsTr("Discard staged AI pack")
                                 type: "text"
-                                visible: ApplicationIconBackend.aiBatchPreviews.length > 0
+                                visible: applicationIconStudio.aiPackPhase !== "idle"
+                                         && applicationIconStudio.aiPackPhase !== "styles_ready"
+                                         && applicationIconStudio.aiPackPhase !== "applied"
+                                         && applicationIconStudio.aiPackPhase !== "applying"
+                                enabled: applicationIconStudio.aiPackPhase !== "releasing"
+                                onClicked: applicationIconStudio.discardFormalAiPack()
+                            }
+                            MeoButton {
+                                text: qsTr("Undo this AI icon pack")
+                                type: "text"
+                                visible: applicationIconStudio.aiPackPhase === "applied"
+                                         && applicationIconStudio.appliedAiApplicationIds.length > 0
+                                         && typeof ApplicationIconBackend.resetApplications === "function"
+                                enabled: ApplicationIconBackend.available
                                          && !ApplicationIconBackend.busy
-                                onClicked: {
-                                    AccountBackend.clearGeneratedIconImage()
-                                    applicationIconStudio.stopAiQueue(true)
-                                }
+                                         && !applicationIconStudio.undoingAiPack
+                                onClicked: applicationIconStudio.undoAppliedAiPack()
+                            }
+                            MeoButton {
+                                text: qsTr("Refresh AI styles")
+                                type: "text"
+                                visible: AccountBackend.signedIn
+                                         && !applicationIconStudio.aiInputsFrozen
+                                enabled: !applicationIconStudio.aiPackBusy
+                                onClicked: AccountBackend.refreshAiIconStyles()
                             }
                             MeoButton {
                                 text: qsTr("Manage AI connections")
@@ -858,20 +1179,35 @@ Item {
                         text: qsTr("Restore original application icons")
                         type: "text"
                         enabled: ApplicationIconBackend.available && !ApplicationIconBackend.busy
+                                 && !applicationIconStudio.aiInputsFrozen
                         onClicked: {
                             ApplicationIconBackend.reset()
                             applicationIconStudio.close()
                         }
                     }
 
-                    MeoText {
+                    Column {
                         width: parent.width
-                        text: ApplicationIconBackend.error
-                        visible: text !== ""
-                        typeRole: "body"
-                        typeSize: "small"
-                        color: MeoTheme.error
-                        wrapMode: Text.WordWrap
+                        visible: applicationIconStudio.iconStudioError !== ""
+                        spacing: MeoTheme.space4
+                        MeoBanner {
+                            width: parent.width
+                            title: applicationIconStudio.aiStyle
+                                   ? qsTr("AI icon pack needs attention")
+                                   : qsTr("Application icons need attention")
+                            text: qsTr("Check the selected icon, then try again.")
+                            icon: "error"
+                            tone: "error"
+                        }
+                        MeoText {
+                            width: parent.width
+                            text: qsTr("Technical details: %1").arg(applicationIconStudio.iconStudioError)
+                            Accessible.name: text
+                            typeRole: "label"
+                            typeSize: "small"
+                            color: MeoTheme.contentOnSurfaceVariant
+                            wrapMode: Text.WordWrap
+                        }
                     }
                 }
             }
@@ -882,38 +1218,126 @@ Item {
         target: AccountBackend
 
         function onChanged() {
-            const consent = AccountBackend.aiConsent || {}
-            const requestId = String(consent.requestId || "")
-            if ((AccountBackend.aiState === "consent_ready"
-                    || AccountBackend.aiState === "batch_consent_ready") && requestId !== ""
-                    && requestId !== applicationIconStudio.shownConsentRequest) {
-                applicationIconStudio.shownConsentRequest = requestId
-                aiIconConsent.open()
+            const state = String(AccountBackend.aiIconPackState || "")
+            const returnedJobId = String(AccountBackend.aiIconPackJobId || "")
+
+            if (state === "styles_ready") {
+                applicationIconStudio.chooseDefaultAiStyle()
+                if (applicationIconStudio.aiPackPhase === "idle")
+                    applicationIconStudio.aiPackPhase = "styles_ready"
+                return
             }
-            if ((AccountBackend.aiState === "denied"
-                    || AccountBackend.aiState === "failed")
-                    && applicationIconStudio.aiQueueIndex >= 0) {
-                applicationIconStudio.stopAiQueue(true)
-                if (!AccountBackend.aiBusy)
-                    AccountBackend.clearGeneratedIconImage()
+
+            // A local validation failure can happen before Account allocates
+            // a job ID. It still belongs to the request currently being
+            // prepared and must not leave the sheet stuck in "preparing".
+            if (applicationIconStudio.aiPackPhase === "preparing"
+                    && applicationIconStudio.activeAiPackJobId === ""
+                    && returnedJobId === "" && state === "failed") {
+                applicationIconStudio.aiPackPhase = "failed"
+                return
             }
-            if (AccountBackend.aiState === "batch_image_ready"
-                    && AccountBackend.aiImageSource !== ""
-                    && AccountBackend.aiTargetDesktopId !== applicationIconStudio.stagedAiDesktopId) {
-                applicationIconStudio.stagedAiDesktopId = AccountBackend.aiTargetDesktopId
-                const staged = ApplicationIconBackend.stageAiImage(
-                    AccountBackend.aiTargetDesktopId,
-                    AccountBackend.aiTargetApplicationName,
-                    AccountBackend.aiImageSource,
-                    applicationIconStudio.selectedShape,
-                    applicationIconStudio.promptText)
-                if (staged) {
-                    applicationIconStudio.aiQueueIndex = ApplicationIconBackend.aiBatchPreviews.length
-                    AccountBackend.continuePreparedIconImageBatch()
-                } else {
-                    applicationIconStudio.stopAiQueue(true)
-                    AccountBackend.clearGeneratedIconImage()
+
+            if (applicationIconStudio.aiPackPhase === "preparing"
+                    && applicationIconStudio.activeAiPackJobId === ""
+                    && returnedJobId !== "") {
+                applicationIconStudio.activeAiPackJobId = returnedJobId
+            }
+
+            const matchesActiveJob = applicationIconStudio.activeAiPackJobId !== ""
+                                     && (returnedJobId === ""
+                                         || returnedJobId === applicationIconStudio.activeAiPackJobId)
+            if (!matchesActiveJob)
+                return
+
+            if (state === "consent_ready") {
+                const consent = AccountBackend.aiIconPackConsent || {}
+                const requestId = String(consent.requestId || "")
+                applicationIconStudio.aiPackPhase = "consent_ready"
+                if (requestId !== ""
+                        && requestId !== applicationIconStudio.shownAiPackConsentRequest) {
+                    applicationIconStudio.shownAiPackConsentRequest = requestId
+                    aiIconConsent.open()
                 }
+                return
+            }
+
+            if (state === "generating" || state === "staging") {
+                applicationIconStudio.aiPackPhase = state
+                return
+            }
+
+            if (state === "ready") {
+                if (applicationIconStudio.aiPackPhase !== "preview_ready"
+                        && applicationIconStudio.aiPackPhase !== "applying"
+                        && applicationIconStudio.aiPackPhase !== "releasing") {
+                    applicationIconStudio.startAttestedAiPackPreview()
+                }
+                return
+            }
+
+            if (state === "released" || state === "cancelled" || state === "denied") {
+                applicationIconStudio.finishFormalAiPackCleanup(state)
+                return
+            }
+
+            if (state === "expired") {
+                ApplicationIconBackend.discardAttestedAiPack()
+                applicationIconStudio.activeAiPackJobId = ""
+                applicationIconStudio.activeAiPackManifestKey = ""
+                applicationIconStudio.activeAiApplicationIds = []
+                applicationIconStudio.aiPackCleanupStarted = false
+                applicationIconStudio.aiPackPhase = "expired"
+                return
+            }
+
+            if (state === "failed") {
+                if (applicationIconStudio.aiPackPhase !== "applying")
+                    applicationIconStudio.aiPackPhase = "failed"
+            }
+        }
+    }
+
+    Connections {
+        target: ApplicationIconBackend
+
+        function onChanged() {
+            if (applicationIconStudio.aiPackPhase === "describing"
+                    && !ApplicationIconBackend.aiPackDescribing) {
+                if ((ApplicationIconBackend.aiPackDescriptors || []).length > 0)
+                    applicationIconStudio.prepareFormalAiPackFromDescriptors()
+                else if (ApplicationIconBackend.error !== "")
+                    applicationIconStudio.aiPackPhase = "failed"
+            }
+
+            if (applicationIconStudio.aiPackPhase === "previewing") {
+                if (ApplicationIconBackend.aiPackPreviewReady) {
+                    applicationIconStudio.aiPackPhase = "preview_ready"
+                } else if (!ApplicationIconBackend.aiPackPreviewing
+                           && ApplicationIconBackend.error !== "") {
+                    applicationIconStudio.aiPackPhase = "preview_failed"
+                }
+            }
+
+            if (applicationIconStudio.aiPackPhase === "applying") {
+                if (ApplicationIconBackend.aiPackCommitted) {
+                    applicationIconStudio.appliedAiApplicationIds
+                        = applicationIconStudio.activeAiApplicationIds.slice()
+                    applicationIconStudio.releaseAfterAiPackCommit = true
+                    applicationIconStudio.aiPackPhase = "releasing"
+                    AccountBackend.releaseAiIconMaterialPack()
+                } else if (!ApplicationIconBackend.busy
+                           && ApplicationIconBackend.error !== "") {
+                    applicationIconStudio.aiPackPhase = "preview_ready"
+                }
+            }
+
+            if (applicationIconStudio.undoingAiPack && !ApplicationIconBackend.busy) {
+                if (ApplicationIconBackend.error === "") {
+                    applicationIconStudio.appliedAiApplicationIds = []
+                    applicationIconStudio.aiPackPhase = "idle"
+                }
+                applicationIconStudio.undoingAiPack = false
             }
         }
     }
@@ -921,26 +1345,23 @@ Item {
     MeoSettingsTaskSheet {
         id: aiIconConsent
         popupParent: Overlay.overlay
-        title: AccountBackend.aiState === "batch_consent_ready"
-               ? qsTr("Generate this application icon pack?")
-               : qsTr("Generate one application icon?")
-        subtitle: qsTr("Confirm the exact Account-owned request once. Each image remains payload-bound and the provider key never enters Meo Settings.")
+        title: qsTr("Generate this application icon pack?")
+        subtitle: qsTr("Confirm this exact Account-owned request once. Meo Settings never receives a provider key, provider image, or Account token.")
+        showCloseButton: false
+        dismissible: false
+        closeOnAccept: true
+        closeOnReject: true
         acceptText: qsTr("Confirm and generate pack")
         rejectText: qsTr("Deny")
-        acceptEnabled: !AccountBackend.aiBusy
-                       && String(AccountBackend.aiConsent.requestId || "") !== ""
+        acceptEnabled: !AccountBackend.aiIconPackBusy
+                       && String(AccountBackend.aiIconPackConsent.requestId || "") !== ""
         onAccepted: {
-            if (Number(AccountBackend.aiConsent.itemCount || 0) > 0)
-                AccountBackend.generatePreparedIconImageBatch()
-            else
-                AccountBackend.generatePreparedIconImage()
+            applicationIconStudio.aiPackPhase = "generating"
+            AccountBackend.generatePreparedAiIconMaterialPack()
         }
         onRejected: {
-            if (Number(AccountBackend.aiConsent.itemCount || 0) > 0)
-                AccountBackend.denyPreparedIconImageBatch()
-            else
-                AccountBackend.denyPreparedIconImage()
-            applicationIconStudio.stopAiQueue(true)
+            applicationIconStudio.aiPackPhase = "denying"
+            AccountBackend.denyPreparedAiIconMaterialPack()
         }
 
         content: Component {
@@ -948,18 +1369,19 @@ Item {
                 width: parent.width
                 spacing: 10 * MeoTheme.globalScale
 
-                readonly property var consent: AccountBackend.aiConsent || ({})
+                readonly property var consent: AccountBackend.aiIconPackConsent || ({})
 
                 MeoText {
                     width: parent.width
-                    text: qsTr("Provider: %1\nModel: %2\nDestination: %3\nPurpose: %4\nApplications: %5\nData: %6\nTotal prompt: %7 characters")
+                    text: qsTr("Provider: %1\nModel: %2\nDestination: %3\nPurpose: %4\nStyle: %5\nShape: %6\nApplications: %7\nData: %8")
                           .arg(parent.consent.providerName || parent.consent.provider || qsTr("Unknown"))
                           .arg(parent.consent.model || qsTr("Unknown"))
                           .arg(parent.consent.destination || qsTr("Unknown"))
                           .arg(parent.consent.purpose || qsTr("Unknown"))
+                          .arg(parent.consent.styleId || qsTr("Unknown"))
+                          .arg(parent.consent.shape || qsTr("Unknown"))
                           .arg(parent.consent.itemCount || 1)
                           .arg((parent.consent.dataCategories || []).join(", "))
-                          .arg(parent.consent.promptCharacters || 0)
                     typeRole: "body"
                     typeSize: "medium"
                     color: MeoTheme.contentOnSurface
@@ -967,7 +1389,7 @@ Item {
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("The locked Easel/Monet constraints apply to every icon. Generated images are staged locally for whole-pack preview and are not installed until Apply is pressed.")
+                    text: qsTr("One approved material is generated for this pack. Meo Icon Studio keeps the canonical application identities local, renders a full preview, and does not install anything until Apply is pressed.")
                     typeRole: "body"
                     typeSize: "small"
                     color: MeoTheme.contentOnSurfaceVariant

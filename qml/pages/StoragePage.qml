@@ -321,7 +321,7 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : qsTr("Storage & applications")
-        subtitle: qsTr("Mounted capacity stays separate from optional, bounded personal-folder categories so totals are never invented or double-counted.")
+        subtitle: qsTr("See mounted storage separately from the personal folders you choose to scan, so each total stays clear.")
 
         MeoSettingsGroup {
             width: parent.width
@@ -347,6 +347,9 @@ Item {
         MeoCard {
             width: parent.width
             type: "filled"
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: qsTr("Personal storage scan")
+            Accessible.description: StorageBackend.usageScanSummary
 
             Column {
                 width: parent.width
@@ -406,6 +409,9 @@ Item {
                     width: parent.width
                     visible: StorageBackend.usageScanError !== ""
                     text: StorageBackend.usageScanError
+                    Accessible.role: Accessible.AlertMessage
+                    Accessible.name: qsTr("Storage scan error")
+                    Accessible.description: StorageBackend.usageScanError
                     typeRole: "body"
                     typeSize: "small"
                     color: MeoTheme.error
@@ -470,7 +476,7 @@ Item {
 
                     MeoText {
                         width: parent.width
-                        text: qsTr("%1 used on the system volume. This exact volume figure includes system files, packages, settings, logs, and anything outside the selected personal categories; it is intentionally not presented as a category total.")
+                    text: qsTr("%1 is used on the system volume. It includes system files, apps, settings, logs, and anything outside the personal folders listed above.")
                               .arg(root.formatBytes(root.systemVolume.usedBytes))
                         typeRole: "body"
                         typeSize: "medium"
@@ -484,6 +490,9 @@ Item {
         MeoCard {
             width: parent.width
             type: "filled"
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: qsTr("Installed software storage")
+            Accessible.description: PackageInventoryBackend.summary
 
             Column {
                 width: parent.width
@@ -530,14 +539,26 @@ Item {
                     indeterminate: true
                 }
 
-                MeoText {
+                Column {
                     width: parent.width
                     visible: PackageInventoryBackend.error !== ""
-                    text: PackageInventoryBackend.error
-                    typeRole: "body"
-                    typeSize: "small"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
+                    spacing: MeoTheme.space4
+                    MeoBanner {
+                        width: parent.width
+                        title: qsTr("Package information is unavailable")
+                        text: qsTr("Check that package information is available, then inspect the installed packages again.")
+                        icon: "error"
+                        tone: "error"
+                    }
+                    MeoText {
+                        width: parent.width
+                        text: qsTr("Technical details: %1").arg(PackageInventoryBackend.error)
+                        Accessible.name: text
+                        typeRole: "label"
+                        typeSize: "small"
+                        color: MeoTheme.contentOnSurfaceVariant
+                        wrapMode: Text.WordWrap
+                    }
                 }
 
                 MeoButton {
@@ -714,23 +735,26 @@ Item {
             }
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: OmniStoreAppsBackend.error !== "" && OmniStoreAppsBackend.exporterAvailable
+            spacing: MeoTheme.space4
 
-            Row {
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: OmniStoreAppsBackend.error
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Application information is unavailable")
+                text: qsTr("Check that the application service is available, then refresh the list.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(OmniStoreAppsBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -803,24 +827,32 @@ Item {
             }]
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: KcmBridge.error !== ""
+            spacing: MeoTheme.space4
 
-            Row {
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: KcmBridge.error
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("System storage tool could not open")
+                text: qsTr("Check that this system tool is installed, then try opening it again.")
+                icon: "error"
+                tone: "error"
             }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(KcmBridge.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        RepairEntry {
+            category: "storage"
+            entryTitle: qsTr("Troubleshoot storage")
         }
     }
 

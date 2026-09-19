@@ -9,6 +9,13 @@ Item {
     property var navigateTo: function(route) {}
     property var rootMetrics: null
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
+    readonly property string wifiStatusAccessible: !NetworkBackend.wifiAvailable
+                                                ? qsTr("Wi-Fi unavailable")
+                                                : (NetworkBackend.wifiEnabled
+                                                   ? (NetworkBackend.connected
+                                                      ? qsTr("Connected to %1").arg(NetworkBackend.connectionName)
+                                                      : qsTr("Wi-Fi on, not connected"))
+                                                   : qsTr("Wi-Fi off"))
 
     function activateNetwork(network) {
         if (network.connected) {
@@ -33,11 +40,13 @@ Item {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
         title: root.isCompact ? "" : qsTr("Wi-Fi")
-        subtitle: qsTr("Connect using NetworkManager. Choose whether a new network is saved to disk or is only kept until it disconnects.")
+        subtitle: qsTr("Choose a Wi-Fi network. For a new connection, decide whether to save it for next time.")
 
         MeoCard {
             width: parent.width
             type: "filled"
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: root.wifiStatusAccessible
 
             RowLayout {
                 anchors.fill: parent
@@ -82,23 +91,26 @@ Item {
             }
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: NetworkBackend.error !== ""
+            spacing: MeoTheme.space4
 
-            Row {
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: NetworkBackend.error
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Wi-Fi needs attention")
+                text: qsTr("Check that Wi-Fi is turned on and you are in range, then refresh the network list.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(NetworkBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -149,6 +161,8 @@ Item {
                                         : (modelData.connecting ? qsTr("Connecting…")
                                            : (modelData.saved ? qsTr("Saved") : modelData.securityLabel)))
                                         + qsTr(" · %1%").arg(modelData.strength)
+                        Accessible.name: modelData.ssid
+                        Accessible.description: supportingText
                         leadingIcon: modelData.connected ? "wifi" : (modelData.secured ? "wifi_lock" : "wifi")
                         enabled: !NetworkBackend.busy
                         trailingComponent: Component {
@@ -192,6 +206,11 @@ Item {
             actionText: KcmBridge.isAvailable("kcm_networkmanagement") ? qsTr("Open advanced settings") : ""
             onActionClicked: root.navigateTo("kcm:kcm_networkmanagement")
         }
+
+        RepairEntry {
+            category: "network"
+            entryTitle: qsTr("Troubleshoot network access")
+        }
     }
 
     MeoMotionPopup {
@@ -208,6 +227,8 @@ Item {
 
         contentItem: Column {
             spacing: 16 * MeoTheme.globalScale
+            Accessible.role: Accessible.Dialog
+            Accessible.name: qsTr("Connect to %1").arg(passwordPrompt.ssid)
 
             MeoText {
                 width: parent.width
@@ -220,7 +241,7 @@ Item {
             }
             MeoText {
                 width: parent.width
-                text: qsTr("A saved network creates a NetworkManager profile on disk. Turn this off for a one-time connection that NetworkManager removes when it disconnects.")
+                text: qsTr("Save this network to reconnect more easily. Turn it off for a one-time connection that is removed when you disconnect.")
                 typeRole: "body"
                 typeSize: "small"
                 color: MeoTheme.contentOnSurfaceVariant
@@ -237,7 +258,7 @@ Item {
                 id: saveNetwork
                 width: parent.width
                 label: qsTr("Save this network")
-                helperText: qsTr("Saved credentials remain under NetworkManager’s system policy.")
+                helperText: qsTr("Saved password handling follows your device’s network security settings.")
                 checked: true
             }
             Flow {
@@ -274,9 +295,12 @@ Item {
         padding: 24 * MeoTheme.globalScale
         x: parent ? Math.max(viewportMargin, (parent.width - width) / 2) : 0
         y: parent ? Math.max(viewportMargin, (parent.height - height) / 2) : 0
+        initialFocusItem: forgetNetworkButton
 
         contentItem: Column {
             spacing: 16 * MeoTheme.globalScale
+            Accessible.role: Accessible.Dialog
+            Accessible.name: qsTr("Forget this network?")
 
             MeoText {
                 width: parent.width
@@ -288,7 +312,7 @@ Item {
             }
             MeoText {
                 width: parent.width
-                text: qsTr("NetworkManager will remove the saved profile and credentials for %1.").arg(forgetPrompt.ssid)
+                text: qsTr("This removes the saved connection and password for %1 from this device.").arg(forgetPrompt.ssid)
                 typeRole: "body"
                 typeSize: "small"
                 color: MeoTheme.contentOnSurfaceVariant
@@ -298,6 +322,7 @@ Item {
                 width: parent.width
                 spacing: 8 * MeoTheme.globalScale
                 MeoButton {
+                    id: forgetNetworkButton
                     text: qsTr("Forget network")
                     type: "filled"
                     onClicked: {

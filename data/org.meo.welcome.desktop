@@ -1,9 +1,11 @@
 [Desktop Entry]
 Type=Application
 Name=Welcome to Meo
+Name[zh_CN]=欢迎使用 Meo
 Comment=Set up your MeoArch experience
+Comment[zh_CN]=开始设置你的 MeoArch 体验
 Exec=meo-welcome
-Icon=meoarch-logo
+Icon=org.meo.welcome
 Categories=Settings;Qt;KDE;
 OnlyShowIn=KDE;
 X-KDE-autostart-phase=2

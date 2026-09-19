@@ -1,7 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Wi-Fi & Internet
+Name[zh_CN]=Wi-Fi 和互联网
 Comment=Manage network connections in Meo Settings
+Comment[zh_CN]=在 Meo 设置中管理网络连接
 Exec=meo-settings --route wifi
 Icon=network-wireless
 Categories=Settings;Qt;KDE;

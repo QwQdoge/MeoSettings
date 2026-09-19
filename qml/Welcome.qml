@@ -14,30 +14,35 @@ ApplicationWindow {
     title: qsTr("Welcome to Meo")
     color: MeoTheme.surface
 
+    required property var welcomeState
+    required property var fingerprintBackend
+
     readonly property var steps: [
-        {"title": qsTr("Appearance"), "description": qsTr("Choose a personal, readable Material 3 Expressive workspace."), "icon": "palette", "route": "appearance"},
-        {"title": qsTr("Internet"), "description": qsTr("Connect using Meo's clear NetworkManager-powered controls."), "icon": "wifi", "route": "wifi"},
-        {"title": qsTr("Displays"), "description": qsTr("Set up your screen safely. Meo will restore a layout you do not keep."), "icon": "monitor", "route": "display"},
-        {"title": qsTr("Fingerprint"), "description": qsTr("Review your device support before choosing whether to enable fingerprint authentication."), "icon": "fingerprint", "route": "hardware"},
-        {"title": qsTr("Updates & recovery"), "description": qsTr("Understand full system updates and the recovery protection available on this device."), "icon": "system_update", "route": "recovery"},
-        {"title": qsTr("You're ready"), "description": qsTr("Everything remains adjustable from Meo Settings whenever you need it."), "icon": "check_circle", "route": "home"}
+        {"title": qsTr("Appearance"), "description": qsTr("Make your desktop feel personal and easy to read."), "icon": "palette", "route": "appearance"},
+        {"title": qsTr("Internet"), "description": qsTr("Connect to the internet with clear, familiar controls."), "icon": "wifi", "route": "wifi"},
+        {"title": qsTr("Displays"), "description": qsTr("Adjust your display in Settings when you are ready."), "icon": "monitor", "route": "display"},
+        {"title": qsTr("Fingerprint"), "description": qsTr("Review support for this device before changing any fingerprint settings."), "icon": "fingerprint", "route": "hardware"},
+        {"title": qsTr("Updates & recovery"), "description": qsTr("See available update and recovery information for this device."), "icon": "system_update", "route": "recovery"},
+        {"title": qsTr("You're ready"), "description": qsTr("Return to Meo Settings whenever you want."), "icon": "check_circle", "route": "home"}
     ]
     property int currentStep: 0
     readonly property var current: steps[currentStep]
-    readonly property var fingerprintDefaults: FingerprintBackend.supportPackage()
+    readonly property var fingerprintDefaults: root.fingerprintBackend.supportPackage()
     readonly property bool lockScreenFingerprintDefault: fingerprintDefaults.defaultPAMTargets
                                                        && fingerprintDefaults.defaultPAMTargets.indexOf("lock-screen") >= 0
     readonly property bool passwordFallbackDefault: fingerprintDefaults.passwordFallbackRequired === true
 
     MeoPageLayout {
         anchors.fill: parent
-        title: currentStep === 0 ? qsTr("Welcome to Meo") : current.title
-        subtitle: currentStep === 0 ? qsTr("Fast. Private. Yours.") : ""
+        title: root.currentStep === 0 ? qsTr("Welcome to Meo") : root.current.title
+        subtitle: root.currentStep === 0 ? qsTr("Fast. Private. Yours.") : ""
 
         MeoCard {
             width: parent.width
             type: "filled"
             implicitHeight: 260 * MeoTheme.globalScale
+            Accessible.name: root.current.title
+            Accessible.description: root.current.description
             ColumnLayout {
                 anchors.centerIn: parent
                 width: parent.width - 48 * MeoTheme.globalScale
@@ -51,22 +56,22 @@ ApplicationWindow {
             width: parent.width
             type: "outlined"
             visible: root.currentStep === root.steps.length - 1
-            Accessible.name: qsTr("Optional Meo Account connection")
+            Accessible.name: qsTr("Set up your Meo Account")
+            Accessible.description: qsTr("Manage cloud services, backups, and AI connections in one place.")
             ColumnLayout {
                 anchors.fill: parent
                 spacing: 10 * MeoTheme.globalScale
                 RowLayout {
                     Layout.fillWidth: true
                     MeoIcon { icon: "account_circle"; size: 24; color: MeoTheme.secondary }
-                    MeoText { Layout.fillWidth: true; text: qsTr("Connect Meo Account"); typeRole: "title"; typeSize: "small"; emphasized: true }
-                    MeoBadge { text: qsTr("Optional"); color: MeoTheme.secondaryContainer }
+                    MeoText { Layout.fillWidth: true; text: qsTr("Set up your Meo Account"); typeRole: "title"; typeSize: "small"; emphasized: true }
                 }
                 MeoText {
                     Layout.fillWidth: true
-                    text: qsTr("Connect cloud services, backups, and AI credentials after setup. Your installer never received an account password or cloud session.")
+                    text: qsTr("Manage cloud services, backups, and AI connections in one place.")
                     typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant; wrapMode: Text.WordWrap
                 }
-                MeoButton { text: qsTr("Open account settings"); type: "outlined"; onClicked: WelcomeState.openSettings("accounts") }
+                MeoButton { text: qsTr("Open account settings"); type: "outlined"; onClicked: root.welcomeState.openSettings("accounts") }
             }
         }
 
@@ -74,7 +79,8 @@ ApplicationWindow {
             width: parent.width
             type: "outlined"
             visible: root.currentStep === 3
-            Accessible.name: qsTr("Fingerprint default authentication policy")
+            Accessible.name: qsTr("Fingerprint support")
+            Accessible.description: qsTr("Review whether this device supports fingerprint authentication. This screen does not enroll fingerprints or change sign-in settings.")
 
             ColumnLayout {
                 anchors.fill: parent
@@ -85,26 +91,26 @@ ApplicationWindow {
                     MeoIcon {
                         icon: "fingerprint"
                         size: 24
-                        color: FingerprintBackend.devicePresent ? MeoTheme.primary : MeoTheme.contentOnSurfaceVariant
+                        color: root.fingerprintBackend.devicePresent ? MeoTheme.primary : MeoTheme.contentOnSurfaceVariant
                     }
                     MeoText {
                         Layout.fillWidth: true
-                        text: FingerprintBackend.devicePresent
-                              ? FingerprintBackend.deviceLabel
+                        text: root.fingerprintBackend.devicePresent
+                              ? root.fingerprintBackend.deviceLabel
                               : qsTr("No compatible fingerprint reader detected")
                         typeRole: "title"
                         typeSize: "small"
                         emphasized: true
                     }
                     MeoBadge {
-                        text: FingerprintBackend.devicePresent ? qsTr("Experimental") : qsTr("Unavailable")
-                        color: FingerprintBackend.devicePresent ? MeoTheme.tertiary : MeoTheme.surfaceVariant
+                        text: root.fingerprintBackend.devicePresent ? qsTr("Experimental") : qsTr("Unavailable")
+                        color: root.fingerprintBackend.devicePresent ? MeoTheme.tertiary : MeoTheme.surfaceVariant
                     }
                 }
 
                 MeoText {
                     Layout.fillWidth: true
-                    text: FingerprintBackend.supportSummary
+                    text: root.fingerprintBackend.supportSummary
                     typeRole: "body"
                     typeSize: "small"
                     color: MeoTheme.contentOnSurfaceVariant
@@ -113,7 +119,7 @@ ApplicationWindow {
 
                 MeoText {
                     Layout.fillWidth: true
-                    text: qsTr("Fingerprint defaults")
+                    text: qsTr("Fingerprint support details")
                     typeRole: "label"
                     typeSize: "medium"
                     emphasized: true
@@ -128,12 +134,13 @@ ApplicationWindow {
                     ]
 
                     delegate: RowLayout {
+                        id: fingerprintDefaultRow
                         required property var modelData
                         Layout.fillWidth: true
                         spacing: 10 * MeoTheme.globalScale
-                        MeoIcon { icon: modelData.icon; size: 18; color: MeoTheme.contentOnSurfaceVariant }
-                        MeoText { Layout.fillWidth: true; text: modelData.title; typeRole: "body"; typeSize: "small" }
-                        MeoText { text: modelData.value; typeRole: "label"; typeSize: "small"; emphasized: true; color: MeoTheme.contentOnSurfaceVariant }
+                        MeoIcon { icon: fingerprintDefaultRow.modelData.icon; size: 18; color: MeoTheme.contentOnSurfaceVariant }
+                        MeoText { Layout.fillWidth: true; text: fingerprintDefaultRow.modelData.title; typeRole: "body"; typeSize: "small" }
+                        MeoText { text: fingerprintDefaultRow.modelData.value; typeRole: "label"; typeSize: "small"; emphasized: true; color: MeoTheme.contentOnSurfaceVariant }
                     }
                 }
 
@@ -149,33 +156,37 @@ ApplicationWindow {
                 MeoButton {
                     text: qsTr("Review fingerprint support")
                     type: "outlined"
-                    onClicked: WelcomeState.openSettings("hardware")
+                    onClicked: root.welcomeState.openSettings("hardware")
                 }
             }
         }
 
         MeoProgressBar {
             width: parent.width
-            value: (currentStep + 1) / steps.length
+            value: (root.currentStep + 1) / root.steps.length
             Accessible.name: qsTr("Welcome progress")
+            Accessible.description: qsTr("Step %1 of %2: %3").arg(root.currentStep + 1).arg(root.steps.length).arg(root.current.title)
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
-            visible: WelcomeState.error !== ""
-            Row {
+            visible: root.welcomeState.error !== ""
+            spacing: MeoTheme.space4
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: WelcomeState.error
-                    typeRole: "body"
-                    typeSize: "small"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Couldn't open Meo Settings")
+                text: qsTr("Try again after Meo Settings is installed and available.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(root.welcomeState.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -185,27 +196,27 @@ ApplicationWindow {
             MeoButton {
                 text: qsTr("Skip for now")
                 type: "text"
-                visible: currentStep < steps.length - 1
-                onClicked: WelcomeState.complete()
+                visible: root.currentStep < root.steps.length - 1
+                onClicked: root.welcomeState.complete()
             }
             Item { Layout.fillWidth: true }
             MeoButton {
-                text: currentStep === steps.length - 1 ? qsTr("Finish") : qsTr("Open settings")
+                text: root.currentStep === root.steps.length - 1 ? qsTr("Finish") : qsTr("Open settings")
                 type: "outlined"
                 onClicked: {
-                    if (currentStep === steps.length - 1)
-                        WelcomeState.complete()
+                    if (root.currentStep === root.steps.length - 1)
+                        root.welcomeState.complete()
                     else
-                        WelcomeState.openSettings(root.current.route)
+                        root.welcomeState.openSettings(root.current.route)
                 }
             }
             MeoButton {
-                text: currentStep === steps.length - 1 ? qsTr("Done") : qsTr("Next")
+                text: root.currentStep === root.steps.length - 1 ? qsTr("Done") : qsTr("Next")
                 onClicked: {
-                    if (currentStep === steps.length - 1)
-                        WelcomeState.complete()
+                    if (root.currentStep === root.steps.length - 1)
+                        root.welcomeState.complete()
                     else
-                        ++currentStep
+                        ++root.currentStep
                 }
             }
         }

@@ -40,6 +40,77 @@ Item {
         return rows
     }
 
+    readonly property var credentialRows: [
+        {
+            "id": "account-privacy",
+            "title": qsTr("Meo Account privacy"),
+            "subtitle": AccountBackend.signedIn
+                        ? qsTr("Review saved activity, export your account data, and manage cloud privacy")
+                        : qsTr("Connect Meo Account to manage cloud privacy and data export"),
+            "icon": "account_circle",
+            "tone": "primary",
+            "trailingKind": "navigation",
+            "enabled": AccountBackend.serviceRunning
+        },
+        {
+            "id": "device-ai",
+            "title": qsTr("Device AI connections"),
+            "subtitle": qsTr("%1 shared connection(s), %2 package-authorized app(s); keys remain write-only in KWallet")
+                        .arg((AccountBackend.localAiConnections || []).length)
+                        .arg((AccountBackend.localAiConsumers || []).length),
+            "icon": "auto_awesome",
+            "tone": "secondary",
+            "trailingKind": "navigation",
+            "enabled": AccountBackend.serviceRunning
+        },
+        {
+            "id": "wallet",
+            "title": qsTr("Password wallet"),
+            "subtitle": KcmBridge.isAvailable("kcm_kwallet5")
+                        ? qsTr("Configure locking and inspect the protected store used by Meo applications")
+                        : qsTr("The KDE wallet module is not installed"),
+            "icon": "key",
+            "tone": "tertiary",
+            "trailingKind": "choice",
+            "trailingText": qsTr("Advanced"),
+            "enabled": KcmBridge.isAvailable("kcm_kwallet5")
+        }
+    ]
+
+    readonly property var localAiConsumerRows: {
+        const rows = []
+        const consumers = AccountBackend.localAiConsumers || []
+        for (let index = 0; index < consumers.length; ++index) {
+            const consumer = consumers[index]
+            rows.push({
+                "id": consumer.id,
+                "title": consumer.name || consumer.id,
+                "subtitle": qsTr("May list enabled connection metadata and request an operation after confirmation; cannot read saved keys"),
+                "icon": consumer.id === "org.meo.OmniStore" ? "apps" : "verified_user",
+                "tone": "secondary",
+                "trailingKind": "choice",
+                "trailingText": qsTr("Package policy"),
+                "interactive": false
+            })
+        }
+        return rows
+    }
+
+    function openCredentialControl(row) {
+        if (!row || !row.enabled)
+            return
+        if (row.id === "account-privacy") {
+            if (AccountBackend.signedIn)
+                AccountBackend.openHostedAction("privacy")
+            else
+                root.navigateTo("accounts")
+        } else if (row.id === "device-ai") {
+            root.navigateTo("accounts")
+        } else if (row.id === "wallet") {
+            root.navigateTo("kcm:kcm_kwallet5")
+        }
+    }
+
     function inspectApplication(row) {
         if (!row || !row.id)
             return
@@ -89,6 +160,22 @@ Item {
             subtitle: AppPermissionsBackend.sourceDescription
             model: root.applicationRows
             onRowActivated: (index, row) => root.inspectApplication(row)
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("Credentials, AI, and account data")
+            subtitle: qsTr("Local secrets stay in KWallet. Cloud privacy changes and exports require account verification.")
+            model: root.credentialRows
+            onRowActivated: (index, row) => root.openCredentialControl(row)
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: root.localAiConsumerRows.length > 0
+            title: qsTr("Applications allowed to use device AI")
+            subtitle: qsTr("These permissions come from root-installed package manifests. Remove the application package to revoke one; no application receives the provider key.")
+            model: root.localAiConsumerRows
         }
 
         MeoEmptyState {
@@ -144,24 +231,32 @@ Item {
             onClicked: AppPermissionsBackend.refresh()
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: AppPermissionsBackend.error !== ""
+            spacing: MeoTheme.space4
 
-            Row {
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: AppPermissionsBackend.error
-                    typeRole: "body"
-                    typeSize: "small"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Permission information is unavailable")
+                text: qsTr("Check that the app is available, then refresh its permission details.")
+                icon: "error"
+                tone: "error"
             }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(AppPermissionsBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        RepairEntry {
+            category: "security"
+            entryTitle: qsTr("Check security problems")
         }
     }
 
@@ -210,6 +305,30 @@ Item {
                         }))
                     }
 
+                    Column {
+                        width: parent.width
+                        visible: !AppPermissionsBackend.inspecting
+                                 && AppPermissionsBackend.error !== ""
+                        spacing: MeoTheme.space4
+
+                        MeoBanner {
+                            width: parent.width
+                            title: qsTr("Permission information is unavailable")
+                            text: qsTr("Check that the app is available, then refresh its permission details.")
+                            icon: "error"
+                            tone: "error"
+                        }
+                        MeoText {
+                            width: parent.width
+                            text: qsTr("Technical details: %1").arg(AppPermissionsBackend.error)
+                            Accessible.name: text
+                            typeRole: "label"
+                            typeSize: "small"
+                            color: MeoTheme.contentOnSurfaceVariant
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
                     MeoEmptyState {
                         width: parent.width
                         height: 200 * MeoTheme.globalScale
@@ -220,7 +339,7 @@ Item {
                                ? qsTr("Permission information unavailable")
                                : qsTr("No additional sandbox entries")
                         description: AppPermissionsBackend.error !== ""
-                                     ? AppPermissionsBackend.error
+                                     ? qsTr("Check that the app is available, then refresh its permission details.")
                                      : qsTr("Flatpak did not report additional effective permission entries for this app.")
                     }
                 }

@@ -1,7 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Bluetooth
+Name[zh_CN]=蓝牙
 Comment=Manage Bluetooth devices in Meo Settings
+Comment[zh_CN]=在 Meo 设置中管理蓝牙设备
 Exec=meo-settings --route bluetooth
 Icon=bluetooth
 Categories=Settings;Qt;KDE;

@@ -15,6 +15,7 @@
 #include "backends/omnistoreappsbackend.h"
 #include "backends/packageinventorybackend.h"
 #include "backends/powerbackend.h"
+#include "backends/repairlauncher.h"
 #include "backends/recoverybackend.h"
 #include "backends/storagebackend.h"
 #include "backends/systeminfobackend.h"
@@ -22,23 +23,75 @@
 #include "backends/configbackend.h"
 #include "backends/updatesbackend.h"
 #include "backends/welcomebackend.h"
+#include "backends/weatherbackend.h"
 #include "core/capabilitymanager.h"
 #include "core/qmlimportpolicy.h"
 #include "core/settingsregistry.h"
 
 #include <QGuiApplication>
 #include <QCommandLineParser>
+#include <QCoreApplication>
 #include <QDebug>
+#include <QDir>
 #include <QImage>
+#include <QLocale>
 #include <QRegularExpression>
 #include <QQuickWindow>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QSize>
+#include <QStringList>
 #include <QTimer>
+#include <QTranslator>
 
 #include <cstdio>
 #include <memory>
+
+namespace
+{
+QString normalizedUiLanguage(const QString &requestedLanguage)
+{
+    const QLocale requestedLocale(requestedLanguage.trimmed().isEmpty()
+                                      ? QLocale::system()
+                                      : QLocale(requestedLanguage));
+    if (requestedLocale.language() == QLocale::Chinese) {
+        // Meo Settings currently ships a Simplified Chinese catalog. Resolve
+        // all Chinese system locales to it rather than silently falling back
+        // to English for a Chinese-language desktop.
+        return QStringLiteral("zh_CN");
+    }
+    const QString name = requestedLocale.name();
+    return name == QStringLiteral("C") ? QStringLiteral("en_US") : name;
+}
+
+QString bundledTranslationDirectory()
+{
+    return QDir::cleanPath(
+        QDir(QCoreApplication::applicationDirPath())
+            .filePath(QStringLiteral("../share/meoui-qml/translations")));
+}
+
+QString bundledSettingsTranslationDirectory()
+{
+    return QDir::cleanPath(
+        QDir(QCoreApplication::applicationDirPath())
+            .filePath(QStringLiteral("../share/meo-settings/translations")));
+}
+
+bool installCatalog(QGuiApplication &app,
+                    QTranslator &translator,
+                    const QString &catalog,
+                    const QStringList &paths)
+{
+    for (const QString &path : paths) {
+        if (!path.isEmpty() && translator.load(catalog, path)) {
+            app.installTranslator(&translator);
+            return true;
+        }
+    }
+    return false;
+}
+}
 
 int main(int argc, char *argv[])
 {
@@ -65,12 +118,63 @@ int main(int argc, char *argv[])
     const QCommandLineOption sessionEntryLayoutEditorOption(
         QStringLiteral("session-entry-layout-editor"),
         QStringLiteral("Open the non-persistent lock-screen layout editor for validation."));
+    const QCommandLineOption uiLanguageOption(
+        QStringLiteral("ui-language"),
+        QStringLiteral("Use an explicit UI language for development and validation."),
+        QStringLiteral("locale"));
     parser.addOption(smokeOption);
     parser.addOption(routeOption);
     parser.addOption(sizeOption);
     parser.addOption(screenshotOption);
     parser.addOption(sessionEntryLayoutEditorOption);
+    parser.addOption(uiLanguageOption);
     parser.process(app);
+
+    // The default follows the device locale. The command-line choice exists
+    // only for isolated validation and is not persisted or written into the
+    // Plasma session, system locale, or Account service.
+    const QLocale uiLocale(normalizedUiLanguage(parser.value(uiLanguageOption)));
+    QLocale::setDefault(uiLocale);
+    QTranslator meoUiTranslator;
+    QTranslator meoSettingsTranslator;
+    bool meoUiCatalogLoaded = false;
+    bool meoSettingsCatalogLoaded = false;
+    if (uiLocale.name() == QStringLiteral("zh_CN")) {
+        QStringList translationPaths;
+        const QString configuredTranslations = qEnvironmentVariable("MEOUI_TRANSLATIONS").trimmed();
+        if (!configuredTranslations.isEmpty()) {
+            translationPaths.append(configuredTranslations);
+        }
+        translationPaths.append(bundledTranslationDirectory());
+#ifdef MEOUI_TRANSLATIONS_DEVELOPMENT_DIR
+        translationPaths.append(QString::fromUtf8(MEOUI_TRANSLATIONS_DEVELOPMENT_DIR));
+#endif
+#ifdef MEOUI_TRANSLATIONS_INSTALL_DIR
+        translationPaths.append(QString::fromUtf8(MEOUI_TRANSLATIONS_INSTALL_DIR));
+#endif
+        meoUiCatalogLoaded = installCatalog(app, meoUiTranslator,
+                                            QStringLiteral("meoui_zh_CN"),
+                                            translationPaths);
+
+        QStringList settingsTranslationPaths;
+        const QString configuredSettingsTranslations = qEnvironmentVariable("MEO_SETTINGS_TRANSLATIONS").trimmed();
+        if (!configuredSettingsTranslations.isEmpty()) {
+            settingsTranslationPaths.append(configuredSettingsTranslations);
+        }
+        settingsTranslationPaths.append(bundledSettingsTranslationDirectory());
+#ifdef MEO_SETTINGS_TRANSLATIONS_BUILD_DIR
+        settingsTranslationPaths.append(QString::fromUtf8(MEO_SETTINGS_TRANSLATIONS_BUILD_DIR));
+#endif
+#ifdef MEO_SETTINGS_TRANSLATIONS_INSTALL_DIR
+        settingsTranslationPaths.append(QString::fromUtf8(MEO_SETTINGS_TRANSLATIONS_INSTALL_DIR));
+#endif
+        meoSettingsCatalogLoaded = installCatalog(app, meoSettingsTranslator,
+                                                  QStringLiteral("meo_settings_zh_CN"),
+                                                  settingsTranslationPaths);
+    }
+    qInfo().nospace() << "Meo Settings UI language=" << uiLocale.name()
+                      << ", MeoUI zh_CN catalog=" << meoUiCatalogLoaded
+                      << ", Meo Settings zh_CN catalog=" << meoSettingsCatalogLoaded;
 
     QSize requestedSize;
     if (parser.isSet(sizeOption)) {
@@ -102,8 +206,10 @@ int main(int argc, char *argv[])
     DocumentationProvider documentationProvider;
     SystemTransactionBackend systemTransactionBackend;
     DynamicColorBackend dynamicColorBackend;
+    WeatherBackend weatherBackend;
     MeoAccountBackend meoAccountBackend;
     PowerBackend powerBackend;
+    RepairLauncher repairLauncher;
     SystemInfoBackend systemInfoBackend;
     StorageBackend storageBackend;
     OmniStoreAppsBackend omniStoreAppsBackend;
@@ -115,6 +221,7 @@ int main(int argc, char *argv[])
     CapabilityManager capabilities(&networkBackend, &bluetoothBackend, &audioBackend, &displayBackend, &powerBackend);
 
     QQmlApplicationEngine engine;
+    engine.setUiLanguage(uiLocale.bcp47Name());
 #ifdef MEOUI_IMPORT_ROOT_PATH
     MeoQmlImportPolicy::prioritizeMeoUi(engine, QStringLiteral(MEOUI_IMPORT_ROOT_PATH));
 #else
@@ -147,8 +254,10 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("DocumentationProvider"), &documentationProvider);
     context->setContextProperty(QStringLiteral("SystemTransactionBackend"), &systemTransactionBackend);
     context->setContextProperty(QStringLiteral("DynamicColorBackend"), &dynamicColorBackend);
+    context->setContextProperty(QStringLiteral("WeatherBackend"), &weatherBackend);
     context->setContextProperty(QStringLiteral("AccountBackend"), &meoAccountBackend);
     context->setContextProperty(QStringLiteral("PowerBackend"), &powerBackend);
+    context->setContextProperty(QStringLiteral("RepairLauncher"), &repairLauncher);
     context->setContextProperty(QStringLiteral("SystemInfoBackend"), &systemInfoBackend);
     context->setContextProperty(QStringLiteral("StorageBackend"), &storageBackend);
     context->setContextProperty(QStringLiteral("OmniStoreAppsBackend"), &omniStoreAppsBackend);

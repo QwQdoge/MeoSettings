@@ -10,58 +10,58 @@ Item {
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
 
     function stateText(available, readyText) {
-        return available ? readyText : qsTr("Unavailable on this system")
+        return available ? readyText : qsTr("Not available on this device")
     }
 
     readonly property var desktopRows: [
         {
-            "title": qsTr("Advanced compatibility"),
+            "title": qsTr("Advanced settings"),
             "subtitle": KcmBridge.launcherAvailable
-                        ? qsTr("%1 specialized system tools are available when a Meo page cannot safely own the workflow").arg(KcmBridge.modules.length)
-                        : qsTr("No supported advanced system tools are available"),
+                        ? qsTr("%1 advanced system tools are ready when you need a setting Meo does not manage here").arg(KcmBridge.modules.length)
+                        : qsTr("No advanced system tools are available on this device"),
             "icon": "settings", "tone": "neutral", "route": "kcm:kcm_landingpage",
             "enabled": KcmBridge.isAvailable("kcm_landingpage"), "trailingKind": "navigation"
         },
         {
-            "title": qsTr("Material theme pipeline"),
+            "title": qsTr("Meo color theme"),
             "subtitle": root.stateText(MeoShellTheme.ready && DynamicColorBackend.available,
-                                        qsTr("System palette → Meo HCT roles → MeoUI, shell, and application icons")),
+                                        qsTr("System colors are ready across Meo apps and the shell")),
             "icon": "palette", "tone": "tertiary", "route": "appearance",
             "enabled": true, "trailingKind": "navigation"
         },
         {
-            "title": qsTr("NetworkManager"),
+            "title": qsTr("Network"),
             "subtitle": root.stateText(Capabilities.network,
                                         NetworkBackend.connected
                                         ? qsTr("Connected to %1").arg(NetworkBackend.connectionName)
-                                        : qsTr("Network service connected; no active Wi-Fi connection")),
+                                        : qsTr("Network service is ready; no Wi-Fi connection is active")),
             "icon": "wifi", "tone": "primary", "route": "wifi",
             "enabled": Capabilities.wifi, "trailingKind": "navigation"
         },
         {
             "title": qsTr("Bluetooth"),
             "subtitle": root.stateText(Capabilities.bluetooth,
-                                        BluetoothBackend.enabled ? qsTr("BlueZ connected and Bluetooth is on")
-                                                                 : qsTr("BlueZ connected and Bluetooth is off")),
+                                        BluetoothBackend.enabled ? qsTr("Bluetooth is on")
+                                                                 : qsTr("Bluetooth is off")),
             "icon": "bluetooth", "tone": "secondary", "route": "bluetooth",
             "enabled": Capabilities.bluetooth, "trailingKind": "navigation"
         },
         {
-            "title": qsTr("Audio service"),
+            "title": qsTr("Sound"),
             "subtitle": root.stateText(Capabilities.audio,
-                                        AudioBackend.pipeWire ? qsTr("PipeWire connected · %1").arg(AudioBackend.outputName)
-                                                              : qsTr("PulseAudio-compatible service connected · %1").arg(AudioBackend.outputName)),
+                                        AudioBackend.pipeWire ? qsTr("Sound is ready · %1").arg(AudioBackend.outputName)
+                                                              : qsTr("Sound is ready · %1").arg(AudioBackend.outputName)),
             "icon": "volume_up", "tone": "primary", "route": "sound",
             "enabled": Capabilities.audio, "trailingKind": "navigation"
         },
         {
-            "title": qsTr("Display service"),
+            "title": qsTr("Display"),
             "subtitle": root.stateText(Capabilities.display, DisplayBackend.summary),
             "icon": "monitor", "tone": "secondary", "route": "display",
             "enabled": Capabilities.display, "trailingKind": "navigation"
         },
         {
-            "title": qsTr("Power management"),
+            "title": qsTr("Power"),
             "subtitle": root.stateText(PowerBackend.available, PowerBackend.summary),
             "icon": "battery_full", "tone": "neutral", "route": "power",
             "enabled": PowerBackend.available, "trailingKind": "navigation"
@@ -77,17 +77,17 @@ Item {
             "enabled": true, "trailingKind": "navigation"
         },
         {
-            "title": qsTr("OmniStore application data"),
+            "title": qsTr("OmniStore apps"),
             "subtitle": OmniStoreAppsBackend.exporterAvailable ? OmniStoreAppsBackend.summary
                                                                  : qsTr("OmniStore inventory exporter is unavailable"),
             "icon": "store", "tone": "tertiary", "route": "storage",
             "enabled": true, "trailingKind": "navigation"
         },
         {
-            "title": qsTr("Update orchestration"),
+            "title": qsTr("Updates"),
             "subtitle": UpdatesBackend.orchestratorAvailable
-                        ? qsTr("OmniStore update state is connected to Meo Settings")
-                        : qsTr("Read-only pacman metadata is available; OmniStore orchestration is not connected"),
+                        ? qsTr("Update information from OmniStore is ready")
+                        : qsTr("Available update information is ready to review"),
             "icon": "system_update", "tone": "primary", "route": "updates",
             "enabled": true, "trailingKind": "navigation"
         },
@@ -106,12 +106,12 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : qsTr("System integration")
-        subtitle: qsTr("Live, read-only status for the services behind every Meo Settings page.")
+        subtitle: qsTr("Check whether the services used by Meo Settings are ready. This page does not change any settings.")
 
         MeoSettingsGroup {
             width: parent.width
-            title: qsTr("System & hardware services")
-            subtitle: qsTr("Rows are shown only from real backend state. Opening a row never claims support that the service did not report.")
+            title: qsTr("Device services")
+            subtitle: qsTr("Only services that report a real status are shown. Open a row to view its settings.")
             model: root.desktopRows
             onRowActivated: (index, row) => { if (row.enabled) root.navigateTo(row.route) }
         }
@@ -119,7 +119,7 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Meo services")
-            subtitle: qsTr("Credentials, package changes, and protected operations remain with their owning service.")
+            subtitle: qsTr("Accounts, package changes, and protected actions stay with the service that manages them.")
             model: root.meoRows
             onRowActivated: (index, row) => { if (row.enabled) root.navigateTo(row.route) }
         }
@@ -131,13 +131,13 @@ Item {
                 width: parent.width
                 spacing: 6 * MeoTheme.globalScale
                 MeoText {
-                    text: qsTr("Integration contract")
+                    text: qsTr("How these services work together")
                     typeRole: "title"; typeSize: "small"; emphasized: true
                     color: MeoTheme.contentOnSurface
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("Meo Settings owns the unified interface. Platform services retain specialized configuration, Meo Account owns credentials and consent, and OmniStore owns privileged package transactions. This page verifies those connections without moving authority into the UI.")
+                    text: qsTr("Meo Settings brings your settings together. Platform services keep their specialized controls, Meo Account keeps credentials and consent, and OmniStore handles protected package changes.")
                     typeRole: "body"; typeSize: "small"
                     color: MeoTheme.contentOnSurfaceVariant
                     wrapMode: Text.WordWrap

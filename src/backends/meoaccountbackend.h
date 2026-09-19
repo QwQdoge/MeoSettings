@@ -10,6 +10,13 @@ class MeoAccountContract final
 public:
     static QString safeProfileText(const QVariant &value);
     static QString safeRemoteAvatarSource(const QVariant &value);
+
+    // Normalizes the untrusted Studio description into the exact Account
+    // request contract.  This keeps the Account boundary independent of
+    // QML objects and deliberately drops display names, artwork, prompts and
+    // any provider-specific fields: Account approves one material style for
+    // hashes of local canonical identities, not a request to redraw brands.
+    static QVariantMap normalizedAiIconPackRequest(const QVariantMap &value);
 };
 
 /**
@@ -45,10 +52,21 @@ class MeoAccountBackend final : public BackendBase
     Q_PROPERTY(bool aiBusy READ aiBusy NOTIFY changed)
     Q_PROPERTY(QString aiState READ aiState NOTIFY changed)
     Q_PROPERTY(QVariantList aiCredentials READ aiCredentials NOTIFY changed)
+    Q_PROPERTY(QVariantList localAiConnections READ localAiConnections NOTIFY changed)
+    Q_PROPERTY(QVariantList localAiConsumers READ localAiConsumers NOTIFY changed)
+    Q_PROPERTY(bool localAiDiscoveryBusy READ localAiDiscoveryBusy NOTIFY changed)
     Q_PROPERTY(QVariantMap aiConsent READ aiConsent NOTIFY changed)
     Q_PROPERTY(QString aiImageSource READ aiImageSource NOTIFY changed)
     Q_PROPERTY(QString aiTargetDesktopId READ aiTargetDesktopId NOTIFY changed)
     Q_PROPERTY(QString aiTargetApplicationName READ aiTargetApplicationName NOTIFY changed)
+    Q_PROPERTY(QVariantList aiIconStyles READ aiIconStyles NOTIFY changed)
+    Q_PROPERTY(bool aiIconPackBusy READ aiIconPackBusy NOTIFY changed)
+    Q_PROPERTY(QString aiIconPackState READ aiIconPackState NOTIFY changed)
+    Q_PROPERTY(QVariantMap aiIconPackConsent READ aiIconPackConsent NOTIFY changed)
+    Q_PROPERTY(QString aiIconPackJobId READ aiIconPackJobId NOTIFY changed)
+    Q_PROPERTY(QString aiIconPackManifestPath READ aiIconPackManifestPath NOTIFY changed)
+    Q_PROPERTY(QString aiIconPackManifestSha256 READ aiIconPackManifestSha256 NOTIFY changed)
+    Q_PROPERTY(QVariantMap aiIconPackSummary READ aiIconPackSummary NOTIFY changed)
 
 public:
     explicit MeoAccountBackend(QObject *parent = nullptr);
@@ -75,10 +93,21 @@ public:
     bool aiBusy() const;
     QString aiState() const;
     QVariantList aiCredentials() const;
+    QVariantList localAiConnections() const;
+    QVariantList localAiConsumers() const;
+    bool localAiDiscoveryBusy() const;
     QVariantMap aiConsent() const;
     QString aiImageSource() const;
     QString aiTargetDesktopId() const;
     QString aiTargetApplicationName() const;
+    QVariantList aiIconStyles() const;
+    bool aiIconPackBusy() const;
+    QString aiIconPackState() const;
+    QVariantMap aiIconPackConsent() const;
+    QString aiIconPackJobId() const;
+    QString aiIconPackManifestPath() const;
+    QString aiIconPackManifestSha256() const;
+    QVariantMap aiIconPackSummary() const;
 
 public Q_SLOTS:
     /// Refreshes only the current session-bus broker status. It never starts
@@ -94,6 +123,15 @@ public:
     Q_INVOKABLE void signOutAll();
     Q_INVOKABLE void revokeClient(const QString &clientId);
     Q_INVOKABLE void refreshAiCredentials();
+    Q_INVOKABLE void refreshLocalAiConnections();
+    Q_INVOKABLE void saveLocalAiConnection(const QString &id,
+                                           const QString &provider,
+                                           const QString &displayName,
+                                           const QString &endpoint,
+                                           const QString &defaultModel,
+                                           const QString &apiKey);
+    Q_INVOKABLE void removeLocalAiConnection(const QString &id);
+    Q_INVOKABLE void discoverLocalAiModels(const QString &id);
     Q_INVOKABLE void prepareIconImage(const QString &desktopId, const QString &applicationName,
                                       const QString &credentialId, const QString &model,
                                       const QString &prompt);
@@ -108,8 +146,24 @@ public:
     Q_INVOKABLE void continuePreparedIconImageBatch();
     Q_INVOKABLE void denyPreparedIconImageBatch();
 
+    // Account-owned, one-material AI icon-pack flow.  Unlike the legacy
+    // single-image methods above, this API never returns a provider PNG or a
+    // data URI to QML.  On success it exposes only an Account-private
+    // manifest path fetched through GetRequest(), ready for Studio preview.
+    Q_INVOKABLE void refreshAiIconStyles();
+    Q_INVOKABLE void prepareAiIconMaterialPack(const QVariantMap &iconPack);
+    Q_INVOKABLE void generatePreparedAiIconMaterialPack();
+    Q_INVOKABLE void denyPreparedAiIconMaterialPack();
+    Q_INVOKABLE void refreshAiIconMaterialPackStatus();
+    Q_INVOKABLE void cancelAiIconMaterialPack();
+    Q_INVOKABLE void releaseAiIconMaterialPack();
+    Q_INVOKABLE void clearAiIconMaterialPack();
+
 Q_SIGNALS:
     void changed();
+    void localAiConnectionSaved(const QString &id);
+    void localAiConnectionSaveFailed(const QString &message);
+    void localAiModelsDiscovered(const QString &id, const QVariantList &models);
 
 private:
     void updateLauncherAvailability();
@@ -125,6 +179,13 @@ private:
                                    const QString &prompt) const;
     void prepareNextIconImageBatchItem();
     void startPreparedIconImageBatchItem(const QString &action, const QString &state);
+    void startAiIconPackOperation(const QString &action, const QVariantMap &arguments,
+                                  const QString &state, bool replacesActiveRequest = false);
+    void fetchAiIconPackRequest(const QString &requestId, quint64 operationGeneration);
+    void handleAiIconPackUpdate(const QString &requestId, const QString &state,
+                                const QVariantMap &result, bool fromPrivateRequest);
+    void failAiIconPackOperation(const QString &message);
+    void clearAiIconPackPresentation(bool clearJob);
 
 private Q_SLOTS:
     void handleRequestChanged(const QString &requestId, const QString &state,
@@ -153,6 +214,11 @@ private:
     bool m_aiBusy = false;
     QString m_aiState = QStringLiteral("idle");
     QVariantList m_aiCredentials;
+    QVariantList m_localAiConnections;
+    QVariantList m_localAiConsumers;
+    bool m_localAiDiscoveryBusy = false;
+    QString m_localAiDiscoveryConnectionId;
+    QString m_activeLocalAiRequestId;
     QVariantMap m_aiConsent;
     QVariantMap m_pendingAiArguments;
     QString m_aiImageSource;
@@ -165,6 +231,18 @@ private:
     bool m_aiBatchPreparing = false;
     bool m_aiBatchGenerating = false;
     bool m_aiBatchDenying = false;
+    QVariantList m_aiIconStyles;
+    bool m_aiIconPackBusy = false;
+    QString m_aiIconPackState = QStringLiteral("idle");
+    QVariantMap m_aiIconPackConsent;
+    QString m_aiIconPackJobId;
+    QString m_aiIconPackManifestPath;
+    QString m_aiIconPackManifestSha256;
+    QVariantMap m_aiIconPackSummary;
+    QString m_activeAiIconPackRequestId;
+    QString m_aiIconPackLifecycleRequestId;
+    QString m_activeAiIconPackAction;
+    quint64 m_aiIconPackGeneration = 0;
     bool m_signOutAfterReauth = false;
     QString m_clientToRevokeAfterReauth;
 };

@@ -27,7 +27,7 @@ Item {
             return qsTr("Reduce energy use and background activity")
         if (profile === "balanced")
             return qsTr("Balance performance and battery life")
-        return qsTr("System-provided power profile")
+        return qsTr("Power mode provided by this device")
     }
 
     function profileIcon(profile) {
@@ -98,37 +98,34 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : qsTr("Power & battery")
-        subtitle: qsTr("Manage the live power profile directly. Scheduling and hardware policy remain in the maintained PowerDevil module.")
+        subtitle: qsTr("Choose a power mode and review battery status. More advanced schedules are available in system power settings.")
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: Platform.lastError !== ""
+            spacing: MeoTheme.space4
 
-            Column {
+            MeoBanner {
                 width: parent.width
-                spacing: 8 * MeoTheme.globalScale
-
-                Row {
-                    width: parent.width
-                    spacing: 12 * MeoTheme.globalScale
-                    MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                    MeoText {
-                        width: parent.width - 36 * MeoTheme.globalScale
-                        text: Platform.lastError
-                        typeRole: "body"
-                        typeSize: "medium"
-                        color: MeoTheme.error
-                        wrapMode: Text.WordWrap
-                    }
-                }
-
-                MeoButton {
-                    text: qsTr("Dismiss")
-                    type: "text"
-                    size: "s"
-                    onClicked: Platform.clearError()
-                }
+                title: qsTr("This power setting could not be applied")
+                text: qsTr("Check the device power state, then try the setting again.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(Platform.lastError)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
+            }
+            MeoButton {
+                text: qsTr("Dismiss")
+                type: "text"
+                size: "s"
+                onClicked: Platform.clearError()
             }
         }
 
@@ -136,6 +133,9 @@ Item {
             width: parent.width
             type: "outlined"
             visible: Platform.powerProfileDegradedReason !== ""
+            Accessible.role: Accessible.AlertMessage
+            Accessible.name: qsTr("Power mode needs attention")
+            Accessible.description: Platform.powerProfileDegradedReason
 
             Row {
                 width: parent.width
@@ -155,7 +155,7 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Battery")
-            subtitle: qsTr("Live primary-battery state from the device service")
+            subtitle: qsTr("Battery level and charging status from this device")
             model: root.batteryRows
         }
 
@@ -163,7 +163,7 @@ Item {
             width: parent.width
             visible: !SessionActions.scheduled
             title: qsTr("Session exit")
-            subtitle: qsTr("A deliberate session-only action; it does not shut down the computer")
+            subtitle: qsTr("This only signs you out. It does not shut down your computer")
             model: root.scheduledLogoutRows
             onRowActionTriggered: (index, row) => {
                 if (row.id === "schedule-logout")
@@ -175,6 +175,9 @@ Item {
             width: parent.width
             visible: SessionActions.scheduled
             type: "outlined"
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: qsTr("Sign-out countdown")
+            Accessible.description: qsTr("%1 seconds remaining").arg(SessionActions.remainingSeconds)
 
             Column {
                 width: parent.width
@@ -198,6 +201,7 @@ Item {
                     value: Math.max(0, Math.min(1, SessionActions.remainingSeconds / 30))
                     type: "linear"
                     Accessible.name: qsTr("Sign-out countdown")
+                    Accessible.description: qsTr("%1 seconds remaining").arg(SessionActions.remainingSeconds)
                 }
 
                 MeoText {
@@ -226,22 +230,25 @@ Item {
             }
         }
 
-        MeoCard {
+        Column {
             width: parent.width
             visible: !SessionActions.available && SessionActions.error !== ""
-            type: "outlined"
-            Row {
+            spacing: MeoTheme.space4
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "info"; size: 24; color: MeoTheme.primary }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: qsTr("Scheduled sign-out is unavailable: %1").arg(SessionActions.error)
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.contentOnSurfaceVariant
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Scheduled sign-out is unavailable")
+                text: qsTr("Check that the current session supports sign-out, then try again.")
+                icon: "info"
+                tone: "tonal"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(SessionActions.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -249,7 +256,7 @@ Item {
             width: parent.width
             visible: Platform.powerProfilesAvailable
             title: qsTr("Power mode")
-            subtitle: qsTr("The selected profile is applied by the system power-profiles service")
+            subtitle: qsTr("The system applies the power mode you choose")
             model: root.profileRows
             onRowToggled: (index, checked, row) => {
                 if (checked && row.profile)
@@ -268,7 +275,7 @@ Item {
                 MeoIcon { icon: "info"; size: 24; color: MeoTheme.primary }
                 MeoText {
                     width: parent.width - 36 * MeoTheme.globalScale
-                    text: qsTr("This system does not publish power profiles. Battery state and the screen-lock action below remain available when supported.")
+                    text: qsTr("Power modes are not available on this device. Battery status and screen lock can still be available.")
                     typeRole: "body"
                     typeSize: "medium"
                     color: MeoTheme.contentOnSurfaceVariant
@@ -292,10 +299,10 @@ Item {
             width: parent.width
             visible: KcmBridge.isAvailable("kcm_powerdevilprofilesconfig")
             title: qsTr("Advanced power policy")
-            subtitle: qsTr("Use the maintained PowerDevil module for AC/battery schedules, thresholds, and other recovery-sensitive policy.")
+            subtitle: qsTr("Use system power settings for schedules, charge limits, and other advanced options.")
             model: [{
                 "title": qsTr("Advanced Power Management"),
-                "subtitle": qsTr("Schedules, critical-battery actions, and device-specific power policy"),
+                "subtitle": qsTr("Schedules, critical battery actions, and device-specific power options"),
                 "icon": "tune",
                 "tone": "neutral",
                 "route": "kcm:kcm_powerdevilprofilesconfig",

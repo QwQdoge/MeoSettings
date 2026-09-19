@@ -57,5 +57,10 @@ Item {
                 }
             }
         }
+
+        RepairEntry {
+            category: "graphics"
+            entryTitle: qsTr("Troubleshoot graphics and drivers")
+        }
     }
 }

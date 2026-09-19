@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Meo Settings">
+  <path fill="#7661C9" d="M10 12H38V16H10Z"/>
+  <circle cx="18" cy="14" r="5" fill="#B69DF8"/>
+  <path fill="#4B2B82" d="M10 22H38V26H10Z"/>
+  <circle cx="30" cy="24" r="5" fill="#8BE0CF"/>
+  <path fill="#7661C9" d="M10 32H38V36H10Z"/>
+  <circle cx="22" cy="34" r="5" fill="#FFB4AB"/>
+</svg>

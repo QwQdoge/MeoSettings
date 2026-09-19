@@ -108,11 +108,14 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : qsTr("Updates")
-        subtitle: qsTr("Meo, KDE, system, and configured-repository packages are shown independently from OmniStore. This page never installs an update.")
+        subtitle: qsTr("See what updates are available. Install them in the system updater or OmniStore, not on this page.")
 
         MeoCard {
             width: parent.width
             type: "filled"
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: qsTr("Update overview")
+            Accessible.description: UpdatesBackend.summary
 
             Column {
                 width: parent.width
@@ -154,7 +157,7 @@ Item {
                 MeoText {
                     width: parent.width
                     visible: UpdatesBackend.cachedMetadataTimestamp !== ""
-                    text: qsTr("Based on locally cached repository metadata from %1. Refreshing here does not download metadata or run pacman -Sy/-Syu.")
+                    text: qsTr("Using repository information last downloaded on %1. Refresh here only rereads information already on this device.")
                           .arg(UpdatesBackend.cachedMetadataTimestamp)
                     typeRole: "body"
                     typeSize: "small"
@@ -233,7 +236,7 @@ Item {
                      && UpdatesBackend.updateCount === 0 && UpdatesBackend.error === ""
             icon: "check_circle"
             title: qsTr("No cached system updates")
-            description: qsTr("This only reflects your currently downloaded pacman repository metadata. Use the system updater to refresh repositories and install updates.")
+            description: qsTr("This uses update information already downloaded to your device. Open the system updater to check for and install updates.")
         }
 
         MeoSettingsGroup {
@@ -346,23 +349,31 @@ Item {
             model: root.repositoryRows
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: UpdatesBackend.error !== ""
-            Row {
+            spacing: MeoTheme.space4
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: UpdatesBackend.error
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("Update information is unavailable")
+                text: qsTr("Check your connection, then refresh the update information.")
+                icon: "error"
+                tone: "error"
             }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(UpdatesBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        RepairEntry {
+            category: "packages"
+            entryTitle: qsTr("Troubleshoot packages and updates")
         }
     }
 

@@ -4,5 +4,6 @@
   "oauthClientId": "registered-meo-settings-oauth-client-id",
   "redirectUri": "meo-settings://auth/callback",
   "executables": ["/usr/bin/meo-settings"],
-  "scopes": ["openid", "profile"]
+  "scopes": ["openid", "profile"],
+  "capabilities": ["local_ai"]
 }

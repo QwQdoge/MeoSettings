@@ -6,8 +6,10 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 #include <QDBusReply>
+#include <QDir>
 #include <QFileInfo>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QSet>
 #include <QStandardPaths>
 #include <QUrl>
@@ -50,6 +52,196 @@ bool isSafeText(const QString &value, const int maximum)
            });
 }
 
+QString safeText(const QVariant &value, int maximum);
+
+bool validAiIconPackDesktopId(const QString &value)
+{
+    static const QRegularExpression identifier(
+        QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._-]{0,511}$"));
+    return identifier.match(value).hasMatch();
+}
+
+bool validSha256(const QString &value)
+{
+    static const QRegularExpression hash(QStringLiteral("^[a-f0-9]{64}$"));
+    return hash.match(value).hasMatch();
+}
+
+bool validAiIconPackStyleId(const QString &value)
+{
+    static const QRegularExpression identifier(
+        QStringLiteral("^[a-z0-9][a-z0-9-]{0,79}$"));
+    return identifier.match(value).hasMatch();
+}
+
+bool validAiIconPackJobId(const QString &value)
+{
+    const QUuid id(value);
+    return !id.isNull()
+        && id.toString(QUuid::WithoutBraces) == value.trimmed().toLower();
+}
+
+bool isAiIconPackOperation(const QString &operation)
+{
+    return operation == QLatin1String("ai_icon_styles")
+        || operation.startsWith(QStringLiteral("ai_icon_pack_"));
+}
+
+bool isPrivateAiIconPackManifestPath(const QString &value, const QString &jobId)
+{
+    const QString runtime = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    if (runtime.isEmpty() || !validAiIconPackJobId(jobId) || !QDir::isAbsolutePath(value)
+        || value.size() > 4096) {
+        return false;
+    }
+    const QString root = QDir::cleanPath(QDir(runtime).absoluteFilePath(
+        QStringLiteral("meo-account/icon-packs")));
+    const QString path = QDir::cleanPath(value);
+    if (!path.startsWith(root + QLatin1Char('/'))
+        || QFileInfo(path).fileName() != QLatin1String("pack.json")) {
+        return false;
+    }
+    return QDir(root).relativeFilePath(path)
+        == jobId + QStringLiteral("/pack.json");
+}
+
+QVariantMap safeAiIconPackConsent(const QVariantMap &value)
+{
+    const QString requestId = value.value(QStringLiteral("requestId")).toString().trimmed();
+    const QString payloadSha256 = value.value(QStringLiteral("payloadSha256")).toString();
+    const QString styleId = value.value(QStringLiteral("styleId")).toString().trimmed();
+    const QString recipe = safeText(value.value(QStringLiteral("promptRecipeVersion")), 128);
+    const QString shape = value.value(QStringLiteral("shape")).toString().trimmed().toLower();
+    const int itemCount = value.value(QStringLiteral("itemCount")).toInt();
+    if (!validAiIconPackJobId(requestId) || !validSha256(payloadSha256)
+        || value.value(QStringLiteral("confirmationVersion")).toInt() != 1
+        || !validAiIconPackStyleId(styleId)
+        || !QSet<QString>{QStringLiteral("circle"), QStringLiteral("pixel"),
+                          QStringLiteral("squircle"), QStringLiteral("rounded")}.contains(shape)
+        || recipe.isEmpty() || itemCount < 1 || itemCount > 128) {
+        return {};
+    }
+
+    QVariantList categories;
+    const QVariantList submittedCategories = value.value(QStringLiteral("dataCategories")).toList();
+    for (const QVariant &category : submittedCategories) {
+        const QString text = safeText(category, 128);
+        if (text.isEmpty() || categories.contains(text)) return {};
+        categories.append(text);
+    }
+    if (categories.isEmpty()) return {};
+
+    return {
+        {QStringLiteral("requestId"), requestId},
+        {QStringLiteral("payloadSha256"), payloadSha256},
+        {QStringLiteral("confirmationVersion"), 1},
+        {QStringLiteral("expiresAt"), safeText(value.value(QStringLiteral("expiresAt")), 64)},
+        {QStringLiteral("provider"), safeText(value.value(QStringLiteral("provider")), 128)},
+        {QStringLiteral("providerName"), safeText(value.value(QStringLiteral("providerName")), 128)},
+        {QStringLiteral("destination"), safeText(value.value(QStringLiteral("destination")), 256)},
+        {QStringLiteral("model"), safeText(value.value(QStringLiteral("model")), 160)},
+        {QStringLiteral("clientId"), safeText(value.value(QStringLiteral("clientId")), 128)},
+        {QStringLiteral("purpose"), safeText(value.value(QStringLiteral("purpose")), 240)},
+        {QStringLiteral("dataCategories"), categories},
+        {QStringLiteral("operation"), safeText(value.value(QStringLiteral("operation")), 128)},
+        {QStringLiteral("styleId"), styleId},
+        {QStringLiteral("promptRecipeVersion"), recipe},
+        {QStringLiteral("shape"), shape},
+        {QStringLiteral("itemCount"), itemCount},
+    };
+}
+
+QVariantMap safeAiIconPackSummary(const QVariantMap &value)
+{
+    QVariantMap summary;
+    const QString jobId = value.value(QStringLiteral("jobId")).toString().trimmed();
+    if (validAiIconPackJobId(jobId)) summary.insert(QStringLiteral("jobId"), jobId);
+    const QString styleId = value.value(QStringLiteral("styleId")).toString().trimmed();
+    if (validAiIconPackStyleId(styleId)) summary.insert(QStringLiteral("styleId"), styleId);
+    const QString recipe = safeText(value.value(QStringLiteral("promptRecipeVersion")), 128);
+    if (!recipe.isEmpty()) summary.insert(QStringLiteral("promptRecipeVersion"), recipe);
+    const QString shape = value.value(QStringLiteral("shape")).toString().trimmed().toLower();
+    if (QSet<QString>{QStringLiteral("circle"), QStringLiteral("pixel"),
+                      QStringLiteral("squircle"), QStringLiteral("rounded")}.contains(shape)) {
+        summary.insert(QStringLiteral("shape"), shape);
+    }
+    const QString provider = safeText(value.value(QStringLiteral("provider")), 128);
+    if (!provider.isEmpty()) summary.insert(QStringLiteral("provider"), provider);
+    const QString model = safeText(value.value(QStringLiteral("model")), 160);
+    if (!model.isEmpty()) summary.insert(QStringLiteral("model"), model);
+    const int itemCount = value.value(QStringLiteral("itemCount")).toInt();
+    if (itemCount >= 1 && itemCount <= 128) summary.insert(QStringLiteral("itemCount"), itemCount);
+    const QString expiresAt = safeText(value.value(QStringLiteral("expiresAt")), 64);
+    if (!expiresAt.isEmpty()) summary.insert(QStringLiteral("expiresAt"), expiresAt);
+    const QString manifestSha256 = value.value(QStringLiteral("manifestSha256")).toString();
+    if (validSha256(manifestSha256))
+        summary.insert(QStringLiteral("manifestSha256"), manifestSha256);
+    return summary;
+}
+
+QVariantList safeAiIconStyleCatalog(const QVariantList &value)
+{
+    if (value.isEmpty() || value.size() > 32) return {};
+    QSet<QString> seen;
+    QList<QVariantMap> styles;
+    styles.reserve(value.size());
+    for (const QVariant &entry : value) {
+        const QVariantMap style = entry.toMap();
+        const QString id = style.value(QStringLiteral("id")).toString().trimmed();
+        const QString recipeVersion = safeText(style.value(QStringLiteral("recipeVersion")), 128);
+        const QString displayName = safeText(style.value(QStringLiteral("displayName")), 128);
+        const QString description = safeText(style.value(QStringLiteral("description")), 512);
+        if (!validAiIconPackStyleId(id) || recipeVersion.isEmpty() || displayName.isEmpty()
+            || description.isEmpty() || seen.contains(id)) {
+            return {};
+        }
+        seen.insert(id);
+        const bool available = style.value(QStringLiteral("available"), true).toBool();
+        QVariantMap safe{{QStringLiteral("id"), id},
+                         {QStringLiteral("recipeVersion"), recipeVersion},
+                         {QStringLiteral("displayName"), displayName},
+                         {QStringLiteral("description"), description},
+                         {QStringLiteral("available"), available}};
+        const QString unavailableReason = safeText(style.value(QStringLiteral("unavailableReason")), 256);
+        if (!unavailableReason.isEmpty())
+            safe.insert(QStringLiteral("unavailableReason"), unavailableReason);
+        styles.append(safe);
+    }
+    std::sort(styles.begin(), styles.end(), [](const QVariantMap &left, const QVariantMap &right) {
+        return left.value(QStringLiteral("id")).toString()
+            < right.value(QStringLiteral("id")).toString();
+    });
+    QVariantList result;
+    result.reserve(styles.size());
+    for (const QVariantMap &style : std::as_const(styles)) result.append(style);
+    return result;
+}
+
+bool aiIconPackOperationIsExpected(const QString &action, const QString &operation)
+{
+    if (operation == QLatin1String("ai_icon_pack_request_started")
+        || operation == QLatin1String("ai_icon_pack_failed")
+        || operation == QLatin1String("ai_icon_pack_expired")) {
+        return true;
+    }
+    if (action == QLatin1String("list_ai_icon_styles"))
+        return operation == QLatin1String("ai_icon_styles");
+    if (action == QLatin1String("prepare_ai_icon_material_pack"))
+        return operation == QLatin1String("ai_icon_pack_consent");
+    if (action == QLatin1String("generate_ai_icon_material_pack"))
+        return operation == QLatin1String("ai_icon_pack_staging")
+            || operation == QLatin1String("ai_icon_pack_ready");
+    if (action == QLatin1String("deny_ai_icon_material_pack"))
+        return operation == QLatin1String("ai_icon_pack_denied");
+    if (action == QLatin1String("get_ai_icon_material_pack_status"))
+        return operation == QLatin1String("ai_icon_pack_status");
+    if (action == QLatin1String("cancel_ai_icon_material_pack"))
+        return operation == QLatin1String("ai_icon_pack_cancelled");
+    if (action == QLatin1String("release_ai_icon_material_pack"))
+        return operation == QLatin1String("ai_icon_pack_released");
+    return false;
+}
+
 QString safeText(const QVariant &value, const int maximum)
 {
     const QString text = value.toString().trimmed();
@@ -87,6 +279,58 @@ QString MeoAccountContract::safeProfileText(const QVariant &value)
 QString MeoAccountContract::safeRemoteAvatarSource(const QVariant &value)
 {
     return safeAvatarUrl(value);
+}
+
+QVariantMap MeoAccountContract::normalizedAiIconPackRequest(const QVariantMap &value)
+{
+    bool versionOk = false;
+    const int contractVersion = value.value(QStringLiteral("contractVersion")).toInt(&versionOk);
+    const QString styleId = value.value(QStringLiteral("styleId")).toString().trimmed();
+    const QString shape = value.value(QStringLiteral("shape")).toString().trimmed().toLower();
+    static const QSet<QString> supportedShapes{
+        QStringLiteral("circle"), QStringLiteral("pixel"),
+        QStringLiteral("squircle"), QStringLiteral("rounded"),
+    };
+    if (value.value(QStringLiteral("schema")).toString()
+            != QLatin1String("org.meo.ai-icon-pack-request/v1")
+        || !versionOk || contractVersion != 1 || !validAiIconPackStyleId(styleId)
+        || !supportedShapes.contains(shape)) {
+        return {};
+    }
+
+    const QVariantList submittedItems = value.value(QStringLiteral("items")).toList();
+    if (submittedItems.isEmpty() || submittedItems.size() > 128) return {};
+
+    QSet<QString> seenDesktopIds;
+    QList<QVariantMap> items;
+    items.reserve(submittedItems.size());
+    for (const QVariant &submittedItem : submittedItems) {
+        const QVariantMap item = submittedItem.toMap();
+        const QString desktopId = item.value(QStringLiteral("desktopId")).toString().trimmed();
+        const QString sourceIconHash = item.value(QStringLiteral("sourceIconHash")).toString();
+        if (!validAiIconPackDesktopId(desktopId) || !validSha256(sourceIconHash)
+            || seenDesktopIds.contains(desktopId)) {
+            return {};
+        }
+        seenDesktopIds.insert(desktopId);
+        items.append({{QStringLiteral("desktopId"), desktopId},
+                      {QStringLiteral("sourceIconHash"), sourceIconHash}});
+    }
+    std::sort(items.begin(), items.end(), [](const QVariantMap &left, const QVariantMap &right) {
+        return left.value(QStringLiteral("desktopId")).toString()
+            < right.value(QStringLiteral("desktopId")).toString();
+    });
+
+    QVariantList canonicalItems;
+    canonicalItems.reserve(items.size());
+    for (const QVariantMap &item : std::as_const(items)) canonicalItems.append(item);
+    return {
+        {QStringLiteral("schema"), QStringLiteral("org.meo.ai-icon-pack-request/v1")},
+        {QStringLiteral("contractVersion"), 1},
+        {QStringLiteral("styleId"), styleId},
+        {QStringLiteral("shape"), shape},
+        {QStringLiteral("items"), canonicalItems},
+    };
 }
 
 MeoAccountBackend::MeoAccountBackend(QObject *parent)
@@ -143,10 +387,21 @@ QString MeoAccountBackend::requestState() const { return m_requestState; }
 bool MeoAccountBackend::aiBusy() const { return m_aiBusy; }
 QString MeoAccountBackend::aiState() const { return m_aiState; }
 QVariantList MeoAccountBackend::aiCredentials() const { return m_aiCredentials; }
+QVariantList MeoAccountBackend::localAiConnections() const { return m_localAiConnections; }
+QVariantList MeoAccountBackend::localAiConsumers() const { return m_localAiConsumers; }
+bool MeoAccountBackend::localAiDiscoveryBusy() const { return m_localAiDiscoveryBusy; }
 QVariantMap MeoAccountBackend::aiConsent() const { return m_aiConsent; }
 QString MeoAccountBackend::aiImageSource() const { return m_aiImageSource; }
 QString MeoAccountBackend::aiTargetDesktopId() const { return m_aiTargetDesktopId; }
 QString MeoAccountBackend::aiTargetApplicationName() const { return m_aiTargetApplicationName; }
+QVariantList MeoAccountBackend::aiIconStyles() const { return m_aiIconStyles; }
+bool MeoAccountBackend::aiIconPackBusy() const { return m_aiIconPackBusy; }
+QString MeoAccountBackend::aiIconPackState() const { return m_aiIconPackState; }
+QVariantMap MeoAccountBackend::aiIconPackConsent() const { return m_aiIconPackConsent; }
+QString MeoAccountBackend::aiIconPackJobId() const { return m_aiIconPackJobId; }
+QString MeoAccountBackend::aiIconPackManifestPath() const { return m_aiIconPackManifestPath; }
+QString MeoAccountBackend::aiIconPackManifestSha256() const { return m_aiIconPackManifestSha256; }
+QVariantMap MeoAccountBackend::aiIconPackSummary() const { return m_aiIconPackSummary; }
 
 QString MeoAccountBackend::cloudName() const
 {
@@ -223,7 +478,138 @@ void MeoAccountBackend::refresh()
                 m_lastSyncedAt = safeText(overview.value(QStringLiteral("lastSyncedAt")), 64);
                 m_logoutEpoch = overview.value(QStringLiteral("logoutEpoch")).toULongLong();
                 applyStatus(overview, overview.value(QStringLiteral("identity")).toMap());
+                refreshLocalAiConnections();
                 Q_EMIT changed();
+            });
+}
+
+void MeoAccountBackend::refreshLocalAiConnections()
+{
+    if (!brokerIsRunning()) {
+        m_localAiConnections.clear();
+        m_localAiConsumers.clear();
+        Q_EMIT changed();
+        return;
+    }
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("ListLocalAiConnections")), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QVariantList> reply = *completed;
+                completed->deleteLater();
+                if (!reply.isValid()) {
+                    setError(tr("The local AI connection store could not be read."));
+                    Q_EMIT changed();
+                    return;
+                }
+                m_localAiConnections = reply.value();
+                Q_EMIT changed();
+            });
+    auto *consumerWatcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("ListLocalAiConsumers")), this);
+    connect(consumerWatcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QVariantList> reply = *completed;
+                completed->deleteLater();
+                if (!reply.isValid()) {
+                    m_localAiConsumers.clear();
+                    Q_EMIT changed();
+                    return;
+                }
+                m_localAiConsumers = reply.value();
+                Q_EMIT changed();
+            });
+}
+
+void MeoAccountBackend::saveLocalAiConnection(const QString &id,
+                                              const QString &provider,
+                                              const QString &displayName,
+                                              const QString &endpoint,
+                                              const QString &defaultModel,
+                                              const QString &apiKey)
+{
+    clearError();
+    if (!brokerIsRunning()) {
+        setError(tr("Meo Account must be running to access the password wallet."));
+        Q_EMIT changed();
+        return;
+    }
+    const QVariantMap connection{{QStringLiteral("id"), id},
+                                 {QStringLiteral("provider"), provider},
+                                 {QStringLiteral("displayName"), displayName},
+                                 {QStringLiteral("endpoint"), endpoint},
+                                 {QStringLiteral("defaultModel"), defaultModel},
+                                 {QStringLiteral("enabled"), true}};
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("UpsertLocalAiConnection"), connection, apiKey), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QVariantMap> reply = *completed;
+                completed->deleteLater();
+                if (!reply.isValid() || reply.value().isEmpty()) {
+                    const QString message = tr("The local AI connection could not be saved to the password wallet.");
+                    setError(message);
+                    Q_EMIT localAiConnectionSaveFailed(message);
+                    Q_EMIT changed();
+                    return;
+                }
+                Q_EMIT localAiConnectionSaved(reply.value().value(QStringLiteral("id")).toString());
+                refreshLocalAiConnections();
+            });
+}
+
+void MeoAccountBackend::discoverLocalAiModels(const QString &id)
+{
+    clearError();
+    if (!brokerIsRunning() || QUuid(id).isNull() || m_localAiDiscoveryBusy) {
+        const QString message = tr("Save the device AI connection before detecting models.");
+        setError(message);
+        Q_EMIT changed();
+        return;
+    }
+    m_localAiDiscoveryBusy = true;
+    m_localAiDiscoveryConnectionId = id;
+    m_activeLocalAiRequestId.clear();
+    Q_EMIT changed();
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("StartLocalAiOperation"), settingsClientId(),
+                         QStringLiteral("discover_models"),
+                         QVariantMap{{QStringLiteral("connectionId"), id}}), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QString> reply = *completed;
+                completed->deleteLater();
+                if (!reply.isValid() || reply.value().isEmpty()) {
+                    m_localAiDiscoveryBusy = false;
+                    m_localAiDiscoveryConnectionId.clear();
+                    setError(tr("The AI model catalog could not be requested."));
+                    Q_EMIT changed();
+                    return;
+                }
+                m_activeLocalAiRequestId = reply.value();
+            });
+}
+
+void MeoAccountBackend::removeLocalAiConnection(const QString &id)
+{
+    clearError();
+    if (!brokerIsRunning()) return;
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("RemoveLocalAiConnection"), id), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<bool> reply = *completed;
+                completed->deleteLater();
+                if (!reply.isValid() || !reply.value()) {
+                    setError(tr("The local AI connection could not be removed."));
+                    Q_EMIT changed();
+                    return;
+                }
+                refreshLocalAiConnections();
             });
 }
 
@@ -527,10 +913,390 @@ void MeoAccountBackend::clearGeneratedIconImage()
     Q_EMIT changed();
 }
 
+void MeoAccountBackend::refreshAiIconStyles()
+{
+    if (!m_signedIn || m_aiBusy || m_aiIconPackBusy || !m_aiIconPackJobId.isEmpty()) {
+        if (!m_signedIn) setError(tr("Connect Meo Account before loading AI icon styles."));
+        else if (!m_aiIconPackJobId.isEmpty())
+            setError(tr("Finish, cancel, or release the current AI icon pack first."));
+        Q_EMIT changed();
+        return;
+    }
+    startAiIconPackOperation(QStringLiteral("list_ai_icon_styles"), {},
+                             QStringLiteral("loading_styles"));
+}
+
+void MeoAccountBackend::prepareAiIconMaterialPack(const QVariantMap &iconPack)
+{
+    if (!m_signedIn || m_aiBusy || m_aiIconPackBusy || !m_aiIconPackJobId.isEmpty()) {
+        if (!m_signedIn) setError(tr("Connect Meo Account before creating an AI icon pack."));
+        else if (!m_aiIconPackJobId.isEmpty())
+            setError(tr("Finish, cancel, or release the current AI icon pack first."));
+        Q_EMIT changed();
+        return;
+    }
+    const QVariantMap canonical = MeoAccountContract::normalizedAiIconPackRequest(iconPack);
+    if (canonical.isEmpty()) {
+        setError(tr("The selected application identities or AI icon style are invalid."));
+        Q_EMIT changed();
+        return;
+    }
+    clearError();
+    clearAiIconPackPresentation(true);
+    startAiIconPackOperation(QStringLiteral("prepare_ai_icon_material_pack"),
+                             {{QStringLiteral("iconPack"), canonical}},
+                             QStringLiteral("preparing"));
+}
+
+void MeoAccountBackend::generatePreparedAiIconMaterialPack()
+{
+    if (m_aiIconPackBusy || m_aiIconPackState != QLatin1String("consent_ready")
+        || !validAiIconPackJobId(m_aiIconPackJobId) || m_aiIconPackConsent.isEmpty()) {
+        return;
+    }
+    const QString consentRequestId = m_aiIconPackConsent.value(QStringLiteral("requestId")).toString();
+    const QString consentHash = m_aiIconPackConsent.value(QStringLiteral("payloadSha256")).toString();
+    if (!validAiIconPackJobId(consentRequestId) || !validSha256(consentHash)
+        || m_aiIconPackConsent.value(QStringLiteral("confirmationVersion")).toInt() != 1) {
+        failAiIconPackOperation(tr("The AI icon pack consent is no longer valid."));
+        return;
+    }
+    startAiIconPackOperation(QStringLiteral("generate_ai_icon_material_pack"), {
+        {QStringLiteral("jobId"), m_aiIconPackJobId},
+        {QStringLiteral("consent"), QVariantMap{
+            {QStringLiteral("requestId"), consentRequestId},
+            {QStringLiteral("payloadSha256"), consentHash},
+            {QStringLiteral("confirmationVersion"), 1},
+        }},
+    }, QStringLiteral("generating"));
+}
+
+void MeoAccountBackend::denyPreparedAiIconMaterialPack()
+{
+    if (m_aiIconPackBusy || m_aiIconPackState != QLatin1String("consent_ready")
+        || !validAiIconPackJobId(m_aiIconPackJobId)) {
+        return;
+    }
+    startAiIconPackOperation(QStringLiteral("deny_ai_icon_material_pack"),
+                             {{QStringLiteral("jobId"), m_aiIconPackJobId}},
+                             QStringLiteral("denying"));
+}
+
+void MeoAccountBackend::refreshAiIconMaterialPackStatus()
+{
+    if (m_aiIconPackBusy || !validAiIconPackJobId(m_aiIconPackJobId)) return;
+    startAiIconPackOperation(QStringLiteral("get_ai_icon_material_pack_status"),
+                             {{QStringLiteral("jobId"), m_aiIconPackJobId}},
+                             QStringLiteral("checking_status"));
+}
+
+void MeoAccountBackend::cancelAiIconMaterialPack()
+{
+    if (!validAiIconPackJobId(m_aiIconPackJobId)) return;
+    // Account can abort local staging while a provider request is in flight.
+    // Replacing the active request intentionally makes a late generation
+    // result stale; it must not repopulate a cancelled pack in Settings.
+    startAiIconPackOperation(QStringLiteral("cancel_ai_icon_material_pack"),
+                             {{QStringLiteral("jobId"), m_aiIconPackJobId}},
+                             QStringLiteral("cancelling"), true);
+}
+
+void MeoAccountBackend::releaseAiIconMaterialPack()
+{
+    if (m_aiIconPackBusy || m_aiIconPackState != QLatin1String("ready")
+        || !validAiIconPackJobId(m_aiIconPackJobId)) {
+        return;
+    }
+    startAiIconPackOperation(QStringLiteral("release_ai_icon_material_pack"),
+                             {{QStringLiteral("jobId"), m_aiIconPackJobId}},
+                             QStringLiteral("releasing"));
+}
+
+void MeoAccountBackend::clearAiIconMaterialPack()
+{
+    if (m_aiIconPackBusy) return;
+    if (m_aiIconPackState == QLatin1String("ready")) {
+        setError(tr("Release the private AI icon pack after applying or discarding it."));
+        Q_EMIT changed();
+        return;
+    }
+    clearError();
+    clearAiIconPackPresentation(true);
+    m_aiIconPackState = QStringLiteral("idle");
+    Q_EMIT changed();
+}
+
+void MeoAccountBackend::startAiIconPackOperation(const QString &action,
+                                                 const QVariantMap &arguments,
+                                                 const QString &state,
+                                                 const bool replacesActiveRequest)
+{
+    if (!m_signedIn || m_aiBusy || (m_aiIconPackBusy && !replacesActiveRequest)) {
+        if (!m_signedIn) setError(tr("Connect Meo Account before using AI icon packs."));
+        Q_EMIT changed();
+        return;
+    }
+
+    clearError();
+    const quint64 generation = ++m_aiIconPackGeneration;
+    m_aiIconPackBusy = true;
+    m_aiIconPackState = state;
+    m_activeAiIconPackRequestId.clear();
+    m_activeAiIconPackAction = action;
+    Q_EMIT changed();
+
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("StartAccountOperation"), action, arguments), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this, generation](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QString> reply = *completed;
+                completed->deleteLater();
+                if (generation != m_aiIconPackGeneration) return;
+                if (!reply.isValid() || !validAiIconPackJobId(reply.value())) {
+                    // Account operation request IDs are also UUIDs.  Reject an
+                    // empty or malformed reply before it can become a broad
+                    // signal match.
+                    failAiIconPackOperation(tr("The Meo Account AI icon pack request could not be started."));
+                    return;
+                }
+                m_activeAiIconPackRequestId = reply.value();
+                fetchAiIconPackRequest(reply.value(), generation);
+            });
+}
+
+void MeoAccountBackend::fetchAiIconPackRequest(const QString &requestId,
+                                               const quint64 operationGeneration)
+{
+    if (operationGeneration != m_aiIconPackGeneration
+        || requestId != m_activeAiIconPackRequestId) {
+        return;
+    }
+    QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("GetRequest"), requestId), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this, requestId, operationGeneration](QDBusPendingCallWatcher *completed) {
+                const QDBusPendingReply<QVariantMap> reply = *completed;
+                completed->deleteLater();
+                if (operationGeneration != m_aiIconPackGeneration
+                    || requestId != m_activeAiIconPackRequestId) {
+                    return;
+                }
+                if (!reply.isValid() || reply.value().isEmpty()) {
+                    failAiIconPackOperation(tr("The private AI icon pack result could not be read."));
+                    return;
+                }
+                const QVariantMap request = reply.value();
+                handleAiIconPackUpdate(requestId,
+                                       request.value(QStringLiteral("state")).toString(),
+                                       request, true);
+            });
+}
+
+void MeoAccountBackend::failAiIconPackOperation(const QString &message)
+{
+    m_aiIconPackBusy = false;
+    m_aiIconPackState = QStringLiteral("failed");
+    m_activeAiIconPackRequestId.clear();
+    m_activeAiIconPackAction.clear();
+    setError(message);
+    Q_EMIT changed();
+}
+
+void MeoAccountBackend::clearAiIconPackPresentation(const bool clearJob)
+{
+    m_aiIconPackConsent.clear();
+    m_aiIconPackManifestPath.clear();
+    m_aiIconPackManifestSha256.clear();
+    m_aiIconPackSummary.clear();
+    if (clearJob) m_aiIconPackJobId.clear();
+    m_activeAiIconPackRequestId.clear();
+    m_aiIconPackLifecycleRequestId.clear();
+    m_activeAiIconPackAction.clear();
+}
+
+void MeoAccountBackend::handleAiIconPackUpdate(const QString &requestId, const QString &state,
+                                               const QVariantMap &result,
+                                               const bool fromPrivateRequest)
+{
+    // Never use the legacy `operation.startsWith("ai_")` fallback for a pack
+    // event.  A request ID is acquired first and every later event must carry
+    // it; private material metadata is then read only with GetRequest().
+    if (requestId != m_activeAiIconPackRequestId) return;
+    const QString operation = result.value(QStringLiteral("operation")).toString();
+    if (!isAiIconPackOperation(operation)
+        || !aiIconPackOperationIsExpected(m_activeAiIconPackAction, operation)) {
+        return;
+    }
+
+    const bool listingStyles = m_activeAiIconPackAction == QLatin1String("list_ai_icon_styles");
+    const QString returnedJobId = result.value(QStringLiteral("jobId")).toString().trimmed();
+    if (!listingStyles) {
+        if (!validAiIconPackJobId(returnedJobId)) {
+            failAiIconPackOperation(tr("The AI icon pack response did not identify its job."));
+            return;
+        }
+        if (m_aiIconPackJobId.isEmpty()) {
+            if (m_activeAiIconPackAction != QLatin1String("prepare_ai_icon_material_pack")) {
+                failAiIconPackOperation(tr("The AI icon pack response did not match the active job."));
+                return;
+            }
+            m_aiIconPackJobId = returnedJobId;
+        } else if (returnedJobId != m_aiIconPackJobId) {
+            // A late response from a replaced/cancelled request is stale. It
+            // must not alter the job, consent or private manifest now shown.
+            return;
+        }
+    }
+
+    const QString requestError = safeText(result.value(QStringLiteral("error")), 512);
+    if (!requestError.isEmpty()) setError(requestError);
+    const QVariantMap summary = safeAiIconPackSummary(result);
+    if (!summary.isEmpty()) m_aiIconPackSummary = summary;
+
+    if (operation == QLatin1String("ai_icon_pack_request_started")) {
+        if (m_activeAiIconPackAction == QLatin1String("prepare_ai_icon_material_pack")
+            || m_activeAiIconPackAction == QLatin1String("generate_ai_icon_material_pack")) {
+            m_aiIconPackLifecycleRequestId = requestId;
+        }
+        m_aiIconPackState = QStringLiteral("contacting");
+        Q_EMIT changed();
+        return;
+    }
+    if (operation == QLatin1String("ai_icon_styles")) {
+        const QVariantList styles = safeAiIconStyleCatalog(result.value(QStringLiteral("styles")).toList());
+        if (styles.isEmpty()) {
+            failAiIconPackOperation(tr("The Meo Account AI icon style catalog was invalid."));
+            return;
+        }
+        m_aiIconStyles = styles;
+        m_aiIconPackBusy = false;
+        m_aiIconPackState = QStringLiteral("styles_ready");
+        m_activeAiIconPackRequestId.clear();
+        m_activeAiIconPackAction.clear();
+        Q_EMIT changed();
+        return;
+    }
+    if (operation == QLatin1String("ai_icon_pack_consent")) {
+        const QVariantMap consent = safeAiIconPackConsent(result.value(QStringLiteral("consent")).toMap());
+        if (consent.isEmpty()
+            || consent.value(QStringLiteral("styleId")).toString()
+                != m_aiIconPackSummary.value(QStringLiteral("styleId")).toString()
+            || consent.value(QStringLiteral("shape")).toString()
+                != m_aiIconPackSummary.value(QStringLiteral("shape")).toString()
+            || consent.value(QStringLiteral("itemCount")).toInt()
+                != m_aiIconPackSummary.value(QStringLiteral("itemCount")).toInt()) {
+            failAiIconPackOperation(tr("The AI icon pack consent did not match the selected identities."));
+            return;
+        }
+        m_aiIconPackConsent = consent;
+        m_aiIconPackBusy = false;
+        m_aiIconPackState = QStringLiteral("consent_ready");
+        m_activeAiIconPackRequestId.clear();
+        m_activeAiIconPackAction.clear();
+        Q_EMIT changed();
+        return;
+    }
+    if (operation == QLatin1String("ai_icon_pack_staging")) {
+        m_aiIconPackState = QStringLiteral("staging");
+        Q_EMIT changed();
+        return;
+    }
+    if (operation == QLatin1String("ai_icon_pack_ready")) {
+        if (!fromPrivateRequest) {
+            m_aiIconPackState = QStringLiteral("staging");
+            fetchAiIconPackRequest(requestId, m_aiIconPackGeneration);
+            Q_EMIT changed();
+            return;
+        }
+        const QString manifestPath = result.value(QStringLiteral("manifestPath")).toString();
+        const QString manifestSha256 = result.value(QStringLiteral("manifestSha256")).toString();
+        if (!isPrivateAiIconPackManifestPath(manifestPath, m_aiIconPackJobId)
+            || !validSha256(manifestSha256)) {
+            failAiIconPackOperation(tr("The private AI icon pack manifest was invalid."));
+            return;
+        }
+        m_aiIconPackManifestPath = manifestPath;
+        m_aiIconPackManifestSha256 = manifestSha256;
+        m_aiIconPackSummary.insert(QStringLiteral("manifestSha256"), manifestSha256);
+        m_aiIconPackConsent.clear();
+        m_aiIconPackBusy = false;
+        m_aiIconPackState = QStringLiteral("ready");
+        m_activeAiIconPackRequestId.clear();
+        m_activeAiIconPackAction.clear();
+        Q_EMIT changed();
+        return;
+    }
+    if (operation == QLatin1String("ai_icon_pack_status")) {
+        const QString packState = result.value(QStringLiteral("state")).toString();
+        if (packState == QLatin1String("staged")) {
+            if (!fromPrivateRequest) {
+                fetchAiIconPackRequest(requestId, m_aiIconPackGeneration);
+                return;
+            }
+            const QString manifestPath = result.value(QStringLiteral("manifestPath")).toString();
+            const QString manifestSha256 = result.value(QStringLiteral("manifestSha256")).toString();
+            if (!isPrivateAiIconPackManifestPath(manifestPath, m_aiIconPackJobId)
+                || !validSha256(manifestSha256)) {
+                failAiIconPackOperation(tr("The private AI icon pack manifest was invalid."));
+                return;
+            }
+            m_aiIconPackManifestPath = manifestPath;
+            m_aiIconPackManifestSha256 = manifestSha256;
+            m_aiIconPackSummary.insert(QStringLiteral("manifestSha256"), manifestSha256);
+            m_aiIconPackState = QStringLiteral("ready");
+        } else {
+            m_aiIconPackState = safeText(packState, 64);
+            if (m_aiIconPackState.isEmpty()) m_aiIconPackState = QStringLiteral("unknown");
+        }
+        m_aiIconPackBusy = false;
+        m_activeAiIconPackRequestId.clear();
+        m_activeAiIconPackAction.clear();
+        Q_EMIT changed();
+        return;
+    }
+    if (operation == QLatin1String("ai_icon_pack_denied")
+        || operation == QLatin1String("ai_icon_pack_cancelled")
+        || operation == QLatin1String("ai_icon_pack_released")) {
+        const QString terminalState = operation == QLatin1String("ai_icon_pack_denied")
+            ? QStringLiteral("denied")
+            : operation == QLatin1String("ai_icon_pack_cancelled")
+                ? QStringLiteral("cancelled") : QStringLiteral("released");
+        clearAiIconPackPresentation(true);
+        m_aiIconPackBusy = false;
+        m_aiIconPackState = terminalState;
+        Q_EMIT changed();
+        return;
+    }
+    if (operation == QLatin1String("ai_icon_pack_expired")) {
+        clearAiIconPackPresentation(true);
+        m_aiIconPackBusy = false;
+        m_aiIconPackState = QStringLiteral("expired");
+        Q_EMIT changed();
+        return;
+    }
+    if (operation == QLatin1String("ai_icon_pack_failed")) {
+        m_aiIconPackBusy = false;
+        m_aiIconPackState = state == QLatin1String("expired")
+            ? QStringLiteral("expired") : QStringLiteral("failed");
+        m_aiIconPackConsent.clear();
+        m_activeAiIconPackRequestId.clear();
+        m_aiIconPackLifecycleRequestId.clear();
+        m_activeAiIconPackAction.clear();
+        Q_EMIT changed();
+    }
+}
+
 void MeoAccountBackend::startAiOperation(const QString &action,
                                          const QVariantMap &arguments,
                                          const QString &state)
 {
+    if (m_aiIconPackBusy) {
+        setError(tr("Finish the active AI icon pack before starting a legacy image request."));
+        Q_EMIT changed();
+        return;
+    }
     clearError();
     m_aiBusy = true;
     m_aiState = state;
@@ -603,6 +1369,53 @@ void MeoAccountBackend::handleRequestChanged(const QString &requestId, const QSt
 {
     if (result.value(QStringLiteral("clientId")).toString() != settingsClientId()) return;
     const QString operation = result.value(QStringLiteral("operation")).toString();
+    if (operation == QLatin1String("ai_icon_pack_expired")
+        && requestId == m_aiIconPackLifecycleRequestId
+        && result.value(QStringLiteral("jobId")).toString().trimmed() == m_aiIconPackJobId
+        && validAiIconPackJobId(m_aiIconPackJobId)) {
+        const QString requestError = safeText(result.value(QStringLiteral("error")), 512);
+        if (!requestError.isEmpty()) setError(requestError);
+        clearAiIconPackPresentation(true);
+        m_aiIconPackBusy = false;
+        m_aiIconPackState = QStringLiteral("expired");
+        Q_EMIT changed();
+        return;
+    }
+    if (isAiIconPackOperation(operation)) {
+        // A pack signal received before StartAccountOperation returns is
+        // deliberately ignored here; fetchAiIconPackRequest() reads the same
+        // private request once its exact request ID is known.  This prevents
+        // an unrelated `ai_` signal from claiming the legacy image state.
+        if (!m_activeAiIconPackRequestId.isEmpty()
+            && requestId == m_activeAiIconPackRequestId) {
+            handleAiIconPackUpdate(requestId, state, result, false);
+        }
+        return;
+    }
+    if (m_localAiDiscoveryBusy && operation == QLatin1String("local_ai_models")
+        && (m_activeLocalAiRequestId.isEmpty() || requestId == m_activeLocalAiRequestId)) {
+        if (m_activeLocalAiRequestId.isEmpty()) m_activeLocalAiRequestId = requestId;
+        const bool terminal = state == QLatin1String("completed")
+            || state == QLatin1String("failed") || state == QLatin1String("denied")
+            || state == QLatin1String("expired");
+        if (state == QLatin1String("completed")) {
+            const QVariantList models = result.value(QStringLiteral("models")).toList();
+            if (models.isEmpty()) {
+                setError(tr("The provider did not report any available models."));
+            } else {
+                Q_EMIT localAiModelsDiscovered(m_localAiDiscoveryConnectionId, models);
+            }
+        }
+        const QString requestError = result.value(QStringLiteral("error")).toString();
+        if (!requestError.isEmpty()) setError(requestError);
+        if (terminal) {
+            m_localAiDiscoveryBusy = false;
+            m_localAiDiscoveryConnectionId.clear();
+            m_activeLocalAiRequestId.clear();
+        }
+        Q_EMIT changed();
+        return;
+    }
     if ((!m_activeAiRequestId.isEmpty() && requestId == m_activeAiRequestId)
         || (m_aiBusy && operation.startsWith(QStringLiteral("ai_")))) {
         if (m_activeAiRequestId.isEmpty()) m_activeAiRequestId = requestId;

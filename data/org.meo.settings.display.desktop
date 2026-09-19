@@ -1,7 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Displays
+Name[zh_CN]=显示器
 Comment=Manage displays in Meo Settings
+Comment[zh_CN]=在 Meo 设置中管理显示器
 Exec=meo-settings --route display
 Icon=video-display
 Categories=Settings;Qt;KDE;

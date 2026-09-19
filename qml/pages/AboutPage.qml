@@ -67,11 +67,15 @@ Item {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
         title: root.isCompact ? "" : qsTr("About")
-        subtitle: qsTr("Device, operating system, and runtime information.")
+        subtitle: qsTr("Details about this device, its software, and the services Meo uses.")
 
         MeoCard {
             width: parent.width
             type: "filled"
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: qsTr("Device overview")
+            Accessible.description: (SystemInfoBackend.operatingSystemName || qsTr("MeoArch"))
+                                    + ", " + (SystemInfoBackend.deviceName || qsTr("This device"))
 
             Column {
                 width: parent.width

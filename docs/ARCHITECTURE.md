@@ -146,6 +146,7 @@ read-only, schema-validated application-usage exporter.
 | `DisplayBackend` | KScreen | Read active output inventory and refresh it. |
 | `Meo.System::Platform` | PowerDevil ScreenBrightness, KWin Night Light, UPower PowerProfiles, and the KDE screen-lock service | Adjust reported display brightness, toggle Night Light, select a published power profile, and lock the current session after an explicit user action. |
 | `PowerBackend` | Solid | Read the actual primary-battery percentage, charge state, and remaining-time estimate for Home and the native Power page. |
+| `RepairLauncher` | Installed `meoarch-repair` application | Open one allowlisted, versioned troubleshooting category after an explicit user action. Settings cannot supply commands, paths, repair actions, or approval on the user's behalf. |
 | `DynamicColorBackend` | Installed `meo-dynamic-colors` | After explicit confirmation, regenerate and select the complete Meo HCT/Material scheme from KDE accent, configured local wallpaper, or a validated manual seed. It surfaces tool availability, busy state, and errors; it does not restart Plasma or KWin. |
 | `ControlCenterBackend` | Active Plasma Shell `org.meo.topbar` applet | Read and write the one active Meo Quick Settings layout: known tile order, compact/wide span, visibility, and compact/comfortable/spacious density. |
 | `StorageBackend` | Qt storage information plus Solid | Inspect representative mounted filesystems, mount points, capacity, removable-drive context, and an explicit bounded Home-subfolder category scan without changing a disk. |
@@ -161,6 +162,22 @@ connection. The QML page clears the entered password immediately and does not
 implement a second Secret Agent or KWallet credential store. A saved choice
 creates a disk-backed profile; an unsaved choice creates a volatile profile
 that NetworkManager removes after disconnecting.
+
+### Troubleshooting handoff
+
+Sound, display, Wi-Fi, storage, updates, hardware/graphics, recovery/boot,
+privacy/security, and services pages end with a contextual troubleshooting
+entry. `RepairLauncher` discovers only the installed `meoarch-repair`
+executable and supplies exactly `--category` plus one category from its closed
+allowlist. If the application is absent, the row remains visible but disabled
+and explains why it cannot open.
+
+Meo Settings does not copy the repair runbooks, diagnose the system, construct
+commands, grant consent, request a password, or execute a repair. The separate
+repair application owns its one-question flow, local knowledge pack,
+independent plan review, final user confirmation, Polkit boundary, action
+allowlist, and post-check. This keeps every Settings entry consistent without
+creating a second repair implementation.
 
 ### Dynamic color action
 
@@ -254,10 +271,26 @@ OmniStore's application figures.
 signed-in session, asks for `GetIdentity("org.meo.Settings")` through the
 broker's existing manifest-and-executable gate. The installed
 `data/meo-account/clients/org.meo.Settings.json` manifest requests only
-`openid profile`; it grants Settings no token, refresh credential, password,
-or arbitrary client launch capability. The account broker owns KWallet and
-opens the maintained Meo Account application for account mutation. Settings
-does not call its sign-in/sign-out methods.
+`openid profile` from the identity provider. Its separate `local_ai`
+capability permits only the Account broker's allowlisted device-AI operations;
+the capability is never sent as an OAuth scope. Settings receives no token,
+refresh credential, password, or saved provider key. The account broker owns
+KWallet, performs model discovery itself, and opens the maintained Meo Account
+application for hosted account mutation. Security-sensitive sign-out remains
+an explicit, reauthenticated broker operation.
+
+The Accounts page can create, update, remove, and test per-user device AI
+connections through the broker. A new connection may be saved without guessing
+a model name; Settings then requests the provider catalog and fills the first
+reported model while keeping the task sheet open for review. Cloud keys are
+write-only, fields are cleared when the sheet closes, and applications consume
+the connection by opaque ID instead of receiving the credential.
+
+Privacy & Security lists every installed client manifest carrying the
+`local_ai` capability. The list is broker-derived rather than inferred from
+running processes, and explains that the permission is package-owned: removing
+the owning application package revokes it. It never exposes provider keys or
+registered executable paths.
 
 The public status can provide a signed-in name/avatar. A raw cloud ID is shown
 only when the manifest-scoped identity reply actually contains one. When that

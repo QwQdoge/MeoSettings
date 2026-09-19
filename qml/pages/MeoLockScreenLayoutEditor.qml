@@ -36,6 +36,45 @@ Item {
         selectedWidget = widgetId
     }
 
+    function widgetTitle(widgetId) {
+        switch (widgetId) {
+        case "clock": return qsTr("Clock")
+        case "weather": return qsTr("Weather")
+        case "media": return qsTr("Media controls")
+        case "notifications": return qsTr("Notification summary")
+        case "guides": return qsTr("Alignment guides")
+        default: return qsTr("Widget")
+        }
+    }
+
+    function handleWidgetKey(widget, widgetId, event) {
+        if (event.isAutoRepeat || !widget.visible)
+            return
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+            selectWidget(widgetId)
+            event.accepted = true
+            return
+        }
+
+        let horizontalSteps = 0
+        let verticalSteps = 0
+        if (event.key === Qt.Key_Left)
+            horizontalSteps = -1
+        else if (event.key === Qt.Key_Right)
+            horizontalSteps = 1
+        else if (event.key === Qt.Key_Up)
+            verticalSteps = -1
+        else if (event.key === Qt.Key_Down)
+            verticalSteps = 1
+        else
+            return
+
+        selectWidget(widgetId)
+        widget.x = snap(widget.x + horizontalSteps * snapUnit, layoutCanvas.width - widget.width)
+        widget.y = snap(widget.y + verticalSteps * snapUnit, layoutCanvas.height - widget.height)
+        event.accepted = true
+    }
+
     MeoCard {
         id: editorCard
         width: parent.width
@@ -59,7 +98,7 @@ Item {
                         color: MeoTheme.contentOnSurface
                     }
                     MeoText {
-                        text: qsTr("A simulated secure surface. Drag only reviewed Meo widgets; it cannot unlock, cover a display, or load desktop applets.")
+                        text: qsTr("This is a safe preview. Arrange reviewed Meo widgets here; it cannot unlock or cover your display.")
                         typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant
                         wrapMode: Text.WordWrap
                     }
@@ -76,6 +115,9 @@ Item {
                 border.width: MeoTheme.strokeWidthThin
                 border.color: MeoTheme.outlineVariant
                 clip: true
+                Accessible.role: Accessible.Pane
+                Accessible.name: qsTr("Lock-screen layout preview")
+                Accessible.description: qsTr("Use Tab to select a widget. Press Enter to select it, then use arrow keys to move it by 8 dp.")
 
                 Repeater {
                     model: root.guidesVisible ? Math.ceil(layoutCanvas.width / root.guideInterval) + 1 : 0
@@ -116,7 +158,7 @@ Item {
 
                 MeoText {
                     anchors { left: parent.left; top: parent.top; margins: MeoTheme.space12 }
-                    text: qsTr("SIMULATED LOCK SCREEN")
+                    text: qsTr("LOCK-SCREEN PREVIEW")
                     typeRole: "label"; typeSize: "small"; emphasized: true
                     color: MeoTheme.contentOnSurfaceVariant
                     opacity: 0.72
@@ -127,6 +169,14 @@ Item {
                     width: 252 * MeoTheme.globalScale
                     height: 128 * MeoTheme.globalScale
                     visible: root.clockVisible
+                    activeFocusOnTab: visible
+                    Accessible.role: Accessible.Button
+                    Accessible.name: qsTr("Clock layout widget")
+                    Accessible.description: qsTr("Press Enter to select. Use arrow keys to move this widget by 8 dp.")
+                    Accessible.focusable: visible
+                    Accessible.selected: root.selectedWidget === "clock"
+                    Accessible.onPressAction: root.selectWidget("clock")
+                    Keys.onPressed: function(event) { root.handleWidgetKey(clockWidget, "clock", event) }
 
                     function resetPosition() {
                         x = root.snap((layoutCanvas.width - width) / 2, layoutCanvas.width - width)
@@ -160,6 +210,14 @@ Item {
                     width: 226 * MeoTheme.globalScale
                     height: 72 * MeoTheme.globalScale
                     visible: root.weatherVisible
+                    activeFocusOnTab: visible
+                    Accessible.role: Accessible.Button
+                    Accessible.name: qsTr("Weather layout widget")
+                    Accessible.description: qsTr("Press Enter to select. Use arrow keys to move this widget by 8 dp.")
+                    Accessible.focusable: visible
+                    Accessible.selected: root.selectedWidget === "weather"
+                    Accessible.onPressAction: root.selectWidget("weather")
+                    Keys.onPressed: function(event) { root.handleWidgetKey(weatherWidget, "weather", event) }
 
                     function resetPosition() {
                         x = root.snap((layoutCanvas.width - width) / 2, layoutCanvas.width - width)
@@ -200,6 +258,14 @@ Item {
                     width: Math.min(220 * MeoTheme.globalScale, layoutCanvas.width * 0.42)
                     height: 88 * MeoTheme.globalScale
                     visible: root.notificationsVisible
+                    activeFocusOnTab: visible
+                    Accessible.role: Accessible.Button
+                    Accessible.name: qsTr("Notification summary layout widget")
+                    Accessible.description: qsTr("Press Enter to select. Use arrow keys to move this widget by 8 dp.")
+                    Accessible.focusable: visible
+                    Accessible.selected: root.selectedWidget === "notifications"
+                    Accessible.onPressAction: root.selectWidget("notifications")
+                    Keys.onPressed: function(event) { root.handleWidgetKey(notificationWidget, "notifications", event) }
 
                     function resetPosition() {
                         x = root.snap(layoutCanvas.width - width - 24 * MeoTheme.globalScale,
@@ -239,6 +305,14 @@ Item {
                     width: Math.min(340 * MeoTheme.globalScale, layoutCanvas.width - 2 * MeoTheme.space16)
                     height: 108 * MeoTheme.globalScale
                     visible: root.mediaVisible
+                    activeFocusOnTab: visible
+                    Accessible.role: Accessible.Button
+                    Accessible.name: qsTr("Media controls layout widget")
+                    Accessible.description: qsTr("Press Enter to select. Use arrow keys to move this widget by 8 dp.")
+                    Accessible.focusable: visible
+                    Accessible.selected: root.selectedWidget === "media"
+                    Accessible.onPressAction: root.selectWidget("media")
+                    Keys.onPressed: function(event) { root.handleWidgetKey(mediaWidget, "media", event) }
 
                     function resetPosition() {
                         x = root.snap((layoutCanvas.width - width) / 2, layoutCanvas.width - width)
@@ -289,12 +363,12 @@ Item {
             MeoSettingsGroup {
                 Layout.fillWidth: true
                 title: qsTr("Widgets and guides")
-                subtitle: qsTr("Placement snaps to 8 dp. Guides are editor-only and never become a desktop or lock-screen overlay.")
+                subtitle: qsTr("Move widgets in 8 dp steps. Guides appear only while you edit.")
                 model: [
-                    { "id": "clock", "title": qsTr("Clock"), "subtitle": qsTr("Required Meo ambient clock"), "icon": "schedule", "tone": "primary", "trailingKind": "toggle", "checked": root.clockVisible },
-                    { "id": "weather", "title": qsTr("Weather"), "subtitle": qsTr("Cached, optional status"), "icon": "partly_cloudy_day", "tone": "secondary", "trailingKind": "toggle", "checked": root.weatherVisible },
-                    { "id": "media", "title": qsTr("Media controls"), "subtitle": qsTr("Current-session MPRIS preview"), "icon": "music_note", "tone": "tertiary", "trailingKind": "toggle", "checked": root.mediaVisible },
-                    { "id": "notifications", "title": qsTr("Notification summary"), "subtitle": qsTr("Privacy-filtered presentation"), "icon": "notifications", "tone": "primary", "trailingKind": "toggle", "checked": root.notificationsVisible },
+                    { "id": "clock", "title": qsTr("Clock"), "subtitle": qsTr("Lock-screen clock"), "icon": "schedule", "tone": "primary", "trailingKind": "toggle", "checked": root.clockVisible },
+                    { "id": "weather", "title": qsTr("Weather"), "subtitle": qsTr("Weather status"), "icon": "partly_cloudy_day", "tone": "secondary", "trailingKind": "toggle", "checked": root.weatherVisible },
+                    { "id": "media", "title": qsTr("Media controls"), "subtitle": qsTr("Now playing preview"), "icon": "music_note", "tone": "tertiary", "trailingKind": "toggle", "checked": root.mediaVisible },
+                    { "id": "notifications", "title": qsTr("Notification summary"), "subtitle": qsTr("Shows notification details allowed by your privacy settings"), "icon": "notifications", "tone": "primary", "trailingKind": "toggle", "checked": root.notificationsVisible },
                     { "id": "guides", "title": qsTr("Alignment guides"), "subtitle": qsTr("Show an 8 dp snap grid while editing"), "icon": "grid_on", "tone": "neutral", "trailingKind": "toggle", "checked": root.guidesVisible }
                 ]
                 onRowToggled: (index, checked, row) => {
@@ -310,7 +384,7 @@ Item {
                 Layout.fillWidth: true
                 MeoText {
                     Layout.fillWidth: true
-                    text: qsTr("Selected: %1").arg(root.selectedWidget)
+                    text: qsTr("Selected: %1").arg(root.widgetTitle(root.selectedWidget))
                     typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant
                 }
                 MeoButton {

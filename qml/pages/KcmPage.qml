@@ -24,6 +24,9 @@ Item {
             width: parent.width
             type: "filled"
             visible: root.installed
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: qsTr("Advanced system setting")
+            Accessible.description: root.pageDescription
 
             Column {
                 width: parent.width
@@ -36,7 +39,7 @@ Item {
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("Advanced compatibility tool")
+                    text: qsTr("Advanced system settings")
                     typeRole: "title"
                     typeSize: "small"
                     emphasized: true
@@ -44,14 +47,14 @@ Item {
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("This specialized workflow opens in the system’s supported configuration tool. It stays separate because it may need its own privilege, recovery, or authentication surface.")
+                    text: qsTr("This setting opens in the system tool that supports it. It stays separate because it may need its own permission, recovery, or sign-in steps.")
                     typeRole: "body"
                     typeSize: "medium"
                     color: MeoTheme.contentOnSurfaceVariant
                     wrapMode: Text.WordWrap
                 }
                 MeoButton {
-                    text: qsTr("Open advanced tool")
+                    text: qsTr("Open system settings")
                     type: "filled"
                     enabled: KcmBridge.launcherAvailable
                     onClicked: KcmBridge.open(root.moduleId)
@@ -59,23 +62,26 @@ Item {
             }
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: KcmBridge.error !== ""
+            spacing: MeoTheme.space4
 
-            Row {
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    text: KcmBridge.error
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
+                title: qsTr("System settings could not open")
+                text: qsTr("Check that this system tool is installed, then try opening it again.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(KcmBridge.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -84,8 +90,8 @@ Item {
             height: 260 * MeoTheme.globalScale
             visible: !root.installed
             icon: "extension_off"
-            title: qsTr("Settings module unavailable")
-            description: qsTr("This advanced system tool is not installed in the current system image.")
+            title: qsTr("This setting is not available")
+            description: qsTr("This advanced setting is not included in this system.")
             actionText: qsTr("Back to Home")
             onActionClicked: root.navigateTo("home")
         }
@@ -99,7 +105,7 @@ Item {
                 width: parent.width
                 spacing: 8 * MeoTheme.globalScale
                 MeoText {
-                    text: qsTr("Why this is a fallback")
+                    text: qsTr("Why this opens in system settings")
                     typeRole: "title"
                     typeSize: "small"
                     emphasized: true
@@ -107,7 +113,7 @@ Item {
                 }
                 MeoText {
                     width: parent.width
-                    text: qsTr("Meo Settings is the normal settings experience. This advanced tool remains separate because its complex workflow is already tested for system-specific permissions, recovery, or hardware behavior.")
+                    text: qsTr("Meo Settings is your everyday settings app. This advanced setting stays in its system tool because its controls have their own tested permission, recovery, or hardware steps.")
                     typeRole: "body"
                     typeSize: "small"
                     color: MeoTheme.contentOnSurfaceVariant

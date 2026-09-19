@@ -88,16 +88,52 @@ Item {
           "icon": "cloud", "tone": "secondary", "route": "kcm:kcm_kaccounts",
           "enabled": KcmBridge.isAvailable("kcm_kaccounts"), "trailingKind": "choice", "trailingText": qsTr("Advanced") },
         { "id": "wallet", "title": qsTr("Password wallet"),
-          "subtitle": KcmBridge.isAvailable("kcm_kwallet5") ? qsTr("Protected credential storage used by KDE and Meo Account") : qsTr("The KDE wallet module is not installed"),
+          "subtitle": KcmBridge.isAvailable("kcm_kwallet5") ? qsTr("Unlock and configure the protected store used by Meo Account and local application secrets") : qsTr("The KDE wallet module is not installed"),
           "icon": "key", "tone": "tertiary", "route": "kcm:kcm_kwallet5",
           "enabled": KcmBridge.isAvailable("kcm_kwallet5"), "trailingKind": "choice", "trailingText": qsTr("Advanced") }
     ]
     readonly property var aiRows: [
         { "id": "ai-providers", "title": qsTr("AI connections"),
-          "subtitle": qsTr("Choose the encrypted Meo Account AI connection used for generated Pixel-style application icons"),
+          "subtitle": qsTr("Manage encrypted account connections; shared Ollama and device-only provider keys are listed below"),
           "icon": "auto_awesome", "tone": "primary", "trailingKind": "navigation",
           "interactive": AccountBackend.serviceRunning }
     ]
+    readonly property var localAiRows: {
+        const rows = [{
+            "id": "add-local-ai", "title": qsTr("Add device AI connection"),
+            "subtitle": qsTr("Save an Ollama or cloud connection in the password wallet for this Linux user"),
+            "icon": "add", "tone": "primary", "trailingKind": "navigation", "interactive": true
+        }]
+        const connections = AccountBackend.localAiConnections || []
+        for (let index = 0; index < connections.length; ++index) {
+            const connection = connections[index]
+            rows.push({
+                "id": connection.id,
+                "title": connection.displayName || qsTr("AI connection"),
+                "subtitle": qsTr("%1 · %2 · Select to edit")
+                            .arg(connection.provider === "ollama" ? qsTr("Local Ollama") : connection.provider)
+                            .arg(connection.defaultModel || qsTr("No model selected")),
+                "icon": connection.provider === "ollama" ? "memory" : "cloud_lock",
+                "tone": connection.provider === "ollama" ? "tertiary" : "secondary",
+                "trailingKind": "navigation", "interactive": true,
+                "connection": connection
+            })
+        }
+        return rows
+    }
+
+    function editLocalAiConnection(row) {
+        const connection = row && row.connection ? row.connection : ({})
+        localAiEditor.connectionId = connection.id || ""
+        localAiEditor.provider = connection.provider || "ollama"
+        localAiEditor.displayName = connection.displayName || qsTr("Local Ollama")
+        localAiEditor.endpoint = connection.endpoint || "http://127.0.0.1:11434"
+        localAiEditor.defaultModel = connection.defaultModel || ""
+        localAiEditor.apiKey = ""
+        localAiEditor.discoveredModels = []
+        localAiEditor.saveThenDiscover = false
+        localAiEditor.open()
+    }
 
     function initials(name) {
         const parts = String(name || "").trim().split(/\s+/).filter(part => part.length > 0)
@@ -223,6 +259,14 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
+            title: qsTr("AI connections on this device")
+            subtitle: qsTr("Metadata and write-only keys are owned by the Meo Account broker in KWallet. Applications must never receive the saved key.")
+            model: root.localAiRows
+            onRowActivated: (index, row) => root.editLocalAiConnection(row)
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
             title: qsTr("Active sessions")
             subtitle: root.localizedSyncState(AccountBackend.syncState)
             model: root.sessionRows
@@ -248,20 +292,30 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("AI & application icons")
-            subtitle: qsTr("AI keys stay encrypted in Meo Account. Each future icon-generation request will show its provider, model, purpose and the app metadata sent before it runs.")
+            subtitle: qsTr("Account AI keys stay encrypted in Meo Account. Device-only keys stay in the password wallet. Every prompt request must show provider, model, purpose and data before it runs.")
             model: root.aiRows
             onRowActivated: (index, row) => { if (row.interactive) AccountBackend.openHostedAction("ai_providers") }
         }
 
-        MeoCard {
+        Column {
             width: parent.width
-            type: "outlined"
             visible: AccountBackend.error !== ""
-            Row {
+            spacing: MeoTheme.space4
+            MeoBanner {
                 width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-                MeoIcon { icon: "error"; size: 24; color: MeoTheme.error }
-                MeoText { width: parent.width - 36 * MeoTheme.globalScale; text: AccountBackend.error; typeRole: "body"; typeSize: "medium"; color: MeoTheme.error; wrapMode: Text.WordWrap }
+                title: qsTr("Account information needs attention")
+                text: qsTr("Check your connection or sign-in, then try again.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(AccountBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -291,4 +345,195 @@ Item {
         cancelText: qsTr("Cancel")
         onConfirmed: AccountBackend.signOutAll()
     }
+
+    MeoSettingsTaskSheet {
+        id: localAiEditor
+        popupParent: Overlay.overlay
+        property string connectionId: ""
+        property string provider: "ollama"
+        property string displayName: ""
+        property string endpoint: "http://127.0.0.1:11434"
+        property string defaultModel: ""
+        property string apiKey: ""
+        property var discoveredModels: []
+        property bool saveThenDiscover: false
+        readonly property bool cloudProvider: provider !== "ollama"
+        title: connectionId === "" ? qsTr("Add device AI connection") : qsTr("Edit device AI connection")
+        subtitle: qsTr("The API key is write-only and stored by Meo Account in KWallet. If the model is empty, the broker detects available models after saving.")
+        acceptText: qsTr("Save securely")
+        rejectText: qsTr("Cancel")
+        closeOnAccept: false
+        acceptEnabled: displayName.trim() !== "" && endpoint.trim() !== ""
+                       && (!cloudProvider || apiKey.trim() !== "" || connectionId !== "")
+        onAccepted: {
+            saveThenDiscover = defaultModel.trim() === ""
+            AccountBackend.saveLocalAiConnection(connectionId, provider,
+                                                   displayName, endpoint,
+                                                   defaultModel, apiKey)
+            apiKey = ""
+        }
+        onRejected: {
+            apiKey = ""
+            discoveredModels = []
+            saveThenDiscover = false
+        }
+        onClosed: {
+            apiKey = ""
+            discoveredModels = []
+            saveThenDiscover = false
+        }
+
+        content: Component {
+            Flickable {
+                clip: true
+                contentWidth: width
+                contentHeight: localAiEditorContent.implicitHeight + 32 * MeoTheme.globalScale
+
+                Column {
+                    id: localAiEditorContent
+                    width: parent.width - 32 * MeoTheme.globalScale
+                    x: 16 * MeoTheme.globalScale
+                    y: 16 * MeoTheme.globalScale
+                    spacing: 14 * MeoTheme.globalScale
+
+                    MeoExposedDropdown {
+                        width: parent.width
+                        label: qsTr("Provider")
+                        model: [qsTr("Ollama"), qsTr("OpenAI-compatible")]
+                        currentIndex: ["ollama", "openai_compatible"].indexOf(localAiEditor.provider)
+                        onCurrentIndexChanged: {
+                            const providers = ["ollama", "openai_compatible"]
+                            if (currentIndex < 0 || currentIndex >= providers.length)
+                                return
+                            localAiEditor.provider = providers[currentIndex]
+                            localAiEditor.discoveredModels = []
+                            if (localAiEditor.provider === "ollama")
+                                localAiEditor.endpoint = "http://127.0.0.1:11434"
+                            else if (localAiEditor.endpoint.startsWith("http://127.0.0.1"))
+                                localAiEditor.endpoint = ""
+                        }
+                    }
+                    MeoTextField {
+                        width: parent.width
+                        label: qsTr("Connection name")
+                        text: localAiEditor.displayName
+                        maxLength: 160
+                        onTextEdited: localAiEditor.displayName = text
+                    }
+                    MeoTextField {
+                        width: parent.width
+                        label: qsTr("Endpoint")
+                        text: localAiEditor.endpoint
+                        enabled: localAiEditor.provider === "ollama"
+                                 || localAiEditor.provider === "openai_compatible"
+                        helperText: localAiEditor.provider === "ollama"
+                                    ? qsTr("Only a loopback HTTP(S) address is accepted")
+                                    : qsTr("Only a public HTTPS OpenAI-compatible endpoint is accepted")
+                        maxLength: 2048
+                        onTextEdited: localAiEditor.endpoint = text
+                    }
+                    MeoTextField {
+                        width: parent.width
+                        visible: localAiEditor.discoveredModels.length === 0
+                        label: qsTr("Default model")
+                        text: localAiEditor.defaultModel
+                        maxLength: 160
+                        onTextEdited: localAiEditor.defaultModel = text
+                    }
+                    MeoExposedDropdown {
+                        width: parent.width
+                        visible: localAiEditor.discoveredModels.length > 0
+                        label: qsTr("Default model")
+                        model: localAiEditor.discoveredModels
+                        currentIndex: Math.max(0, localAiEditor.discoveredModels.indexOf(localAiEditor.defaultModel))
+                        onCurrentIndexChanged: {
+                            if (currentIndex >= 0 && currentIndex < localAiEditor.discoveredModels.length)
+                                localAiEditor.defaultModel = localAiEditor.discoveredModels[currentIndex]
+                        }
+                    }
+                    MeoButton {
+                        text: AccountBackend.localAiDiscoveryBusy
+                              ? qsTr("Detecting models…") : qsTr("Detect available models")
+                        type: "outlined"
+                        loading: AccountBackend.localAiDiscoveryBusy
+                        enabled: localAiEditor.connectionId !== ""
+                                 && !AccountBackend.localAiDiscoveryBusy
+                        onClicked: AccountBackend.discoverLocalAiModels(localAiEditor.connectionId)
+                    }
+                    MeoText {
+                        width: parent.width
+                        visible: AccountBackend.error !== ""
+                        text: qsTr("Technical details: %1").arg(AccountBackend.error)
+                        Accessible.name: text
+                        typeRole: "label"
+                        typeSize: "small"
+                        color: MeoTheme.contentOnSurfaceVariant
+                        wrapMode: Text.WordWrap
+                    }
+                    MeoTextField {
+                        width: parent.width
+                        visible: localAiEditor.cloudProvider
+                        label: localAiEditor.connectionId === ""
+                               ? qsTr("API key") : qsTr("New API key (leave empty to keep current)")
+                        text: localAiEditor.apiKey
+                        echoMode: TextInput.Password
+                        maxLength: 8192
+                        helperText: qsTr("The field clears when this sheet closes; saved keys cannot be read back.")
+                        onTextEdited: localAiEditor.apiKey = text
+                    }
+                    MeoButton {
+                        visible: localAiEditor.connectionId !== ""
+                        text: qsTr("Remove connection")
+                        type: "text"
+                        onClicked: {
+                            removeLocalAiDialog.connectionId = localAiEditor.connectionId
+                            removeLocalAiDialog.connectionName = localAiEditor.displayName
+                            removeLocalAiDialog.open()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    MeoDialog {
+        id: removeLocalAiDialog
+        property string connectionId: ""
+        property string connectionName: ""
+        title: qsTr("Remove this device AI connection?")
+        message: qsTr("%1 and its saved API key will be removed from KWallet. This cannot be undone.")
+                 .arg(connectionName || qsTr("This connection"))
+        confirmText: qsTr("Remove")
+        cancelText: qsTr("Cancel")
+        onConfirmed: {
+            AccountBackend.removeLocalAiConnection(connectionId)
+            localAiEditor.apiKey = ""
+            localAiEditor.close()
+        }
+    }
+
+    Connections {
+        target: AccountBackend
+        function onLocalAiConnectionSaved(id) {
+            localAiEditor.connectionId = id
+            if (localAiEditor.saveThenDiscover) {
+                localAiEditor.saveThenDiscover = false
+                AccountBackend.discoverLocalAiModels(id)
+            } else {
+                localAiEditor.close()
+            }
+        }
+        function onLocalAiConnectionSaveFailed(message) {
+            localAiEditor.saveThenDiscover = false
+        }
+        function onLocalAiModelsDiscovered(id, models) {
+            if (id !== localAiEditor.connectionId)
+                return
+            localAiEditor.discoveredModels = models
+            if (models.length > 0 && localAiEditor.defaultModel.trim() === "")
+                localAiEditor.defaultModel = models[0]
+        }
+    }
+
+    Component.onCompleted: AccountBackend.refreshLocalAiConnections()
 }

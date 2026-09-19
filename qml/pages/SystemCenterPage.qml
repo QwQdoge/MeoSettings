@@ -34,5 +34,10 @@ Item {
                 {"title": qsTr("Critical"), "subtitle": qsTr("Login, D-Bus, and core session services are disabled in standard mode."), "icon": "security", "tone": "error", "trailingKind": "none"}
             ]
         }
+
+        RepairEntry {
+            category: "general"
+            entryTitle: qsTr("Troubleshoot system services")
+        }
     }
 }

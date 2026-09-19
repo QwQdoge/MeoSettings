@@ -331,7 +331,7 @@ Item {
             width: parent.width
             visible: root.hasPersistentSettingsIndex
             title: qsTr("Connected now")
-            subtitle: qsTr("Live status from NetworkManager, BlueZ, the audio service, and Plasma notifications.")
+            subtitle: qsTr("Current network, Bluetooth, sound, and notification status.")
             model: root.connectedOverviewRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }
@@ -340,7 +340,7 @@ Item {
             width: parent.width
             visible: root.hasPersistentSettingsIndex
             title: qsTr("Device")
-            subtitle: qsTr("The most useful system facts and maintenance entry points.")
+            subtitle: qsTr("Quick details and useful maintenance entry points.")
             model: root.deviceOverviewRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }

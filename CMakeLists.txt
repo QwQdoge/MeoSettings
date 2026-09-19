@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(GNUInstallDirs)
 include(CTest)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Concurrent Core DBus Gui Qml Quick QuickControls2 Test)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Concurrent Core DBus Gui Qml Quick QuickControls2 Test LinguistTools)
 find_package(KF6CoreAddons REQUIRED)
 find_package(KF6NetworkManagerQt REQUIRED)
 find_package(KF6BluezQt REQUIRED)
@@ -96,10 +96,14 @@ qt_add_executable(meo-settings
     src/backends/systemtransactionbackend.h
     src/backends/dynamiccolorbackend.cpp
     src/backends/dynamiccolorbackend.h
+    src/backends/weatherbackend.cpp
+    src/backends/weatherbackend.h
     src/backends/meoaccountbackend.cpp
     src/backends/meoaccountbackend.h
     src/backends/powerbackend.cpp
     src/backends/powerbackend.h
+    src/backends/repairlauncher.cpp
+    src/backends/repairlauncher.h
     src/backends/systeminfobackend.cpp
     src/backends/systeminfobackend.h
     src/backends/storagebackend.cpp
@@ -145,6 +149,7 @@ qt_add_qml_module(meo-settings
         qml/pages/SystemCenterPage.qml
         qml/pages/AboutPage.qml
         qml/pages/KcmPage.qml
+        qml/components/RepairEntry.qml
 )
 
 qt_add_executable(meo-welcome
@@ -160,6 +165,77 @@ qt_add_qml_module(meo-welcome
     VERSION 1.0
     QML_FILES qml/Welcome.qml
 )
+
+# Meo Welcome owns its product copy, while MeoUI remains the owner of shared
+# component copy. Catalog loading stays in the Welcome process so an
+# account-specific app preference never changes the Plasma session locale.
+set(MEO_WELCOME_TRANSLATIONS_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/translations")
+set(MEO_SETTINGS_TRANSLATIONS_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/translations")
+set(MEOUI_TRANSLATIONS_DEVELOPMENT_DIR "")
+if(MEOUI_IMPORT_ROOT)
+    set(MEOUI_TRANSLATIONS_DEVELOPMENT_DIR "${MEOUI_IMPORT_ROOT}/translations")
+endif()
+
+qt_add_lupdate(
+    SOURCE_TARGETS meo-welcome
+    TS_FILES translations/meo_welcome_zh_CN.ts
+    LUPDATE_TARGET meo_welcome_update_translations
+)
+qt_add_lrelease(
+    LRELEASE_TARGET meo_welcome_lrelease
+    TS_FILES translations/meo_welcome_zh_CN.ts
+    QM_OUTPUT_DIRECTORY "${MEO_WELCOME_TRANSLATIONS_BUILD_DIR}"
+    QM_FILES_OUTPUT_VARIABLE MEO_WELCOME_TRANSLATION_QM_FILES
+)
+add_dependencies(meo-welcome meo_welcome_lrelease)
+target_compile_definitions(meo-welcome PRIVATE
+    MEO_WELCOME_TRANSLATIONS_BUILD_DIR="${MEO_WELCOME_TRANSLATIONS_BUILD_DIR}"
+    MEO_WELCOME_TRANSLATIONS_INSTALL_DIR="${CMAKE_INSTALL_FULL_DATADIR}/meo-settings/translations"
+    MEOUI_TRANSLATIONS_DEVELOPMENT_DIR="${MEOUI_TRANSLATIONS_DEVELOPMENT_DIR}"
+    MEOUI_TRANSLATIONS_INSTALL_DIR="${CMAKE_INSTALL_FULL_DATADIR}/meoui-qml/translations"
+)
+
+# The Settings catalog owns every shipped Settings page. Keeping this list
+# complete means a later lupdate run cannot silently omit a translated route
+# just because it was added after the initial shell catalog work. Welcome is a
+# separate executable and deliberately keeps its own catalog above.
+qt_add_lupdate(
+    SOURCES
+        qml/Main.qml
+        qml/components/RepairEntry.qml
+        qml/pages/AboutPage.qml
+        qml/pages/AccountsPage.qml
+        qml/pages/AppearancePage.qml
+        qml/pages/BluetoothPage.qml
+        qml/pages/CategoryPage.qml
+        qml/pages/ControlCenterPage.qml
+        qml/pages/DesktopIntegrationPage.qml
+        qml/pages/DisplayPage.qml
+        qml/pages/HardwarePage.qml
+        qml/pages/HomePage.qml
+        qml/pages/KcmPage.qml
+        qml/pages/MeoLockScreenLayoutEditor.qml
+        qml/pages/WifiPage.qml
+        qml/pages/SoundPage.qml
+        qml/pages/NotificationsPage.qml
+        qml/pages/PowerPage.qml
+        qml/pages/PrivacyPage.qml
+        qml/pages/RecoveryPage.qml
+        qml/pages/SessionEntryPage.qml
+        qml/pages/StoragePage.qml
+        qml/pages/SystemCenterPage.qml
+        qml/pages/UpdatesPage.qml
+        src/core/settingsregistry.cpp
+    TS_FILES translations/meo_settings_zh_CN.ts
+    LUPDATE_TARGET meo_settings_update_shell_translations
+)
+qt_add_lrelease(
+    LRELEASE_TARGET meo_settings_lrelease
+    TS_FILES translations/meo_settings_zh_CN.ts
+    QM_OUTPUT_DIRECTORY "${MEO_SETTINGS_TRANSLATIONS_BUILD_DIR}"
+    QM_FILES_OUTPUT_VARIABLE MEO_SETTINGS_TRANSLATION_QM_FILES
+)
+add_dependencies(meo-settings meo_settings_lrelease)
 
 target_link_libraries(meo-settings PRIVATE
     Qt6::Core
@@ -187,6 +263,10 @@ target_link_libraries(meo-welcome PRIVATE
 
 target_compile_definitions(meo-settings PRIVATE
     MEO_SETTINGS_VERSION="${PROJECT_VERSION}"
+    MEO_SETTINGS_TRANSLATIONS_BUILD_DIR="${MEO_SETTINGS_TRANSLATIONS_BUILD_DIR}"
+    MEO_SETTINGS_TRANSLATIONS_INSTALL_DIR="${CMAKE_INSTALL_FULL_DATADIR}/meo-settings/translations"
+    MEOUI_TRANSLATIONS_DEVELOPMENT_DIR="${MEOUI_TRANSLATIONS_DEVELOPMENT_DIR}"
+    MEOUI_TRANSLATIONS_INSTALL_DIR="${CMAKE_INSTALL_FULL_DATADIR}/meoui-qml/translations"
 )
 
 if(MEOUI_IMPORT_ROOT)
@@ -218,6 +298,10 @@ add_executable(meo-settings-registry-test
     src/core/settingsregistry.h
 )
 target_link_libraries(meo-settings-registry-test PRIVATE Qt6::Core Qt6::Test)
+add_dependencies(meo-settings-registry-test meo_settings_lrelease)
+target_compile_definitions(meo-settings-registry-test PRIVATE
+    MEO_SETTINGS_TRANSLATIONS_BUILD_DIR="${MEO_SETTINGS_TRANSLATIONS_BUILD_DIR}"
+)
 add_test(NAME meo-settings-registry COMMAND meo-settings-registry-test)
 
 add_executable(meo-settings-powerbackend-test
@@ -302,6 +386,16 @@ add_executable(meo-settings-dynamiccolorbackend-test
 target_link_libraries(meo-settings-dynamiccolorbackend-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
 add_test(NAME meo-settings-dynamiccolorbackend COMMAND meo-settings-dynamiccolorbackend-test)
 
+add_executable(meo-settings-weatherbackend-test
+    tests/tst_weatherbackend.cpp
+    src/core/backendbase.cpp
+    src/core/backendbase.h
+    src/backends/weatherbackend.cpp
+    src/backends/weatherbackend.h
+)
+target_link_libraries(meo-settings-weatherbackend-test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME meo-settings-weatherbackend COMMAND meo-settings-weatherbackend-test)
+
 add_executable(meo-settings-applicationiconbackend-test
     tests/tst_applicationiconbackend.cpp
     src/core/backendbase.cpp
@@ -368,6 +462,20 @@ add_executable(meo-settings-qmlimportpolicy-test
 target_include_directories(meo-settings-qmlimportpolicy-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(meo-settings-qmlimportpolicy-test PRIVATE Qt6::Core Qt6::Qml Qt6::Test)
 add_test(NAME meo-settings-qmlimportpolicy COMMAND meo-settings-qmlimportpolicy-test)
+
+add_executable(meo-settings-repairlauncher-test
+    tests/tst_repairlauncher.cpp
+    src/core/backendbase.cpp
+    src/core/backendbase.h
+    src/backends/repairlauncher.cpp
+    src/backends/repairlauncher.h
+)
+target_include_directories(meo-settings-repairlauncher-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(meo-settings-repairlauncher-test PRIVATE
+    MEO_SETTINGS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(meo-settings-repairlauncher-test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME meo-settings-repairlauncher COMMAND meo-settings-repairlauncher-test)
 
 if(MEOUI_IMPORT_ROOT AND MEO_KDE_QML_IMPORT_ROOT AND MEO_SYSTEM_IMPORT_ROOT)
     # --smoke walks every first-milestone route without performing a hardware
@@ -445,6 +553,11 @@ install(TARGETS meo-welcome
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
 install(FILES
+    ${MEO_WELCOME_TRANSLATION_QM_FILES}
+    ${MEO_SETTINGS_TRANSLATION_QM_FILES}
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/meo-settings/translations"
+)
+install(FILES
     data/org.meo.settings.desktop
     data/org.meo.settings.bluetooth.desktop
     data/org.meo.settings.wifi.desktop
@@ -454,6 +567,29 @@ install(FILES
     data/org.meo.settings.power.desktop
     data/org.meo.welcome.desktop
     DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
+)
+# Original application identities remain package-owned artwork. The Studio
+# package owns only its reviewed source sheet and generated user overlay, so a
+# normal FreeDesktop lookup keeps resolving the real Meo app after Undo.
+install(FILES
+    data/icons/hicolor/scalable/apps/org.meo.settings.svg
+    data/icons/hicolor/scalable/apps/org.meo.welcome.svg
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps"
+)
+install(FILES
+    data/icons/hicolor/16x16/apps/org.meo.settings.svg
+    data/icons/hicolor/16x16/apps/org.meo.welcome.svg
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/16x16/apps"
+)
+install(FILES
+    data/icons/hicolor/22x22/apps/org.meo.settings.svg
+    data/icons/hicolor/22x22/apps/org.meo.welcome.svg
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/22x22/apps"
+)
+install(FILES
+    data/icons/hicolor/32x32/apps/org.meo.settings.svg
+    data/icons/hicolor/32x32/apps/org.meo.welcome.svg
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps"
 )
 install(FILES data/meo-account/clients/org.meo.Settings.json
     DESTINATION "${CMAKE_INSTALL_DATADIR}/meo-account/clients"

@@ -1,7 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Sound
+Name[zh_CN]=声音
 Comment=Manage sound devices in Meo Settings
+Comment[zh_CN]=在 Meo 设置中管理声音设备
 Exec=meo-settings --route sound
 Icon=audio-volume-high
 Categories=Settings;Qt;KDE;

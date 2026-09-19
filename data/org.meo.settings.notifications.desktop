@@ -1,7 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Notifications
+Name[zh_CN]=通知
 Comment=Manage notifications in Meo Settings
+Comment[zh_CN]=在 Meo 设置中管理通知
 Exec=meo-settings --route notifications
 Icon=preferences-desktop-notification
 Categories=Settings;Qt;KDE;

@@ -1,6 +1,8 @@
 #include "../src/core/settingsregistry.h"
 
+#include <QCoreApplication>
 #include <QTest>
+#include <QTranslator>
 
 #include <algorithm>
 
@@ -10,6 +12,7 @@ class SettingsRegistryTest final : public QObject
 
 private Q_SLOTS:
     void resolvesKeywordAliases();
+    void translatesPresentationFieldsWithoutChangingMachineValues();
     void exposesCompleteTopLevelArchitecture();
     void exposesCapabilityAwareCoreEntries();
     void separatesDisplayAndSoundFromDevices();
@@ -37,6 +40,40 @@ void SettingsRegistryTest::resolvesKeywordAliases()
     QVERIFY(std::any_of(wlanResults.cbegin(), wlanResults.cend(), [](const QVariant &item) {
         return item.toMap().value(QStringLiteral("id")).toString() == QStringLiteral("wifi");
     }));
+}
+
+void SettingsRegistryTest::translatesPresentationFieldsWithoutChangingMachineValues()
+{
+    const QString translationsDirectory = QString::fromUtf8(MEO_SETTINGS_TRANSLATIONS_BUILD_DIR);
+    QVERIFY2(!translationsDirectory.isEmpty(), "The test needs the build catalog directory.");
+
+    QTranslator translator;
+    QVERIFY2(translator.load(QStringLiteral("meo_settings_zh_CN"), translationsDirectory),
+             qPrintable(translationsDirectory));
+    QCoreApplication::installTranslator(&translator);
+
+    {
+        SettingsRegistry registry;
+        QCOMPARE(registry.category(QStringLiteral("network")).value(QStringLiteral("title")).toString(),
+                 QStringLiteral("网络和互联网"));
+
+        const auto wifi = registry.entry(QStringLiteral("wifi"));
+        QCOMPARE(wifi.value(QStringLiteral("description")).toString(), QStringLiteral("连接无线网络"));
+        QCOMPARE(wifi.value(QStringLiteral("route")).toString(), QStringLiteral("wifi"));
+        QVERIFY(wifi.value(QStringLiteral("keywords")).toStringList().contains(QStringLiteral("wireless")));
+
+        const auto localizedResults = registry.search(QStringLiteral("无线网络"));
+        QVERIFY(std::any_of(localizedResults.cbegin(), localizedResults.cend(), [](const QVariant &item) {
+            return item.toMap().value(QStringLiteral("id")).toString() == QStringLiteral("wifi");
+        }));
+        QCOMPARE(QCoreApplication::translate("Main", "Open settings categories"), QStringLiteral("打开设置分类"));
+        QCOMPARE(QCoreApplication::translate("HomePage", "Search settings"), QStringLiteral("搜索设置"));
+    }
+
+    QCoreApplication::removeTranslator(&translator);
+    SettingsRegistry englishRegistry;
+    QCOMPARE(englishRegistry.category(QStringLiteral("network")).value(QStringLiteral("title")).toString(),
+             QStringLiteral("Network & Internet"));
 }
 
 void SettingsRegistryTest::exposesCompleteTopLevelArchitecture()
