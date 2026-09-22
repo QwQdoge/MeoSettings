@@ -10,7 +10,7 @@ namespace
 {
 QString sourceFile(const QString &relativePath)
 {
-    QFile file(QStringLiteral(MEO_SETTINGS_SOURCE_DIR) + QLatin1Char('/') + relativePath);
+    QFile file(QString::fromUtf8(MEO_SETTINGS_SOURCE_DIR) + QLatin1Char('/') + relativePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return {};
     return QString::fromUtf8(file.readAll());
