@@ -154,6 +154,12 @@ qt_add_qml_module(meo-settings
 
 qt_add_executable(meo-welcome
     src/welcome-main.cpp
+    src/core/backendbase.cpp
+    src/core/backendbase.h
+    src/backends/networkbackend.cpp
+    src/backends/networkbackend.h
+    src/backends/meoaccountbackend.cpp
+    src/backends/meoaccountbackend.h
     src/backends/fingerprintbackend.cpp
     src/backends/fingerprintbackend.h
     src/core/qmlimportpolicy.cpp
@@ -255,10 +261,12 @@ target_link_libraries(meo-settings PRIVATE
 
 target_link_libraries(meo-welcome PRIVATE
     Qt6::Core
+    Qt6::DBus
     Qt6::Gui
     Qt6::Qml
     Qt6::Quick
     Qt6::QuickControls2
+    KF6::NetworkManagerQt
 )
 
 target_compile_definitions(meo-settings PRIVATE
