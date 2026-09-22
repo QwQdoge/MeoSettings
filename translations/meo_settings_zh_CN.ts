@@ -3039,28 +3039,28 @@ Total prompt: %7 characters</source>
     </message>
     <message>
         <location filename="../qml/pages/HomePage.qml" line="357"/>
-        <source>Welcome to Meo</source>
-        <translation>欢迎使用 Meo</translation>
+        <source>Installed system readiness</source>
+        <translation>已安装系统就绪检查</translation>
     </message>
     <message>
         <location filename="../qml/pages/HomePage.qml" line="365"/>
-        <source>Reopen the six-step first-login guide at any time.</source>
-        <translation>可随时重新打开六步首次登录指引。</translation>
+        <source>Recheck network, Meo Account, hardware, updates, and recovery for this installed system.</source>
+        <translation>重新检查此已安装系统的网络、Meo 账号、硬件、更新和恢复状态。</translation>
     </message>
     <message>
         <location filename="../qml/pages/HomePage.qml" line="366"/>
-        <source>Meo Welcome is not installed on this system.</source>
-        <translation>此系统未安装 Meo Welcome。</translation>
+        <source>Installed-system checks are unavailable because Meo Welcome is not installed.</source>
+        <translation>由于未安装 Meo Welcome，已安装系统检查当前不可用。</translation>
     </message>
     <message>
         <location filename="../qml/pages/HomePage.qml" line="373"/>
-        <source>Open Meo Welcome</source>
-        <translation>打开 Meo Welcome</translation>
+        <source>Run installed system check</source>
+        <translation>运行已安装系统检查</translation>
     </message>
     <message>
         <location filename="../qml/pages/HomePage.qml" line="376"/>
-        <source>Opens the independent first-login guide without changing its completion state</source>
-        <translation>打开独立的首次登录指引，不会更改其完成状态</translation>
+        <source>Opens the installed-system readiness flow without changing its completion state</source>
+        <translation>打开已安装系统就绪检查流程，不会更改其完成状态</translation>
     </message>
 </context>
 <context>
