@@ -471,6 +471,15 @@ target_include_directories(meo-settings-qmlimportpolicy-test PRIVATE ${CMAKE_CUR
 target_link_libraries(meo-settings-qmlimportpolicy-test PRIVATE Qt6::Core Qt6::Qml Qt6::Test)
 add_test(NAME meo-settings-qmlimportpolicy COMMAND meo-settings-qmlimportpolicy-test)
 
+add_executable(meo-settings-welcomereadiness-test
+    tests/tst_welcomereadiness.cpp
+)
+target_compile_definitions(meo-settings-welcomereadiness-test PRIVATE
+    MEO_SETTINGS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(meo-settings-welcomereadiness-test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME meo-settings-welcomereadiness COMMAND meo-settings-welcomereadiness-test)
+
 add_executable(meo-settings-repairlauncher-test
     tests/tst_repairlauncher.cpp
     src/core/backendbase.cpp
