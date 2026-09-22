@@ -13,6 +13,8 @@
 #include <QVariant>
 
 #include "backends/fingerprintbackend.h"
+#include "backends/meoaccountbackend.h"
+#include "backends/networkbackend.h"
 #include "core/qmlimportpolicy.h"
 
 #ifndef MEO_WELCOME_TRANSLATIONS_BUILD_DIR
@@ -192,6 +194,8 @@ int main(int argc, char *argv[])
                       << ", Welcome zh_CN catalog=" << welcomeCatalogLoaded;
 
     WelcomeState state;
+    NetworkBackend networkBackend;
+    MeoAccountBackend accountBackend;
     FingerprintBackend fingerprintBackend;
     if (state.completed() && !parser.isSet(showOption)) {
         return 0;
@@ -208,6 +212,8 @@ int main(int argc, char *argv[])
     // cannot read, enroll, export, or otherwise handle biometric data.
     engine.setInitialProperties({
         {QStringLiteral("welcomeState"), QVariant::fromValue(&state)},
+        {QStringLiteral("networkBackend"), QVariant::fromValue(&networkBackend)},
+        {QStringLiteral("accountBackend"), QVariant::fromValue(&accountBackend)},
         {QStringLiteral("fingerprintBackend"), QVariant::fromValue(&fingerprintBackend)}
     });
     engine.loadFromModule(QStringLiteral("org.meo.welcome"), QStringLiteral("Welcome"));
