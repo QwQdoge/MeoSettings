@@ -39,9 +39,13 @@ ApplicationWindow {
                                                  ? qsTr("Online")
                                                  : root.networkBackend.connectivityState === "portal"
                                                    ? qsTr("Sign-in required")
-                                                   : root.networkBackend.systemConnected
+                                                   : root.networkBackend.connectivityState === "limited"
                                                      ? qsTr("Limited")
-                                                     : qsTr("Offline")
+                                                     : root.networkBackend.connectivityState === "connecting"
+                                                       ? qsTr("Connecting")
+                                                       : root.networkBackend.systemConnected
+                                                         ? qsTr("Connected")
+                                                         : qsTr("Offline")
     readonly property string accountCheckValue: root.accountBackend.signedIn
                                                  ? qsTr("Connected")
                                                  : root.accountBackend.serviceRunning
@@ -79,7 +83,7 @@ ApplicationWindow {
 
                 Repeater {
                     model: [
-                        {"icon": "computer", "title": qsTr("Environment"), "value": qsTr("Installed system")},
+                        {"icon": "computer", "title": qsTr("Environment"), "value": root.welcomeState.runtimeEnvironment === "installed" ? qsTr("Installed system") : qsTr("Unknown")},
                         {"icon": "wifi", "title": qsTr("Network"), "value": root.networkCheckValue},
                         {"icon": "account_circle", "title": qsTr("Meo Account"), "value": root.accountCheckValue},
                         {"icon": "fingerprint", "title": qsTr("Fingerprint"), "value": root.fingerprintBackend.devicePresent ? qsTr("Detected") : qsTr("Not detected")}
