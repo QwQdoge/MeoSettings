@@ -14,6 +14,12 @@ class NetworkBackend final : public BackendBase
     Q_PROPERTY(bool wifiAvailable READ wifiAvailable NOTIFY changed)
     Q_PROPERTY(bool wifiEnabled READ wifiEnabled WRITE setWifiEnabled NOTIFY changed)
     Q_PROPERTY(bool connected READ connected NOTIFY changed)
+    // Device-local Wi-Fi state above is intentionally separate from the
+    // machine-wide NetworkManager state used by first-run/system checks.
+    Q_PROPERTY(bool systemConnected READ systemConnected NOTIFY changed)
+    Q_PROPERTY(bool internetAvailable READ internetAvailable NOTIFY changed)
+    Q_PROPERTY(QString connectivityState READ connectivityState NOTIFY changed)
+    Q_PROPERTY(QString primaryConnectionName READ primaryConnectionName NOTIFY changed)
     Q_PROPERTY(QString connectionName READ connectionName NOTIFY changed)
     Q_PROPERTY(bool scanning READ scanning NOTIFY changed)
     Q_PROPERTY(QVariantList networks READ networks NOTIFY changed)
@@ -24,6 +30,10 @@ public:
     bool wifiAvailable() const;
     bool wifiEnabled() const;
     bool connected() const;
+    bool systemConnected() const;
+    bool internetAvailable() const;
+    QString connectivityState() const;
+    QString primaryConnectionName() const;
     QString connectionName() const;
     bool scanning() const;
     QVariantList networks() const;
