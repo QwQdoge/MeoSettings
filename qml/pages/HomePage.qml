@@ -354,7 +354,7 @@ Item {
                 width: parent.width
                 spacing: 10 * MeoTheme.globalScale
                 MeoText {
-                    text: qsTr("Welcome to Meo")
+                    text: qsTr("Installed system readiness")
                     typeRole: "title"
                     typeSize: "small"
                     emphasized: true
@@ -362,18 +362,18 @@ Item {
                 MeoText {
                     width: parent.width
                     text: WelcomeBackend.launcherAvailable
-                          ? qsTr("Reopen the six-step first-login guide at any time.")
-                          : qsTr("Meo Welcome is not installed on this system.")
+                          ? qsTr("Recheck network, Meo Account, hardware, updates, and recovery for this installed system.")
+                          : qsTr("Installed-system checks are unavailable because Meo Welcome is not installed.")
                     typeRole: "body"
                     typeSize: "small"
                     color: MeoTheme.contentOnSurfaceVariant
                     wrapMode: Text.WordWrap
                 }
                 MeoButton {
-                    text: qsTr("Open Meo Welcome")
+                    text: qsTr("Run installed system check")
                     type: "outlined"
                     enabled: WelcomeBackend.launcherAvailable
-                    Accessible.description: qsTr("Opens the independent first-login guide without changing its completion state")
+                    Accessible.description: qsTr("Opens the installed-system readiness flow without changing its completion state")
                     onClicked: WelcomeBackend.open()
                 }
             }
