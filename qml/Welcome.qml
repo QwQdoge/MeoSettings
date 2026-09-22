@@ -191,22 +191,22 @@ ApplicationWindow {
             width: parent.width
             type: "outlined"
             visible: root.currentStep === root.steps.length - 1
-            Accessible.name: qsTr("Set up your Meo Account")
-            Accessible.description: qsTr("Manage cloud services, backups, and AI connections in one place.")
+            Accessible.name: qsTr("Setup complete")
+            Accessible.description: qsTr("Review these installed-system checks again from Meo Settings at any time.")
             ColumnLayout {
                 anchors.fill: parent
                 spacing: 10 * MeoTheme.globalScale
                 RowLayout {
                     Layout.fillWidth: true
-                    MeoIcon { icon: "account_circle"; size: 24; color: MeoTheme.secondary }
-                    MeoText { Layout.fillWidth: true; text: qsTr("Set up your Meo Account"); typeRole: "title"; typeSize: "small"; emphasized: true }
+                    MeoIcon { icon: "check_circle"; size: 24; color: MeoTheme.primary }
+                    MeoText { Layout.fillWidth: true; text: qsTr("Setup complete"); typeRole: "title"; typeSize: "small"; emphasized: true }
                 }
                 MeoText {
                     Layout.fillWidth: true
-                    text: qsTr("Manage cloud services, backups, and AI connections in one place.")
+                    text: qsTr("Network, account, hardware, updates, and recovery remain available in Meo Settings.")
                     typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant; wrapMode: Text.WordWrap
                 }
-                MeoButton { text: qsTr("Open account settings"); type: "outlined"; onClicked: root.welcomeState.openSettings("accounts") }
+                MeoButton { text: qsTr("Open Meo Settings"); type: "outlined"; onClicked: root.welcomeState.openSettings("home") }
             }
         }
 
