@@ -84,6 +84,45 @@ bool NetworkBackend::connected() const
     return m_wifiDevice && m_wifiDevice->state() == NetworkManager::Device::Activated;
 }
 
+bool NetworkBackend::systemConnected() const
+{
+    const auto state = NetworkManager::status();
+    return state == NetworkManager::Connected
+        || state == NetworkManager::ConnectedSiteOnly
+        || state == NetworkManager::ConnectedLinkLocal;
+}
+
+bool NetworkBackend::internetAvailable() const
+{
+    return NetworkManager::connectivity() == NetworkManager::Full;
+}
+
+QString NetworkBackend::connectivityState() const
+{
+    switch (NetworkManager::connectivity()) {
+    case NetworkManager::Full:
+        return QStringLiteral("online");
+    case NetworkManager::Portal:
+        return QStringLiteral("portal");
+    case NetworkManager::Limited:
+        return QStringLiteral("limited");
+    case NetworkManager::NoConnectivity:
+        return QStringLiteral("offline");
+    case NetworkManager::UnknownConnectivity:
+    default:
+        return systemConnected() ? QStringLiteral("connected") : QStringLiteral("unknown");
+    }
+}
+
+QString NetworkBackend::primaryConnectionName() const
+{
+    const auto primary = NetworkManager::primaryConnection();
+    if (primary && !primary->id().isEmpty()) {
+        return primary->id();
+    }
+    return connectionName();
+}
+
 QString NetworkBackend::connectionName() const
 {
     if (!m_wifiDevice) {
