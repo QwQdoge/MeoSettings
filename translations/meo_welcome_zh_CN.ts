@@ -251,6 +251,130 @@
         <source>Next</source>
         <translation>下一步</translation>
     </message>
+    <message>
+        <source>Installed system check</source>
+        <translation>已安装系统检查</translation>
+    </message>
+    <message>
+        <source>Check this installed Meo system before choosing anything else.</source>
+        <translation>先检查当前已安装的 Meo 系统，再继续其他设置。</translation>
+    </message>
+    <message>
+        <source>Check the whole system connection, including Ethernet, Wi-Fi, VPN, and captive portals.</source>
+        <translation>检查整个系统的网络连接，包括以太网、Wi‑Fi、VPN 和需要网页登录的网络。</translation>
+    </message>
+    <message>
+        <source>Meo Account</source>
+        <translation>Meo 账号</translation>
+    </message>
+    <message>
+        <source>Connect cloud services only on the installed system, never inside the Live installer.</source>
+        <translation>仅在已安装的系统中连接云服务，不在 Live 安装环境中登录。</translation>
+    </message>
+    <message>
+        <source>Installed system status</source>
+        <translation>已安装系统状态</translation>
+    </message>
+    <message>
+        <source>Environment</source>
+        <translation>环境</translation>
+    </message>
+    <message>
+        <source>Installed system</source>
+        <translation>已安装系统</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation>未知</translation>
+    </message>
+    <message>
+        <source>Network</source>
+        <translation>网络</translation>
+    </message>
+    <message>
+        <source>Detected</source>
+        <translation>已检测到</translation>
+    </message>
+    <message>
+        <source>Not detected</source>
+        <translation>未检测到</translation>
+    </message>
+    <message>
+        <source>Online</source>
+        <translation>已联网</translation>
+    </message>
+    <message>
+        <source>Sign-in required</source>
+        <translation>需要网页登录</translation>
+    </message>
+    <message>
+        <source>Limited</source>
+        <translation>受限连接</translation>
+    </message>
+    <message>
+        <source>Connecting</source>
+        <translation>正在连接</translation>
+    </message>
+    <message>
+        <source>Connected</source>
+        <translation>已连接</translation>
+    </message>
+    <message>
+        <source>Offline</source>
+        <translation>离线</translation>
+    </message>
+    <message>
+        <source>Not connected</source>
+        <translation>未连接</translation>
+    </message>
+    <message>
+        <source>System network status</source>
+        <translation>系统网络状态</translation>
+    </message>
+    <message>
+        <source>No primary connection</source>
+        <translation>没有主要网络连接</translation>
+    </message>
+    <message>
+        <source>A captive-portal sign-in is required before full Internet access is available.</source>
+        <translation>需要先完成网络网页登录，才能获得完整的互联网访问。</translation>
+    </message>
+    <message>
+        <source>NetworkManager reports full Internet connectivity for this installed system.</source>
+        <translation>NetworkManager 报告当前已安装系统具有完整的互联网连接。</translation>
+    </message>
+    <message>
+        <source>Open Wi-Fi settings to connect or review the current network.</source>
+        <translation>打开 Wi‑Fi 设置以连接网络或检查当前连接。</translation>
+    </message>
+    <message>
+        <source>Meo Account status</source>
+        <translation>Meo 账号状态</translation>
+    </message>
+    <message>
+        <source>Connect Meo Account</source>
+        <translation>连接 Meo 账号</translation>
+    </message>
+    <message>
+        <source>Account settings</source>
+        <translation>账号设置</translation>
+    </message>
+    <message>
+        <source>Setup complete</source>
+        <translation>设置完成</translation>
+    </message>
+    <message>
+        <source>Review these installed-system checks again from Meo Settings at any time.</source>
+        <translation>你可以随时在 Meo 设置中再次查看这些已安装系统检查。</translation>
+    </message>
+    <message>
+        <source>Network, account, hardware, updates, and recovery remain available in Meo Settings.</source>
+        <translation>网络、账号、硬件、更新和恢复功能之后仍可在 Meo 设置中使用。</translation>
+    </message>
+    <message>
+        <source>Open Meo Settings</source>
+        <translation>打开 Meo 设置</translation>
+    </message>
 </context>
 <context>
     <name>WelcomeApplication</name>
