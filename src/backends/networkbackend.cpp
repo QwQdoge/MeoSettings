@@ -110,7 +110,22 @@ QString NetworkBackend::connectivityState() const
         return QStringLiteral("offline");
     case NetworkManager::UnknownConnectivity:
     default:
-        return systemConnected() ? QStringLiteral("connected") : QStringLiteral("unknown");
+        switch (NetworkManager::status()) {
+        case NetworkManager::Connected:
+            return QStringLiteral("connected");
+        case NetworkManager::ConnectedSiteOnly:
+        case NetworkManager::ConnectedLinkLocal:
+            return QStringLiteral("limited");
+        case NetworkManager::Connecting:
+            return QStringLiteral("connecting");
+        case NetworkManager::Disconnected:
+        case NetworkManager::Disconnecting:
+        case NetworkManager::Asleep:
+            return QStringLiteral("offline");
+        case NetworkManager::Unknown:
+        default:
+            return QStringLiteral("unknown");
+        }
     }
 }
 
