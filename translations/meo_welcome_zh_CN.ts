@@ -397,4 +397,31 @@
         <translation>无法打开 Meo 设置。</translation>
     </message>
 </context>
+    <context>
+        <name>MeoAccountBackend</name>
+        <message>
+            <source>Meo Account is installed but not running</source>
+            <translation>Meo 账号服务已安装，但当前未运行</translation>
+        </message>
+        <message>
+            <source>Meo Account is not installed</source>
+            <translation>尚未安装 Meo 账号服务</translation>
+        </message>
+        <message>
+            <source>No Meo Account is connected on this device</source>
+            <translation>此设备尚未连接 Meo 账号</translation>
+        </message>
+        <message>
+            <source>Meo Account sign-in is not configured on this device</source>
+            <translation>此设备尚未配置 Meo 账号登录</translation>
+        </message>
+        <message>
+            <source>Connected as %1</source>
+            <translation>已连接为 %1</translation>
+        </message>
+        <message>
+            <source>Meo Account is connected</source>
+            <translation>Meo 账号已连接</translation>
+        </message>
+    </context>
 </TS>
