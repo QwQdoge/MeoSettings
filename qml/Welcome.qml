@@ -123,7 +123,17 @@ ApplicationWindow {
                         typeSize: "small"
                         emphasized: true
                     }
-                    MeoBadge { text: root.networkCheckValue }
+                    MeoText {
+                        text: root.networkCheckValue
+                        typeRole: "label"
+                        typeSize: "small"
+                        emphasized: true
+                        color: root.networkBackend.internetAvailable
+                               ? MeoTheme.primary
+                               : root.networkBackend.connectivityState === "portal"
+                                 ? MeoTheme.tertiary
+                                 : MeoTheme.contentOnSurfaceVariant
+                    }
                 }
                 MeoText {
                     Layout.fillWidth: true
@@ -161,7 +171,13 @@ ApplicationWindow {
                         typeSize: "small"
                         emphasized: true
                     }
-                    MeoBadge { text: root.accountCheckValue }
+                    MeoText {
+                        text: root.accountCheckValue
+                        typeRole: "label"
+                        typeSize: "small"
+                        emphasized: true
+                        color: root.accountBackend.signedIn ? MeoTheme.primary : MeoTheme.contentOnSurfaceVariant
+                    }
                 }
                 MeoText {
                     Layout.fillWidth: true
