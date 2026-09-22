@@ -91,10 +91,16 @@ bool installCatalog(QGuiApplication &app,
 class WelcomeState final : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QString runtimeEnvironment READ runtimeEnvironment CONSTANT)
     Q_PROPERTY(bool completed READ completed NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
 
 public:
+    QString runtimeEnvironment() const
+    {
+        return QStringLiteral("installed");
+    }
+
     bool completed() const
     {
         return QSettings().value(QStringLiteral("welcome/completed"), false).toBool();
