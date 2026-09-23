@@ -3,6 +3,7 @@
 #include "backends/apppermissionsbackend.h"
 #include "backends/bluetoothbackend.h"
 #include "backends/controlcenterbackend.h"
+#include "backends/shellsettingsbackend.h"
 #include "backends/dynamiccolorbackend.h"
 #include "backends/displaybackend.h"
 #include "backends/documentationprovider.h"
@@ -216,6 +217,7 @@ int main(int argc, char *argv[])
     PackageInventoryBackend packageInventoryBackend;
     UpdatesBackend updatesBackend;
     ControlCenterBackend controlCenterBackend;
+    ShellSettingsBackend shellSettingsBackend;
     KcmBridge kcmBridge;
     WelcomeBackend welcomeBackend;
     CapabilityManager capabilities(&networkBackend, &bluetoothBackend, &audioBackend, &displayBackend, &powerBackend);
@@ -264,6 +266,7 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("PackageInventoryBackend"), &packageInventoryBackend);
     context->setContextProperty(QStringLiteral("UpdatesBackend"), &updatesBackend);
     context->setContextProperty(QStringLiteral("ControlCenterBackend"), &controlCenterBackend);
+    context->setContextProperty(QStringLiteral("ShellSettingsBackend"), &shellSettingsBackend);
     context->setContextProperty(QStringLiteral("KcmBridge"), &kcmBridge);
     context->setContextProperty(QStringLiteral("WelcomeBackend"), &welcomeBackend);
     // This mode exists solely for isolated CTest and screenshot validation of
