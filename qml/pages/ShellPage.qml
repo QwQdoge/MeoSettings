@@ -324,20 +324,6 @@ Item {
             "currentIndex": root.optionIndex(root.densityOptions, notificationsDraft.density || "comfortable")
         },
         {
-            "id": "textScalePercent",
-            "title": qsTr("Text size"),
-            "subtitle": qsTr("Scale text inside the Meo notification surface"),
-            "icon": "text_fields",
-            "tone": "primary",
-            "trailingKind": "slider",
-            "from": 85,
-            "to": 125,
-            "value": Number(notificationsDraft.textScalePercent === undefined ? 100 : notificationsDraft.textScalePercent),
-            "stepSize": 5,
-            "discrete": true,
-            "valueSuffix": "%"
-        },
-        {
             "id": "surfaceStyle",
             "title": qsTr("Surface style"),
             "subtitle": qsTr("Follow the theme or use a different shell surface treatment"),
@@ -361,16 +347,7 @@ Item {
             "discrete": true,
             "valueSuffix": "%"
         },
-        {
-            "id": "motionProfile",
-            "title": qsTr("Motion"),
-            "subtitle": qsTr("Choose the shell animation profile"),
-            "icon": "animation",
-            "tone": "secondary",
-            "trailingKind": "segmented",
-            "options": root.motionOptions,
-            "currentIndex": root.optionIndex(root.motionOptions, notificationsDraft.motionProfile || "pixel")
-        }
+
     ]
 
     readonly property var timeClockRows: [
@@ -500,16 +477,7 @@ Item {
             "discrete": true,
             "valueSuffix": "%"
         },
-        {
-            "id": "motionProfile",
-            "title": qsTr("Motion"),
-            "subtitle": qsTr("Choose the Time Center animation profile"),
-            "icon": "animation",
-            "tone": "secondary",
-            "trailingKind": "segmented",
-            "options": root.motionOptions,
-            "currentIndex": root.optionIndex(root.motionOptions, timeCenterDraft.motionProfile || "pixel")
-        }
+
     ]
 
     function optionValue(row, optionIndex) {
