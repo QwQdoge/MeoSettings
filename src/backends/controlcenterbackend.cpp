@@ -11,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSet>
+#include <QtGlobal>
 
 namespace
 {
@@ -369,6 +370,7 @@ void ControlCenterBackend::saveTopBar(const QVariantMap &settings)
                 setTopBar(serialized);
                 setAvailable(true);
                 Q_EMIT changed();
+                Q_EMIT topBarSaved();
                 watcher->deleteLater();
             });
 }
