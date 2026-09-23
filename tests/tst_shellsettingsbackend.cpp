@@ -41,13 +41,12 @@ void ShellSettingsBackendTest::validatesPresentationRanges()
 {
     QString error;
     auto notifications = ShellSettingsBackend::normalizedNotifications({
-        {QStringLiteral("textScalePercent"), 110},
         {QStringLiteral("surfaceOpacityPercent"), 90},
         {QStringLiteral("notificationPreview"), QStringLiteral("summary")},
     });
     QVERIFY2(!ShellSettingsBackend::serializeNotifications(notifications, &error).isEmpty(), qPrintable(error));
 
-    notifications.insert(QStringLiteral("textScalePercent"), 150);
+    notifications.insert(QStringLiteral("surfaceOpacityPercent"), 60);
     error.clear();
     QVERIFY(ShellSettingsBackend::serializeNotifications(notifications, &error).isEmpty());
     QVERIFY(!error.isEmpty());
