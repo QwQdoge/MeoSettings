@@ -15,6 +15,7 @@ class ControlCenterBackend final : public BackendBase
     Q_OBJECT
     Q_PROPERTY(QVariantList tiles READ tiles NOTIFY changed)
     Q_PROPERTY(QString density READ density NOTIFY changed)
+    Q_PROPERTY(QVariantMap topBar READ topBar NOTIFY changed)
     Q_PROPERTY(QString summary READ summary NOTIFY changed)
 
 public:
@@ -22,11 +23,14 @@ public:
 
     QVariantList tiles() const;
     QString density() const;
+    QVariantMap topBar() const;
     QString summary() const;
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void saveLayout(const QVariantList &tiles, const QString &density);
     Q_INVOKABLE void resetLayout();
+    Q_INVOKABLE void saveTopBar(const QVariantMap &settings);
+    Q_INVOKABLE void resetTopBar();
 
     // Pure contract helpers.  Keeping the parser and serializer here lets the
     // applet schema and this Settings page share one stable wire format while
@@ -39,11 +43,15 @@ public:
     static QVariantMap serializeLayout(const QVariantList &tiles,
                                        const QString &density,
                                        QString *error = nullptr);
+    static QVariantMap normalizedTopBar(const QVariantMap &settings);
+    static QVariantMap serializeTopBar(const QVariantMap &settings,
+                                       QString *error = nullptr);
     static QString readLayoutScript();
     static QString writeLayoutScript(const QString &order,
                                      const QString &sizes,
                                      const QString &visibility,
                                      const QString &density);
+    static QString writeTopBarScript(const QVariantMap &settings);
 
 Q_SIGNALS:
     void changed();
@@ -51,8 +59,10 @@ Q_SIGNALS:
 
 private:
     void setLayout(const QVariantMap &layout);
+    void setTopBar(const QVariantMap &settings);
     QString errorForScriptReason(const QString &reason) const;
 
     QVariantList m_tiles;
     QString m_density = QStringLiteral("comfortable");
+    QVariantMap m_topBar;
 };
