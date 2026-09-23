@@ -56,6 +56,7 @@ public:
 Q_SIGNALS:
     void changed();
     void layoutSaved();
+    void topBarSaved();
 
 private:
     void setLayout(const QVariantMap &layout);
