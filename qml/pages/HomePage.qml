@@ -162,6 +162,12 @@ Item {
         "icon": "storage", "tone": "secondary", "route": "storage", "trailingKind": "navigation"
     },
     {
+        "title": qsTr("Performance"),
+        "subtitle": qsTr("CPU, GPU, memory, network, storage, and power mode"),
+        "icon": "speed",
+        "tone": "primary", "route": "performance", "trailingKind": "navigation"
+    },
+    {
         "title": qsTr("Power & battery"),
         "subtitle": root.powerSummary(),
         "icon": PowerBackend.charging ? "battery_charging_full" : "battery_full",
@@ -198,6 +204,11 @@ Item {
     }]
 
     readonly property var deviceOverviewRows: [{
+        "title": qsTr("Performance"),
+        "subtitle": qsTr("Live CPU, GPU, memory, network, and storage"),
+        "icon": "speed",
+        "tone": "primary", "route": "performance", "trailingKind": "navigation"
+    }, {
         "title": qsTr("Power & battery"),
         "subtitle": root.powerSummary(),
         "icon": PowerBackend.charging ? "battery_charging_full" : "battery_full",
