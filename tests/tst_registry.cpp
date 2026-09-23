@@ -20,6 +20,7 @@ private Q_SLOTS:
     void exposesNativeNotificationsRoute();
     void exposesSessionEntryPreviewRoute();
     void exposesControlCenterRoute();
+    void exposesDesktopShellRoute();
     void exposesNativePowerAndNightLightRoutes();
     void exposesNativeLanguageRegionRoute();
     void exposesCuratedCategoryEntries();
@@ -185,6 +186,28 @@ void SettingsRegistryTest::exposesControlCenterRoute()
     const auto results = registry.search(QStringLiteral("quick settings"));
     QVERIFY(std::any_of(results.cbegin(), results.cend(), [](const QVariant &item) {
         return item.toMap().value(QStringLiteral("id")).toString() == QStringLiteral("control-center");
+    }));
+}
+
+void SettingsRegistryTest::exposesDesktopShellRoute()
+{
+    SettingsRegistry registry;
+
+    const auto shell = registry.entry(QStringLiteral("shell"));
+    QCOMPARE(shell.value(QStringLiteral("route")).toString(), QStringLiteral("shell"));
+    QCOMPARE(shell.value(QStringLiteral("categoryId")).toString(), QStringLiteral("system"));
+    QVERIFY(shell.value(QStringLiteral("direct")).toBool());
+    QCOMPARE(shell.value(QStringLiteral("pageKind")).toString(), QStringLiteral("control"));
+    QCOMPARE(shell.value(QStringLiteral("risk")).toString(), QStringLiteral("reversible"));
+
+    const auto launcherResults = registry.search(QStringLiteral("shelf launcher"));
+    QVERIFY(std::any_of(launcherResults.cbegin(), launcherResults.cend(), [](const QVariant &item) {
+        return item.toMap().value(QStringLiteral("id")).toString() == QStringLiteral("shell");
+    }));
+
+    const auto osdResults = registry.search(QStringLiteral("osd"));
+    QVERIFY(std::any_of(osdResults.cbegin(), osdResults.cend(), [](const QVariant &item) {
+        return item.toMap().value(QStringLiteral("id")).toString() == QStringLiteral("shell");
     }));
 }
 
