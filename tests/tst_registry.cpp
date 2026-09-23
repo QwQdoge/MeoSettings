@@ -21,6 +21,7 @@ private Q_SLOTS:
     void exposesSessionEntryPreviewRoute();
     void exposesControlCenterRoute();
     void exposesNativePowerAndNightLightRoutes();
+    void exposesNativeLanguageRegionRoute();
     void exposesCuratedCategoryEntries();
     void resolvesKcmRoutes();
     void exposesStorageAndSafetyMetadata();
@@ -201,6 +202,22 @@ void SettingsRegistryTest::exposesNativePowerAndNightLightRoutes()
     QCOMPARE(nightLight.value(QStringLiteral("route")).toString(), QStringLiteral("display"));
     QVERIFY(nightLight.value(QStringLiteral("direct")).toBool());
     QCOMPARE(nightLight.value(QStringLiteral("pageKind")).toString(), QStringLiteral("control"));
+}
+
+void SettingsRegistryTest::exposesNativeLanguageRegionRoute()
+{
+    SettingsRegistry registry;
+
+    const auto language = registry.entry(QStringLiteral("language"));
+    QCOMPARE(language.value(QStringLiteral("route")).toString(), QStringLiteral("language-region"));
+    QVERIFY(language.value(QStringLiteral("direct")).toBool());
+    QCOMPARE(language.value(QStringLiteral("pageKind")).toString(), QStringLiteral("control"));
+    QCOMPARE(language.value(QStringLiteral("risk")).toString(), QStringLiteral("reversible"));
+
+    const auto weatherResults = registry.search(QStringLiteral("weather city"));
+    QVERIFY(std::any_of(weatherResults.cbegin(), weatherResults.cend(), [](const QVariant &item) {
+        return item.toMap().value(QStringLiteral("id")).toString() == QStringLiteral("language");
+    }));
 }
 
 void SettingsRegistryTest::exposesCuratedCategoryEntries()
