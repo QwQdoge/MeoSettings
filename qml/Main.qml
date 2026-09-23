@@ -178,8 +178,10 @@ ApplicationWindow {
         {
             "title": "",
             "rows": [
-                sidebarEntryRow("control-center", qsTr("Panels & Quick Settings"),
-                                qsTr("Tiles, density, visibility, and Meo desktop controls")),
+                sidebarEntryRow("shell", qsTr("Desktop & shell"),
+                                qsTr("Shelf, Launcher, panels, notification surfaces, and Time Center")),
+                sidebarEntryRow("control-center", qsTr("Quick Settings"),
+                                qsTr("Top-bar status and Quick Settings tile layout")),
                 sidebarCategoryRow("apps"),
                 sidebarCategoryRow("accounts"),
                 sidebarEntryRow("background-services", qsTr("Services"),
@@ -247,6 +249,7 @@ ApplicationWindow {
         case "accounts": return Qt.resolvedUrl("pages/AccountsPage.qml")
         case "session-entry": return Qt.resolvedUrl("pages/SessionEntryPage.qml")
         case "control-center": return Qt.resolvedUrl("pages/ControlCenterPage.qml")
+        case "shell": return Qt.resolvedUrl("pages/ShellPage.qml")
         case "desktop-integration": return Qt.resolvedUrl("pages/DesktopIntegrationPage.qml")
         case "storage": return Qt.resolvedUrl("pages/StoragePage.qml")
         case "updates": return Qt.resolvedUrl("pages/UpdatesPage.qml")
