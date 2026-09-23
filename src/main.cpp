@@ -3,7 +3,6 @@
 #include "backends/apppermissionsbackend.h"
 #include "backends/bluetoothbackend.h"
 #include "backends/controlcenterbackend.h"
-#include "backends/shelfbackend.h"
 #include "backends/shellsettingsbackend.h"
 #include "backends/dynamiccolorbackend.h"
 #include "backends/displaybackend.h"
@@ -218,7 +217,6 @@ int main(int argc, char *argv[])
     PackageInventoryBackend packageInventoryBackend;
     UpdatesBackend updatesBackend;
     ControlCenterBackend controlCenterBackend;
-    ShelfBackend shelfBackend;
     ShellSettingsBackend shellSettingsBackend;
     KcmBridge kcmBridge;
     WelcomeBackend welcomeBackend;
@@ -268,7 +266,6 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("PackageInventoryBackend"), &packageInventoryBackend);
     context->setContextProperty(QStringLiteral("UpdatesBackend"), &updatesBackend);
     context->setContextProperty(QStringLiteral("ControlCenterBackend"), &controlCenterBackend);
-    context->setContextProperty(QStringLiteral("ShelfBackend"), &shelfBackend);
     context->setContextProperty(QStringLiteral("ShellSettingsBackend"), &shellSettingsBackend);
     context->setContextProperty(QStringLiteral("KcmBridge"), &kcmBridge);
     context->setContextProperty(QStringLiteral("WelcomeBackend"), &welcomeBackend);
