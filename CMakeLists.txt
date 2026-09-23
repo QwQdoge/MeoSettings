@@ -116,6 +116,8 @@ qt_add_executable(meo-settings
     src/backends/updatesbackend.h
     src/backends/controlcenterbackend.cpp
     src/backends/controlcenterbackend.h
+    src/backends/shelfbackend.cpp
+    src/backends/shelfbackend.h
     src/backends/shellsettingsbackend.cpp
     src/backends/shellsettingsbackend.h
     src/backends/kcmbridge.cpp
@@ -139,6 +141,7 @@ qt_add_qml_module(meo-settings
         qml/pages/LanguageRegionPage.qml
         qml/pages/AppearancePage.qml
         qml/pages/ControlCenterPage.qml
+        qml/pages/ShelfLauncherPage.qml
         qml/pages/ShellPage.qml
         qml/pages/DesktopIntegrationPage.qml
         qml/pages/NotificationsPage.qml
@@ -219,6 +222,7 @@ qt_add_lupdate(
         qml/pages/BluetoothPage.qml
         qml/pages/CategoryPage.qml
         qml/pages/ControlCenterPage.qml
+        qml/pages/ShelfLauncherPage.qml
         qml/pages/ShellPage.qml
         qml/pages/DesktopIntegrationPage.qml
         qml/pages/DisplayPage.qml
