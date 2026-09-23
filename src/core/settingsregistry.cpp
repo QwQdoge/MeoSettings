@@ -299,6 +299,12 @@ SettingsRegistry::SettingsRegistry(QObject *parent)
                 {QStringLiteral("disk"), QStringLiteral("health"), QStringLiteral("smart"), QStringLiteral("storage")},
                 false, QStringLiteral("handoff"), QStringLiteral("system"), QStringLiteral("tertiary")),
 
+        setting(QStringLiteral("performance"), tr("Performance"), tr("Monitor CPU, GPU, memory, network, and storage and choose a supported performance mode"),
+                QStringLiteral("speed"), QStringLiteral("performance"), QStringLiteral("system"), tr("System"),
+                {QStringLiteral("performance"), QStringLiteral("cpu"), QStringLiteral("gpu"), QStringLiteral("memory"),
+                 QStringLiteral("ram"), QStringLiteral("temperature"), QStringLiteral("network"), QStringLiteral("disk"),
+                 QStringLiteral("resource monitor"), QStringLiteral("power profile")},
+                true, QStringLiteral("monitor"), QStringLiteral("reversible"), QStringLiteral("primary")),
         setting(QStringLiteral("power"), tr("Power & battery"), tr("Choose a power profile, inspect battery state, and manage safe session controls"),
                 QStringLiteral("battery_full"), QStringLiteral("power"), QStringLiteral("system"), tr("System"),
                 {QStringLiteral("battery"), QStringLiteral("power"), QStringLiteral("energy"), QStringLiteral("performance"),
