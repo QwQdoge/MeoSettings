@@ -11,6 +11,8 @@ Item {
     property var draftTiles: []
     property string draftDensity: "comfortable"
     property bool hasDraftChanges: false
+    property var draftTopBar: ({})
+    property bool hasTopBarDraftChanges: false
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
     readonly property int visibleDraftCount: {
         let count = 0
@@ -73,6 +75,54 @@ Item {
         draftTiles = nextTiles
         draftDensity = ControlCenterBackend.density
         hasDraftChanges = false
+    }
+
+    function loadTopBarDraft() {
+        if (!ControlCenterBackend.available)
+            return
+
+        const source = ControlCenterBackend.topBar || ({})
+        draftTopBar = {
+            "textScalePercent": Number(source.textScalePercent === undefined ? 100 : source.textScalePercent),
+            "density": String(source.density || "comfortable"),
+            "surfaceStyle": String(source.surfaceStyle || "theme"),
+            "surfaceOpacityPercent": Number(source.surfaceOpacityPercent === undefined ? 100 : source.surfaceOpacityPercent),
+            "motionProfile": String(source.motionProfile || "pixel"),
+            "showUnreadBadge": source.showUnreadBadge === undefined ? true : Boolean(source.showUnreadBadge),
+            "showJobs": source.showJobs === undefined ? true : Boolean(source.showJobs),
+            "showNetwork": source.showNetwork === undefined ? true : Boolean(source.showNetwork),
+            "showBluetooth": source.showBluetooth === undefined ? true : Boolean(source.showBluetooth),
+            "showVolume": source.showVolume === undefined ? true : Boolean(source.showVolume),
+            "batteryDisplay": Number(source.batteryDisplay === undefined ? 2 : source.batteryDisplay),
+            "showDate": source.showDate === undefined ? true : Boolean(source.showDate),
+            "showNotifications": source.showNotifications === undefined ? true : Boolean(source.showNotifications),
+            "use24HourClock": source.use24HourClock === undefined ? true : Boolean(source.use24HourClock)
+        }
+        hasTopBarDraftChanges = false
+    }
+
+    function topBarValue(key, fallbackValue) {
+        if (!draftTopBar || draftTopBar[key] === undefined)
+            return fallbackValue
+        return draftTopBar[key]
+    }
+
+    function setTopBarValue(key, value) {
+        const next = ({})
+        const source = draftTopBar || ({})
+        for (const currentKey in source)
+            next[currentKey] = source[currentKey]
+        next[key] = value
+        draftTopBar = next
+        hasTopBarDraftChanges = true
+    }
+
+    function optionIndex(options, value) {
+        for (let index = 0; index < options.length; ++index) {
+            if (String(options[index].value) === String(value))
+                return index
+        }
+        return 0
     }
 
     function updateTile(index, key, value) {
@@ -153,15 +203,189 @@ Item {
                + qsTr(" · ") + (tile.span === 2 ? qsTr("Wide") : qsTr("Compact"))
     }
 
-    Component.onCompleted: loadDraft()
+    readonly property var densityOptions: [
+        { "label": qsTr("Compact"), "value": "compact" },
+        { "label": qsTr("Comfortable"), "value": "comfortable" }
+    ]
+    readonly property var surfaceOptions: [
+        { "label": qsTr("Follow theme"), "value": "theme" },
+        { "label": qsTr("Flat"), "value": "flat" },
+        { "label": qsTr("Tonal"), "value": "tonal" },
+        { "label": qsTr("Translucent"), "value": "translucent" }
+    ]
+    readonly property var motionOptions: [
+        { "label": qsTr("Calm"), "value": "calm" },
+        { "label": qsTr("Pixel"), "value": "pixel" },
+        { "label": qsTr("Playful"), "value": "playful" }
+    ]
+    readonly property var batteryOptions: [
+        { "label": qsTr("Hidden"), "value": 0 },
+        { "label": qsTr("Icon only"), "value": 1 },
+        { "label": qsTr("Icon and percentage"), "value": 2 },
+        { "label": qsTr("Detailed state"), "value": 3 }
+    ]
+
+    readonly property var topBarAppearanceRows: [
+        {
+            "id": "textScalePercent",
+            "title": qsTr("Text size"),
+            "subtitle": qsTr("Scale text inside the Meo top bar without changing the rest of the desktop"),
+            "icon": "text_fields",
+            "tone": "primary",
+            "trailingKind": "slider",
+            "from": 75,
+            "to": 150,
+            "value": Number(root.topBarValue("textScalePercent", 100)),
+            "stepSize": 5,
+            "discrete": true,
+            "valueSuffix": "%"
+        },
+        {
+            "id": "density",
+            "title": qsTr("Density"),
+            "subtitle": qsTr("Choose the spacing used by compact top-bar content"),
+            "icon": "density_medium",
+            "tone": "secondary",
+            "trailingKind": "segmented",
+            "options": root.densityOptions,
+            "currentIndex": root.optionIndex(root.densityOptions, root.topBarValue("density", "comfortable"))
+        },
+        {
+            "id": "surfaceStyle",
+            "title": qsTr("Surface style"),
+            "subtitle": qsTr("Follow the theme or use a flat, tonal, or translucent top-bar surface"),
+            "icon": "layers",
+            "tone": "tertiary",
+            "trailingKind": "dropdown",
+            "options": root.surfaceOptions,
+            "currentIndex": root.optionIndex(root.surfaceOptions, root.topBarValue("surfaceStyle", "theme"))
+        },
+        {
+            "id": "surfaceOpacityPercent",
+            "title": qsTr("Surface opacity"),
+            "subtitle": qsTr("Adjust the opacity used by translucent top-bar surfaces"),
+            "icon": "opacity",
+            "tone": "tertiary",
+            "trailingKind": "slider",
+            "from": 70,
+            "to": 100,
+            "value": Number(root.topBarValue("surfaceOpacityPercent", 100)),
+            "stepSize": 5,
+            "discrete": true,
+            "valueSuffix": "%"
+        },
+        {
+            "id": "motionProfile",
+            "title": qsTr("Motion"),
+            "subtitle": qsTr("Choose the top-bar animation profile"),
+            "icon": "animation",
+            "tone": "secondary",
+            "trailingKind": "segmented",
+            "options": root.motionOptions,
+            "currentIndex": root.optionIndex(root.motionOptions, root.topBarValue("motionProfile", "pixel"))
+        }
+    ]
+
+    readonly property var topBarStatusRows: [
+        {
+            "id": "showNetwork",
+            "title": qsTr("Network status"),
+            "subtitle": qsTr("Show the current network state in the compact top bar"),
+            "icon": "wifi",
+            "tone": "primary",
+            "trailingKind": "toggle",
+            "checked": Boolean(root.topBarValue("showNetwork", true))
+        },
+        {
+            "id": "showBluetooth",
+            "title": qsTr("Bluetooth status"),
+            "subtitle": qsTr("Show Bluetooth state when the service is available"),
+            "icon": "bluetooth",
+            "tone": "secondary",
+            "trailingKind": "toggle",
+            "checked": Boolean(root.topBarValue("showBluetooth", true))
+        },
+        {
+            "id": "showVolume",
+            "title": qsTr("Volume status"),
+            "subtitle": qsTr("Show the current audio state in the compact top bar"),
+            "icon": "volume_up",
+            "tone": "secondary",
+            "trailingKind": "toggle",
+            "checked": Boolean(root.topBarValue("showVolume", true))
+        },
+        {
+            "id": "batteryDisplay",
+            "title": qsTr("Battery"),
+            "subtitle": qsTr("Choose how much battery information appears in the top bar"),
+            "icon": "battery_full",
+            "tone": "primary",
+            "trailingKind": "dropdown",
+            "options": root.batteryOptions,
+            "currentIndex": root.optionIndex(root.batteryOptions, root.topBarValue("batteryDisplay", 2))
+        },
+        {
+            "id": "showDate",
+            "title": qsTr("Date"),
+            "subtitle": qsTr("Show the date alongside the clock"),
+            "icon": "calendar_today",
+            "tone": "tertiary",
+            "trailingKind": "toggle",
+            "checked": Boolean(root.topBarValue("showDate", true))
+        },
+        {
+            "id": "use24HourClock",
+            "title": qsTr("24-hour clock"),
+            "subtitle": qsTr("Use a 24-hour time format in the Meo top bar"),
+            "icon": "schedule",
+            "tone": "secondary",
+            "trailingKind": "toggle",
+            "checked": Boolean(root.topBarValue("use24HourClock", true))
+        },
+        {
+            "id": "showNotifications",
+            "title": qsTr("Notification indicator"),
+            "subtitle": qsTr("Show the notification entry point in the top bar"),
+            "icon": "notifications",
+            "tone": "primary",
+            "trailingKind": "toggle",
+            "checked": Boolean(root.topBarValue("showNotifications", true))
+        },
+        {
+            "id": "showUnreadBadge",
+            "title": qsTr("Unread badge"),
+            "subtitle": qsTr("Show the unread notification count when notifications are visible"),
+            "icon": "mark_email_unread",
+            "tone": "tertiary",
+            "trailingKind": "toggle",
+            "checked": Boolean(root.topBarValue("showUnreadBadge", true))
+        },
+        {
+            "id": "showJobs",
+            "title": qsTr("Background tasks"),
+            "subtitle": qsTr("Show active background jobs and progress"),
+            "icon": "sync",
+            "tone": "secondary",
+            "trailingKind": "toggle",
+            "checked": Boolean(root.topBarValue("showJobs", true))
+        }
+    ]
+
+    Component.onCompleted: {
+        loadDraft()
+        loadTopBarDraft()
+    }
 
     Connections {
         target: ControlCenterBackend
         function onChanged() {
             if (!root.hasDraftChanges)
                 root.loadDraft()
+            if (!root.hasTopBarDraftChanges)
+                root.loadTopBarDraft()
         }
         function onLayoutSaved() { root.loadDraft() }
+        function onTopBarSaved() { root.loadTopBarDraft() }
     }
 
     MeoPageLayout {
@@ -219,6 +443,70 @@ Item {
                     wrapMode: Text.WordWrap
                 }
             }
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: ControlCenterBackend.available
+            title: qsTr("Top bar appearance")
+            subtitle: qsTr("These controls write the real org.meo.topbar Appearance configuration.")
+            model: root.topBarAppearanceRows
+            onRowSliderMoved: (index, value, row) => root.setTopBarValue(row.id, value)
+            onRowOptionSelected: (index, optionIndex, option, row) => {
+                if (option && option.value !== undefined)
+                    root.setTopBarValue(row.id, option.value)
+            }
+            onRowDropdownSelected: (index, optionIndex, value, row) => {
+                const option = row.options && optionIndex >= 0 ? row.options[optionIndex] : null
+                if (option && option.value !== undefined)
+                    root.setTopBarValue(row.id, option.value)
+            }
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: ControlCenterBackend.available
+            title: qsTr("Top bar status")
+            subtitle: ""
+            model: root.topBarStatusRows
+            onRowToggled: (index, checked, row) => root.setTopBarValue(row.id, checked)
+            onRowDropdownSelected: (index, optionIndex, value, row) => {
+                const option = row.options && optionIndex >= 0 ? row.options[optionIndex] : null
+                if (option && option.value !== undefined)
+                    root.setTopBarValue(row.id, option.value)
+            }
+        }
+
+        Flow {
+            width: parent.width
+            visible: ControlCenterBackend.available
+            spacing: MeoTheme.space8
+
+            MeoButton {
+                text: ControlCenterBackend.busy ? qsTr("Applying…") : qsTr("Apply top bar")
+                type: "filled"
+                enabled: root.hasTopBarDraftChanges && !ControlCenterBackend.busy
+                onClicked: ControlCenterBackend.saveTopBar(root.draftTopBar)
+            }
+            MeoButton {
+                text: qsTr("Restore top-bar defaults")
+                type: "tonal"
+                enabled: !ControlCenterBackend.busy
+                onClicked: ControlCenterBackend.resetTopBar()
+            }
+        }
+
+        MeoDivider {
+            width: parent.width
+        }
+
+        MeoText {
+            width: parent.width
+            text: qsTr("Quick Settings")
+            typeRole: "title"
+            typeSize: "medium"
+            emphasized: true
+            color: MeoTheme.contentOnSurface
         }
 
         MeoQuickSettingsEditor {
