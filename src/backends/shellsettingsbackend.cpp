@@ -248,20 +248,16 @@ QVariantMap ShellSettingsBackend::normalizedNotifications(const QVariantMap &set
 {
     const QString density = settings.value(QStringLiteral("density"), QStringLiteral("comfortable")).toString();
     const QString surface = settings.value(QStringLiteral("surfaceStyle"), QStringLiteral("theme")).toString();
-    const QString motion = settings.value(QStringLiteral("motionProfile"), QStringLiteral("pixel")).toString();
     const QString view = settings.value(QStringLiteral("notificationView"), QStringLiteral("cards")).toString();
     const QString preview = settings.value(QStringLiteral("notificationPreview"), QStringLiteral("full")).toString();
 
     return {
         {QStringLiteral("density"), isOneOf(density, {QStringLiteral("compact"), QStringLiteral("comfortable")})
                                       ? density : QStringLiteral("comfortable")},
-        {QStringLiteral("textScalePercent"), qBound(85, settings.value(QStringLiteral("textScalePercent"), 100).toInt(), 125)},
         {QStringLiteral("surfaceStyle"), isOneOf(surface, {QStringLiteral("theme"), QStringLiteral("flat"),
                                                             QStringLiteral("tonal"), QStringLiteral("translucent")})
                                            ? surface : QStringLiteral("theme")},
         {QStringLiteral("surfaceOpacityPercent"), qBound(70, settings.value(QStringLiteral("surfaceOpacityPercent"), 100).toInt(), 100)},
-        {QStringLiteral("motionProfile"), isOneOf(motion, {QStringLiteral("calm"), QStringLiteral("pixel"), QStringLiteral("playful")})
-                                            ? motion : QStringLiteral("pixel")},
         {QStringLiteral("showUnreadBadge"), settings.value(QStringLiteral("showUnreadBadge"), true).toBool()},
         {QStringLiteral("showJobs"), settings.value(QStringLiteral("showJobs"), true).toBool()},
         {QStringLiteral("showNotificationHistory"), settings.value(QStringLiteral("showNotificationHistory"), true).toBool()},
@@ -323,25 +319,18 @@ QVariantMap ShellSettingsBackend::serializeShelf(const QVariantMap &settings, QS
 
 QVariantMap ShellSettingsBackend::serializeNotifications(const QVariantMap &settings, QString *error)
 {
-    const int textScale = settings.value(QStringLiteral("textScalePercent"), 100).toInt();
     const int opacity = settings.value(QStringLiteral("surfaceOpacityPercent"), 100).toInt();
     const auto density = settings.value(QStringLiteral("density"), QStringLiteral("comfortable")).toString();
     const auto surface = settings.value(QStringLiteral("surfaceStyle"), QStringLiteral("theme")).toString();
-    const auto motion = settings.value(QStringLiteral("motionProfile"), QStringLiteral("pixel")).toString();
     const auto view = settings.value(QStringLiteral("notificationView"), QStringLiteral("cards")).toString();
     const auto preview = settings.value(QStringLiteral("notificationPreview"), QStringLiteral("full")).toString();
 
-    if (textScale < 85 || textScale > 125) {
-        if (error) *error = tr("Notification text size must be between 85% and 125%.");
-        return {};
-    }
     if (opacity < 70 || opacity > 100) {
         if (error) *error = tr("Notification surface opacity must be between 70% and 100%.");
         return {};
     }
     if (!isOneOf(density, {QStringLiteral("compact"), QStringLiteral("comfortable")})
         || !isOneOf(surface, {QStringLiteral("theme"), QStringLiteral("flat"), QStringLiteral("tonal"), QStringLiteral("translucent")})
-        || !isOneOf(motion, {QStringLiteral("calm"), QStringLiteral("pixel"), QStringLiteral("playful")})
         || !isOneOf(view, {QStringLiteral("cards"), QStringLiteral("compact")})
         || !isOneOf(preview, {QStringLiteral("full"), QStringLiteral("summary"), QStringLiteral("hidden")})) {
         if (error) *error = tr("One or more notification presentation options are unsupported.");
@@ -358,10 +347,7 @@ QVariantMap ShellSettingsBackend::serializeTimeCenter(const QVariantMap &setting
         return {};
     }
 
-    auto notificationCandidate = settings;
-    notificationCandidate.insert(QStringLiteral("textScalePercent"),
-                                 qBound(85, textScale, 125));
-    if (serializeNotifications(notificationCandidate, error).isEmpty()) {
+    if (serializeNotifications(settings, error).isEmpty()) {
         return {};
     }
 
@@ -429,10 +415,8 @@ print(JSON.stringify({
     }),
     notifications: readSurface("org.meo.notifications", {
         density: "comfortable",
-        textScalePercent: 100,
         surfaceStyle: "theme",
         surfaceOpacityPercent: 100,
-        motionProfile: "pixel",
         showUnreadBadge: true,
         showJobs: true,
         showNotificationHistory: true,
@@ -444,7 +428,6 @@ print(JSON.stringify({
         density: "comfortable",
         surfaceStyle: "theme",
         surfaceOpacityPercent: 100,
-        motionProfile: "pixel",
         showUnreadBadge: true,
         showJobs: true,
         showNotificationHistory: true,
@@ -485,10 +468,8 @@ QString ShellSettingsBackend::writeNotificationsScript(const QVariantMap &settin
 {
     return writeSurfaceScript(QString::fromLatin1(notificationsPlugin), normalizedNotifications(settings), {
         QStringLiteral("density"),
-        QStringLiteral("textScalePercent"),
         QStringLiteral("surfaceStyle"),
         QStringLiteral("surfaceOpacityPercent"),
-        QStringLiteral("motionProfile"),
         QStringLiteral("showUnreadBadge"),
         QStringLiteral("showJobs"),
         QStringLiteral("showNotificationHistory"),
@@ -504,7 +485,6 @@ QString ShellSettingsBackend::writeTimeCenterScript(const QVariantMap &settings)
         QStringLiteral("density"),
         QStringLiteral("surfaceStyle"),
         QStringLiteral("surfaceOpacityPercent"),
-        QStringLiteral("motionProfile"),
         QStringLiteral("showUnreadBadge"),
         QStringLiteral("showJobs"),
         QStringLiteral("showNotificationHistory"),
