@@ -134,6 +134,7 @@ qt_add_qml_module(meo-settings
         qml/pages/SoundPage.qml
         qml/pages/DisplayPage.qml
         qml/pages/PowerPage.qml
+        qml/pages/PerformancePage.qml
         qml/pages/AppearancePage.qml
         qml/pages/ControlCenterPage.qml
         qml/pages/DesktopIntegrationPage.qml
@@ -225,6 +226,7 @@ qt_add_lupdate(
         qml/pages/SoundPage.qml
         qml/pages/NotificationsPage.qml
         qml/pages/PowerPage.qml
+        qml/pages/PerformancePage.qml
         qml/pages/PrivacyPage.qml
         qml/pages/RecoveryPage.qml
         qml/pages/SessionEntryPage.qml
