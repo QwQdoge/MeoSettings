@@ -241,6 +241,7 @@ ApplicationWindow {
         case "sound": return Qt.resolvedUrl("pages/SoundPage.qml")
         case "display": return Qt.resolvedUrl("pages/DisplayPage.qml")
         case "power": return Qt.resolvedUrl("pages/PowerPage.qml")
+        case "language-region": return Qt.resolvedUrl("pages/LanguageRegionPage.qml")
         case "appearance": return Qt.resolvedUrl("pages/AppearancePage.qml")
         case "notifications": return Qt.resolvedUrl("pages/NotificationsPage.qml")
         case "accounts": return Qt.resolvedUrl("pages/AccountsPage.qml")
