@@ -304,7 +304,7 @@ SettingsRegistry::SettingsRegistry(QObject *parent)
                 {QStringLiteral("performance"), QStringLiteral("cpu"), QStringLiteral("gpu"), QStringLiteral("memory"),
                  QStringLiteral("ram"), QStringLiteral("temperature"), QStringLiteral("network"), QStringLiteral("disk"),
                  QStringLiteral("resource monitor"), QStringLiteral("power profile")},
-                true, QStringLiteral("monitor"), QStringLiteral("reversible"), QStringLiteral("primary")),
+                true, QStringLiteral("control"), QStringLiteral("reversible"), QStringLiteral("primary")),
         setting(QStringLiteral("power"), tr("Power & battery"), tr("Choose a power profile, inspect battery state, and manage safe session controls"),
                 QStringLiteral("battery_full"), QStringLiteral("power"), QStringLiteral("system"), tr("System"),
                 {QStringLiteral("battery"), QStringLiteral("power"), QStringLiteral("energy"), QStringLiteral("performance"),
