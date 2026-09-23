@@ -116,6 +116,8 @@ qt_add_executable(meo-settings
     src/backends/updatesbackend.h
     src/backends/controlcenterbackend.cpp
     src/backends/controlcenterbackend.h
+    src/backends/shellsettingsbackend.cpp
+    src/backends/shellsettingsbackend.h
     src/backends/kcmbridge.cpp
     src/backends/kcmbridge.h
     src/backends/welcomebackend.cpp
@@ -137,6 +139,7 @@ qt_add_qml_module(meo-settings
         qml/pages/LanguageRegionPage.qml
         qml/pages/AppearancePage.qml
         qml/pages/ControlCenterPage.qml
+        qml/pages/ShellPage.qml
         qml/pages/DesktopIntegrationPage.qml
         qml/pages/NotificationsPage.qml
         qml/pages/AccountsPage.qml
@@ -216,6 +219,7 @@ qt_add_lupdate(
         qml/pages/BluetoothPage.qml
         qml/pages/CategoryPage.qml
         qml/pages/ControlCenterPage.qml
+        qml/pages/ShellPage.qml
         qml/pages/DesktopIntegrationPage.qml
         qml/pages/DisplayPage.qml
         qml/pages/HardwarePage.qml
@@ -368,6 +372,16 @@ add_executable(meo-settings-controlcenterbackend-test
 )
 target_link_libraries(meo-settings-controlcenterbackend-test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
 add_test(NAME meo-settings-controlcenterbackend COMMAND meo-settings-controlcenterbackend-test)
+
+add_executable(meo-settings-shellsettingsbackend-test
+    tests/tst_shellsettingsbackend.cpp
+    src/core/backendbase.cpp
+    src/core/backendbase.h
+    src/backends/shellsettingsbackend.cpp
+    src/backends/shellsettingsbackend.h
+)
+target_link_libraries(meo-settings-shellsettingsbackend-test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
+add_test(NAME meo-settings-shellsettingsbackend COMMAND meo-settings-shellsettingsbackend-test)
 
 add_executable(meo-settings-bluetoothbackend-test
     tests/tst_bluetoothbackend.cpp
