@@ -219,7 +219,6 @@ qt_add_lupdate(
         qml/pages/BluetoothPage.qml
         qml/pages/CategoryPage.qml
         qml/pages/ControlCenterPage.qml
-        qml/pages/ShelfLauncherPage.qml
         qml/pages/ShellPage.qml
         qml/pages/DesktopIntegrationPage.qml
         qml/pages/DisplayPage.qml
