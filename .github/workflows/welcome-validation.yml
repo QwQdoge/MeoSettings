@@ -1,0 +1,79 @@
+name: Welcome validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - meo/welcome-final-polish
+
+permissions:
+  contents: read
+
+concurrency:
+  group: welcome-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Welcome build and smoke
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    timeout-minutes: 30
+    env:
+      HOME: /tmp/meo-ci-home
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --needed --noconfirm \
+            base-devel cmake ninja git \
+            qt6-base qt6-declarative qt6-tools qt6-shadertools \
+            kcoreaddons networkmanager-qt bluez-qt solid pulseaudio-qt libkscreen
+          mkdir -p "$HOME"
+
+      - name: Check out MeoSettings
+        uses: actions/checkout@v6
+
+      - name: Check out MeoUI
+        uses: actions/checkout@v6
+        with:
+          repository: QwQdoge/MeoUI
+          ref: main
+          path: deps/MeoUI
+
+      - name: Build MeoUI runtime
+        run: |
+          cmake --fresh -S deps/MeoUI -B deps/build-meoui -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_TESTING=OFF \
+            -DMEOUI_BUILD_SHOWCASE=OFF
+          cmake --build deps/build-meoui --parallel 2
+
+      - name: Configure MeoSettings
+        run: >-
+          cmake --fresh -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DBUILD_TESTING=ON
+          -DMEOUI_IMPORT_ROOT="$GITHUB_WORKSPACE/deps/build-meoui"
+
+      - name: Build
+        run: cmake --build build --parallel 2
+
+      - name: Run CTest
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure --timeout 60
+
+      - name: Smoke Welcome in English
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ./build/meo-welcome --show --smoke --ui-language en_US
+
+      - name: Smoke Welcome in Simplified Chinese
+        env:
+          QT_QPA_PLATFORM: offscreen
+          MEOUI_TRANSLATIONS: ${{ github.workspace }}/deps/build-meoui/translations
+          MEO_WELCOME_TRANSLATIONS: ${{ github.workspace }}/build/translations
+        run: ./build/meo-welcome --show --smoke --ui-language zh_CN

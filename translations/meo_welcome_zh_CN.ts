@@ -375,6 +375,37 @@
         <source>Open Meo Settings</source>
         <translation>打开 Meo 设置</translation>
     </message>
+
+<message><source>Make Meo yours</source><translation>让 Meo 更像你的系统</translation></message>
+<message><source>Choose the look you want. Meo keeps the desktop underneath familiar and lets KDE continue owning the system behavior.</source><translation>选择你喜欢的外观。Meo 保持桌面体验熟悉，同时让 KDE 继续负责底层系统行为。</translation></message>
+<message><source>Get connected</source><translation>连接网络与设备</translation></message>
+<message><source>Join Wi-Fi and pair devices with the same system services Plasma already uses.</source><translation>使用 Plasma 原本使用的系统服务连接 Wi-Fi 和配对设备。</translation></message>
+<message><source>Wi-Fi</source><translation>Wi-Fi</translation></message>
+<message><source>Bluetooth</source><translation>蓝牙</translation></message>
+<message><source>Sign in and unlock</source><translation>登录与解锁</translation></message>
+<message><source>Review login, lock-screen, keyboard, session, and fingerprint options without replacing KDE authentication.</source><translation>查看登录、锁屏、键盘、会话和指纹选项，同时继续使用 KDE 的认证机制。</translation></message>
+<message><source>Lock screen &amp; login</source><translation>锁屏与登录</translation></message>
+<message><source>Comfort on this device</source><translation>让这台设备更顺手</translation></message>
+<message><source>Tune displays and power policy while KScreen and PowerDevil remain the source of truth.</source><translation>调整显示与电源策略，同时继续由 KScreen 和 PowerDevil 作为实际配置来源。</translation></message>
+<message><source>Power</source><translation>电源</translation></message>
+<message><source>Private and recoverable</source><translation>隐私与恢复</translation></message>
+<message><source>Review privacy choices, updates, and recovery before you start changing the system.</source><translation>在开始修改系统前，先查看隐私选项、更新与恢复能力。</translation></message>
+<message><source>Privacy</source><translation>隐私</translation></message>
+<message><source>Updates</source><translation>更新</translation></message>
+<message><source>Recovery</source><translation>恢复</translation></message>
+<message><source>Ready for your desktop</source><translation>桌面已准备好</translation></message>
+<message><source>You can come back to any of these controls from Meo Settings. Nothing here creates a second copy of Plasma&apos;s system state.</source><translation>之后可以随时从 Meo 设置返回这些控制项。这里不会另建一套与 Plasma 重复的系统状态。</translation></message>
+<message><source>Step %1 of %2</source><translation>第 %1 步，共 %2 步</translation></message>
+<message><source>Available</source><translation>可用</translation></message>
+<message><source>KScreenLocker can use fingerprint after enrollment. Password fallback remains available.</source><translation>录入指纹后，KScreenLocker 可以使用指纹解锁；密码备用方式仍然保留。</translation></message>
+<message><source>Fingerprint is not enabled for the lock screen by default. Review hardware settings before changing authentication.</source><translation>锁屏默认未启用指纹。更改认证方式前，请先在硬件设置中查看支持状态。</translation></message>
+<message><source>Keep exploring</source><translation>继续探索</translation></message>
+<message><source>Open the real system control</source><translation>打开实际系统控制项</translation></message>
+<message><source>These shortcuts stay available after Welcome closes.</source><translation>关闭欢迎界面后，这些入口仍可在设置中找到。</translation></message>
+<message><source>Welcome only guides you. The owning Meo/KDE page applies the change.</source><translation>欢迎界面只负责引导；真正的更改由对应的 Meo/KDE 设置页执行。</translation></message>
+<message><source>Display layout stays with KScreen. Power profiles and suspend policy stay with PowerDevil. Welcome does not create parallel settings.</source><translation>显示布局继续由 KScreen 管理；电源模式与睡眠策略继续由 PowerDevil 管理。欢迎界面不会创建另一套重复设置。</translation></message>
+<message><source>Check recovery before risky changes. Protected system actions keep their existing authorization and recovery owners.</source><translation>进行高风险更改前先检查恢复能力。受保护的系统操作继续使用现有的授权与恢复机制。</translation></message>
+<message><source>Back</source><translation>返回</translation></message>
 </context>
 <context>
     <name>WelcomeApplication</name>

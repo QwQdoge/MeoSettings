@@ -177,6 +177,10 @@ qt_add_qml_module(meo-welcome
 # account-specific app preference never changes the Plasma session locale.
 set(MEO_WELCOME_TRANSLATIONS_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/translations")
 set(MEO_SETTINGS_TRANSLATIONS_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/translations")
+set_source_files_properties(translations/meo_welcome_zh_CN.ts
+    PROPERTIES OUTPUT_LOCATION "${MEO_WELCOME_TRANSLATIONS_BUILD_DIR}")
+set_source_files_properties(translations/meo_settings_zh_CN.ts
+    PROPERTIES OUTPUT_LOCATION "${MEO_SETTINGS_TRANSLATIONS_BUILD_DIR}")
 set(MEOUI_TRANSLATIONS_DEVELOPMENT_DIR "")
 if(MEOUI_IMPORT_ROOT)
     set(MEOUI_TRANSLATIONS_DEVELOPMENT_DIR "${MEOUI_IMPORT_ROOT}/translations")
@@ -190,7 +194,6 @@ qt_add_lupdate(
 qt_add_lrelease(
     LRELEASE_TARGET meo_welcome_lrelease
     TS_FILES translations/meo_welcome_zh_CN.ts
-    QM_OUTPUT_DIRECTORY "${MEO_WELCOME_TRANSLATIONS_BUILD_DIR}"
     QM_FILES_OUTPUT_VARIABLE MEO_WELCOME_TRANSLATION_QM_FILES
 )
 add_dependencies(meo-welcome meo_welcome_lrelease)
@@ -238,7 +241,6 @@ qt_add_lupdate(
 qt_add_lrelease(
     LRELEASE_TARGET meo_settings_lrelease
     TS_FILES translations/meo_settings_zh_CN.ts
-    QM_OUTPUT_DIRECTORY "${MEO_SETTINGS_TRANSLATIONS_BUILD_DIR}"
     QM_FILES_OUTPUT_VARIABLE MEO_SETTINGS_TRANSLATION_QM_FILES
 )
 add_dependencies(meo-settings meo_settings_lrelease)
