@@ -1,0 +1,47 @@
+name: Arch build and tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arch-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: MeoArch Qt/KF6 build
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --needed --noconfirm             base-devel cmake ninja git             qt6-base qt6-declarative qt6-tools             kcoreaddons networkmanager-qt bluez-qt solid pulseaudio-qt libkscreen
+
+      - name: Check out MeoSettings
+        uses: actions/checkout@v6
+
+      - name: Configure
+        run: cmake --fresh -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build --parallel 2
+
+      - name: Run CTest
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure --timeout 60
+
+      - name: Smoke route registry
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ./build/meo-settings --smoke
