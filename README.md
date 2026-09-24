@@ -24,7 +24,7 @@ License v3.0 或更高版本（`GPL-3.0-or-later`）授权。完整条款见
 
 `docs/` 只存放与当前实现直接绑定、需要公开维护的契约。所有计划、审计、决策记录、Agent 工作日志和历史报告统一存入：
 
-`/home/shekong/Documents/Obsidian Vault/MeoArch/Projects/meo-settings/`
+`$MEO_DOCS_ROOT/Projects/meo-settings/`
 
 该目录必须有面向人的 `README.md`，说明记录目的、当前索引和关联交付物。不要在应用仓库保存其副本。
 
@@ -32,7 +32,7 @@ License v3.0 或更高版本（`GPL-3.0-or-later`）授权。完整条款见
 
 持久生成物统一存入：
 
-`/home/shekong/Projects/outputs/meo-settings/{build,install,validation,packages,tmp}/`
+`$MEO_OUTPUT_ROOT/meo-settings/{build,install,validation,packages,tmp}/`
 
 `build/` 放配置和编译结果，`install/` 放暂存安装树，`packages/` 放待发布包及校验资料，`validation/` 放可复查验证证据，`tmp/` 仅作可丢弃工作区。每次验证使用 UTC 运行标识 `YYYY-MM-DDTHHMMSSZ-short-label`，如 `validation/2026-08-26T104500Z-settings/`，并在里面保存 `README.md`、日志、测试/截图证据和环境说明。`tmp/` 是可丢弃空间，不能当作验收凭据。
 
