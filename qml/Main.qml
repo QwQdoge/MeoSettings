@@ -101,11 +101,47 @@ ApplicationWindow {
         }
     }
 
+    function sidebarEntryRow(entryId, titleOverride, subtitleOverride) {
+        const entry = SettingsRegistry.entry(entryId)
+        const route = String(entry.route || "")
+        const kcmRoute = route.startsWith("kcm:")
+        const available = !kcmRoute || KcmBridge.isAvailable(route.slice(4))
+        return {
+            "title": titleOverride || entry.title || "",
+            "subtitle": available
+                        ? (subtitleOverride || entry.description || "")
+                        : qsTr("This system setting is not installed"),
+            "leadingIcon": entry.icon || "settings",
+            "leadingTone": entry.tone || "primary",
+            "leadingStyle": "tonal",
+            "route": route,
+            "enabled": available,
+            "trailingKind": kcmRoute ? "choice" : "navigation",
+            "trailingText": kcmRoute ? qsTr("Advanced") : ""
+        }
+    }
+
+    function desktopSelectionRoute(route) {
+        for (let groupIndex = 0; groupIndex < desktopSidebarGroups.length; ++groupIndex) {
+            const rows = desktopSidebarGroups[groupIndex].rows || []
+            for (let rowIndex = 0; rowIndex < rows.length; ++rowIndex) {
+                if (String(rows[rowIndex].route || "") === route)
+                    return route
+            }
+        }
+        return navigationRouteFor(route)
+    }
+
+    // Desktop follows Caelestia Nexus' search-first, connected-group rhythm:
+    // a small set of high-signal destinations stays visible, while the full
+    // registry remains available through category pages and search. Nothing is
+    // removed from SettingsRegistry; this is only the primary information
+    // architecture for the wide layout.
     readonly property var desktopSidebarGroups: [
         {
-            "title": qsTr("Overview"),
+            "title": "",
             "rows": [{
-                "title": qsTr("Home"),
+                "title": qsTr("Overview"),
                 "subtitle": qsTr("Account, connected devices, and system status"),
                 "leadingIcon": "home",
                 "leadingTone": "primary",
@@ -115,28 +151,56 @@ ApplicationWindow {
             }]
         },
         {
-            "title": qsTr("Connections"),
-            "rows": [sidebarCategoryRow("network"), sidebarCategoryRow("devices"),
-                     sidebarCategoryRow("display-sound")]
+            "title": "",
+            "rows": [
+                sidebarCategoryRow("personalization")
+            ]
         },
         {
-            "title": qsTr("Personal"),
-            "rows": [sidebarCategoryRow("personalization"), sidebarCategoryRow("apps"),
-                     sidebarCategoryRow("accounts")]
+            "title": "",
+            "rows": [
+                sidebarCategoryRow("network"),
+                sidebarCategoryRow("devices"),
+                sidebarEntryRow("sound", qsTr("Audio"), qsTr("App volumes, sound devices, and microphone")),
+                sidebarEntryRow("display", qsTr("Displays"), qsTr("Brightness, Night Light, layout, HDR, and scaling"))
+            ]
         },
         {
-            "title": qsTr("System"),
-            "rows": [sidebarCategoryRow("storage"), sidebarCategoryRow("system"),
-                     sidebarCategoryRow("privacy"), sidebarCategoryRow("accessibility"),
-                     sidebarCategoryRow("updates"), {
-                         "title": qsTr("About"),
-                         "subtitle": qsTr("MeoArch, hardware, and runtime information"),
-                         "leadingIcon": "info",
-                         "leadingTone": "neutral",
-                         "leadingStyle": "tonal",
-                         "route": "about",
-                         "trailingKind": "navigation"
-                     }]
+            "title": "",
+            "rows": [
+                sidebarEntryRow("power"),
+                sidebarEntryRow("updates"),
+                sidebarCategoryRow("storage"),
+                sidebarCategoryRow("privacy"),
+                sidebarCategoryRow("accessibility")
+            ]
+        },
+        {
+            "title": "",
+            "rows": [
+                sidebarEntryRow("shell", qsTr("Desktop & shell"),
+                                qsTr("Shelf, Launcher, panels, notification surfaces, and Time Center")),
+                sidebarEntryRow("control-center", qsTr("Quick Settings"),
+                                qsTr("Top-bar status and Quick Settings tile layout")),
+                sidebarCategoryRow("apps"),
+                sidebarCategoryRow("accounts"),
+                sidebarEntryRow("background-services", qsTr("Services"),
+                                qsTr("Background services and session components")),
+                sidebarEntryRow("language", qsTr("Language & region"),
+                                qsTr("UI language, locale, formats, and regional settings"))
+            ]
+        },
+        {
+            "title": "",
+            "rows": [{
+                "title": qsTr("About"),
+                "subtitle": qsTr("MeoArch, hardware, and runtime information"),
+                "leadingIcon": "info",
+                "leadingTone": "neutral",
+                "leadingStyle": "tonal",
+                "route": "about",
+                "trailingKind": "navigation"
+            }]
         }
     ]
 
@@ -179,11 +243,13 @@ ApplicationWindow {
         case "sound": return Qt.resolvedUrl("pages/SoundPage.qml")
         case "display": return Qt.resolvedUrl("pages/DisplayPage.qml")
         case "power": return Qt.resolvedUrl("pages/PowerPage.qml")
+        case "language-region": return Qt.resolvedUrl("pages/LanguageRegionPage.qml")
         case "appearance": return Qt.resolvedUrl("pages/AppearancePage.qml")
         case "notifications": return Qt.resolvedUrl("pages/NotificationsPage.qml")
         case "accounts": return Qt.resolvedUrl("pages/AccountsPage.qml")
         case "session-entry": return Qt.resolvedUrl("pages/SessionEntryPage.qml")
         case "control-center": return Qt.resolvedUrl("pages/ControlCenterPage.qml")
+        case "shell": return Qt.resolvedUrl("pages/ShellPage.qml")
         case "desktop-integration": return Qt.resolvedUrl("pages/DesktopIntegrationPage.qml")
         case "storage": return Qt.resolvedUrl("pages/StoragePage.qml")
         case "updates": return Qt.resolvedUrl("pages/UpdatesPage.qml")
@@ -319,7 +385,7 @@ ApplicationWindow {
         showTitle: false
         groups: root.desktopSidebarGroups
         searchResults: root.desktopSearchRows
-        selectedRoute: root.navigationRouteFor(root.currentRoute)
+        selectedRoute: root.desktopSelectionRoute(root.currentRoute)
         onRouteActivated: (route, row) => {
             root.navigate(route)
             if (searching)

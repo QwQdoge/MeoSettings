@@ -11,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSet>
+#include <QtGlobal>
 
 namespace
 {
@@ -130,6 +131,11 @@ QString ControlCenterBackend::density() const
     return m_density;
 }
 
+QVariantMap ControlCenterBackend::topBar() const
+{
+    return m_topBar;
+}
+
 QString ControlCenterBackend::summary() const
 {
     if (!available()) {
@@ -215,6 +221,7 @@ void ControlCenterBackend::refresh()
                                            configuration.value(QStringLiteral("sizes")).toString(),
                                            configuration.value(QStringLiteral("visibility")).toString(),
                                            configuration.value(QStringLiteral("density")).toString()));
+                setTopBar(normalizedTopBar(configuration.value(QStringLiteral("topBar")).toObject().toVariantMap()));
                 setAvailable(true);
                 Q_EMIT changed();
                 watcher->deleteLater();
@@ -298,6 +305,79 @@ void ControlCenterBackend::resetLayout()
     const auto layout = normalizedLayout({}, {}, {}, QString::fromLatin1(defaultDensity));
     saveLayout(layout.value(QStringLiteral("tiles")).toList(),
                layout.value(QStringLiteral("density")).toString());
+}
+
+void ControlCenterBackend::saveTopBar(const QVariantMap &settings)
+{
+    if (busy()) {
+        return;
+    }
+
+    clearError();
+    QString validationError;
+    const auto serialized = serializeTopBar(settings, &validationError);
+    if (serialized.isEmpty()) {
+        setError(validationError);
+        return;
+    }
+    if (!plasmaShellIsAvailable()) {
+        setAvailable(false);
+        setError(tr("Plasma Shell is unavailable, so the Meo top bar cannot be configured."));
+        Q_EMIT changed();
+        return;
+    }
+
+    QDBusInterface shell(QString::fromLatin1(plasmaShellService),
+                          QString::fromLatin1(plasmaShellPath),
+                          QString::fromLatin1(plasmaShellInterface),
+                          QDBusConnection::sessionBus());
+    if (!shell.isValid()) {
+        setAvailable(false);
+        setError(tr("Plasma Shell does not expose the top-bar configuration interface."));
+        Q_EMIT changed();
+        return;
+    }
+
+    setBusy(true);
+    auto *watcher = new QDBusPendingCallWatcher(
+        shell.asyncCall(QStringLiteral("evaluateScript"), writeTopBarScript(serialized)), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this, watcher, serialized](QDBusPendingCallWatcher *) {
+                const QDBusPendingReply<QString> reply = *watcher;
+                setBusy(false);
+                if (reply.isError()) {
+                    setError(scriptErrorMessage(reply.error()));
+                    Q_EMIT changed();
+                    watcher->deleteLater();
+                    return;
+                }
+
+                const auto document = QJsonDocument::fromJson(reply.value().trimmed().toUtf8());
+                if (!document.isObject()) {
+                    setError(tr("Plasma Shell returned an invalid result while updating the Meo top bar."));
+                    Q_EMIT changed();
+                    watcher->deleteLater();
+                    return;
+                }
+                const auto result = document.object();
+                if (!result.value(QStringLiteral("ok")).toBool()) {
+                    setError(errorForScriptReason(result.value(QStringLiteral("reason")).toString()));
+                    Q_EMIT changed();
+                    watcher->deleteLater();
+                    return;
+                }
+
+                setTopBar(serialized);
+                setAvailable(true);
+                Q_EMIT changed();
+                Q_EMIT topBarSaved();
+                watcher->deleteLater();
+            });
+}
+
+void ControlCenterBackend::resetTopBar()
+{
+    saveTopBar(normalizedTopBar({}));
 }
 
 QStringList ControlCenterBackend::defaultTileIds()
@@ -414,6 +494,81 @@ QVariantMap ControlCenterBackend::serializeLayout(const QVariantList &tiles,
     };
 }
 
+QVariantMap ControlCenterBackend::normalizedTopBar(const QVariantMap &settings)
+{
+    const QString densityValue = settings.value(QStringLiteral("density"), QStringLiteral("comfortable")).toString();
+    const QString surfaceStyleValue = settings.value(QStringLiteral("surfaceStyle"), QStringLiteral("theme")).toString();
+    const QString motionProfileValue = settings.value(QStringLiteral("motionProfile"), QStringLiteral("pixel")).toString();
+
+    const QStringList densities{QStringLiteral("compact"), QStringLiteral("comfortable")};
+    const QStringList surfaceStyles{QStringLiteral("theme"), QStringLiteral("flat"),
+                                    QStringLiteral("tonal"), QStringLiteral("translucent")};
+    const QStringList motionProfiles{QStringLiteral("calm"), QStringLiteral("pixel"), QStringLiteral("playful")};
+
+    return {
+        {QStringLiteral("textScalePercent"),
+         qBound(75, settings.value(QStringLiteral("textScalePercent"), 100).toInt(), 150)},
+        {QStringLiteral("density"), densities.contains(densityValue) ? densityValue : QStringLiteral("comfortable")},
+        {QStringLiteral("surfaceStyle"), surfaceStyles.contains(surfaceStyleValue) ? surfaceStyleValue : QStringLiteral("theme")},
+        {QStringLiteral("surfaceOpacityPercent"),
+         qBound(70, settings.value(QStringLiteral("surfaceOpacityPercent"), 100).toInt(), 100)},
+        {QStringLiteral("motionProfile"), motionProfiles.contains(motionProfileValue) ? motionProfileValue : QStringLiteral("pixel")},
+        {QStringLiteral("showUnreadBadge"), settings.value(QStringLiteral("showUnreadBadge"), true).toBool()},
+        {QStringLiteral("showJobs"), settings.value(QStringLiteral("showJobs"), true).toBool()},
+        {QStringLiteral("showNetwork"), settings.value(QStringLiteral("showNetwork"), true).toBool()},
+        {QStringLiteral("showBluetooth"), settings.value(QStringLiteral("showBluetooth"), true).toBool()},
+        {QStringLiteral("showVolume"), settings.value(QStringLiteral("showVolume"), true).toBool()},
+        {QStringLiteral("batteryDisplay"),
+         qBound(0, settings.value(QStringLiteral("batteryDisplay"), 2).toInt(), 3)},
+        {QStringLiteral("showDate"), settings.value(QStringLiteral("showDate"), true).toBool()},
+        {QStringLiteral("showNotifications"), settings.value(QStringLiteral("showNotifications"), true).toBool()},
+        {QStringLiteral("use24HourClock"), settings.value(QStringLiteral("use24HourClock"), true).toBool()},
+    };
+}
+
+QVariantMap ControlCenterBackend::serializeTopBar(const QVariantMap &settings, QString *error)
+{
+    const auto fail = [error](const QString &message) -> QVariantMap {
+        if (error) {
+            *error = message;
+        }
+        return {};
+    };
+
+    const int textScale = settings.value(QStringLiteral("textScalePercent"), 100).toInt();
+    if (textScale < 75 || textScale > 150) {
+        return fail(QObject::tr("Top-bar text size must be between 75% and 150%."));
+    }
+
+    const int opacity = settings.value(QStringLiteral("surfaceOpacityPercent"), 100).toInt();
+    if (opacity < 70 || opacity > 100) {
+        return fail(QObject::tr("Top-bar surface opacity must be between 70% and 100%."));
+    }
+
+    const int batteryDisplay = settings.value(QStringLiteral("batteryDisplay"), 2).toInt();
+    if (batteryDisplay < 0 || batteryDisplay > 3) {
+        return fail(QObject::tr("Choose a supported battery display mode."));
+    }
+
+    const QString densityValue = settings.value(QStringLiteral("density"), QStringLiteral("comfortable")).toString();
+    if (!QStringList{QStringLiteral("compact"), QStringLiteral("comfortable")}.contains(densityValue)) {
+        return fail(QObject::tr("Choose a supported top-bar density."));
+    }
+
+    const QString surfaceStyleValue = settings.value(QStringLiteral("surfaceStyle"), QStringLiteral("theme")).toString();
+    if (!QStringList{QStringLiteral("theme"), QStringLiteral("flat"), QStringLiteral("tonal"),
+                     QStringLiteral("translucent")}.contains(surfaceStyleValue)) {
+        return fail(QObject::tr("Choose a supported top-bar surface style."));
+    }
+
+    const QString motionProfileValue = settings.value(QStringLiteral("motionProfile"), QStringLiteral("pixel")).toString();
+    if (!QStringList{QStringLiteral("calm"), QStringLiteral("pixel"), QStringLiteral("playful")}.contains(motionProfileValue)) {
+        return fail(QObject::tr("Choose a supported top-bar motion profile."));
+    }
+
+    return normalizedTopBar(settings);
+}
+
 QString ControlCenterBackend::readLayoutScript()
 {
     return QStringLiteral(R"JS(
@@ -431,7 +586,23 @@ for (var panelIndex = 0; panelIndex < panelList.length; ++panelIndex) {
             order: widget.readConfig("quickTileOrder", %3),
             sizes: widget.readConfig("quickTileSizes", %4),
             visibility: widget.readConfig("quickTileVisibility", %5),
-            density: widget.readConfig("quickTileDensity", %6)
+            density: widget.readConfig("quickTileDensity", %6),
+            topBar: {
+                textScalePercent: widget.readConfig("textScalePercent", 100),
+                density: widget.readConfig("density", "comfortable"),
+                surfaceStyle: widget.readConfig("surfaceStyle", "theme"),
+                surfaceOpacityPercent: widget.readConfig("surfaceOpacityPercent", 100),
+                motionProfile: widget.readConfig("motionProfile", "pixel"),
+                showUnreadBadge: widget.readConfig("showUnreadBadge", true),
+                showJobs: widget.readConfig("showJobs", true),
+                showNetwork: widget.readConfig("showNetwork", true),
+                showBluetooth: widget.readConfig("showBluetooth", true),
+                showVolume: widget.readConfig("showVolume", true),
+                batteryDisplay: widget.readConfig("batteryDisplay", 2),
+                showDate: widget.readConfig("showDate", true),
+                showNotifications: widget.readConfig("showNotifications", true),
+                use24HourClock: widget.readConfig("use24HourClock", true)
+            }
         });
     }
 }
@@ -481,6 +652,51 @@ if (matches.length !== 1) {
              quoteScriptString(density));
 }
 
+QString ControlCenterBackend::writeTopBarScript(const QVariantMap &settings)
+{
+    const auto safeSettings = normalizedTopBar(settings);
+    const auto payload = QString::fromUtf8(
+        QJsonDocument(QJsonObject::fromVariantMap(safeSettings)).toJson(QJsonDocument::Compact));
+
+    return QStringLiteral(R"JS(
+var matches = [];
+var panelList = panels();
+for (var panelIndex = 0; panelIndex < panelList.length; ++panelIndex) {
+    var widgets = panelList[panelIndex].widgets();
+    for (var widgetIndex = 0; widgetIndex < widgets.length; ++widgetIndex) {
+        if (widgets[widgetIndex].type === "%1")
+            matches.push(widgets[widgetIndex]);
+    }
+}
+if (matches.length !== 1) {
+    print(JSON.stringify({ok: false, reason: matches.length === 0 ? "missing" : "multiple"}));
+} else {
+    var topbar = matches[0];
+    var desired = %3;
+    topbar.currentConfigGroup = ["%2"];
+    topbar.writeConfig("textScalePercent", desired.textScalePercent);
+    topbar.writeConfig("density", desired.density);
+    topbar.writeConfig("surfaceStyle", desired.surfaceStyle);
+    topbar.writeConfig("surfaceOpacityPercent", desired.surfaceOpacityPercent);
+    topbar.writeConfig("motionProfile", desired.motionProfile);
+    topbar.writeConfig("showUnreadBadge", desired.showUnreadBadge);
+    topbar.writeConfig("showJobs", desired.showJobs);
+    topbar.writeConfig("showNetwork", desired.showNetwork);
+    topbar.writeConfig("showBluetooth", desired.showBluetooth);
+    topbar.writeConfig("showVolume", desired.showVolume);
+    topbar.writeConfig("batteryDisplay", desired.batteryDisplay);
+    topbar.writeConfig("showDate", desired.showDate);
+    topbar.writeConfig("showNotifications", desired.showNotifications);
+    topbar.writeConfig("use24HourClock", desired.use24HourClock);
+    topbar.reloadConfig();
+    print(JSON.stringify({ok: true}));
+}
+)JS")
+        .arg(QString::fromLatin1(topbarPlugin),
+             QString::fromLatin1(appearanceGroup),
+             payload);
+}
+
 void ControlCenterBackend::setLayout(const QVariantMap &layout)
 {
     const auto tiles = layout.value(QStringLiteral("tiles")).toList();
@@ -489,6 +705,11 @@ void ControlCenterBackend::setLayout(const QVariantMap &layout)
         m_tiles = tiles;
         m_density = density;
     }
+}
+
+void ControlCenterBackend::setTopBar(const QVariantMap &settings)
+{
+    m_topBar = normalizedTopBar(settings);
 }
 
 QString ControlCenterBackend::errorForScriptReason(const QString &reason) const
