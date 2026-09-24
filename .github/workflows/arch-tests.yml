@@ -1,0 +1,91 @@
+name: Arch build and tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feature/performance-manager
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arch-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: MeoArch Qt/KF6 build
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    timeout-minutes: 35
+    env:
+      HOME: /tmp/meo-ci-home
+
+    steps:
+      - name: Install build and runtime dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --needed --noconfirm \
+            base-devel cmake ninja git extra-cmake-modules \
+            qt6-base qt6-declarative qt6-tools qt6-shadertools \
+            kcoreaddons kconfig ki18n kguiaddons kirigami \
+            networkmanager-qt bluez-qt solid pulseaudio-qt libkscreen \
+            libplasma plasma-workspace
+          mkdir -p "$HOME"
+
+      - name: Check out MeoSettings
+        uses: actions/checkout@v6
+
+      - name: Check out MeoUI
+        uses: actions/checkout@v6
+        with:
+          repository: QwQdoge/MeoUI
+          ref: main
+          path: deps/MeoUI
+
+      - name: Check out MeoKDE
+        uses: actions/checkout@v6
+        with:
+          repository: QwQdoge/meo-kde
+          ref: main
+          path: deps/meo-kde
+
+      - name: Build MeoUI runtime
+        run: |
+          cmake --fresh -S deps/MeoUI -B deps/build-meoui -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_TESTING=OFF \
+            -DMEOUI_BUILD_SHOWCASE=OFF
+          cmake --build deps/build-meoui --parallel 2
+
+      - name: Build Meo.System runtime
+        run: |
+          cmake --fresh -S deps/meo-kde/native/system -B deps/build-meosystem -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_TESTING=OFF
+          cmake --build deps/build-meosystem --parallel 2
+
+      - name: Configure MeoSettings
+        run: >-
+          cmake --fresh -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DBUILD_TESTING=ON
+          -DMEOUI_IMPORT_ROOT="$GITHUB_WORKSPACE/deps/build-meoui"
+          -DMEO_KDE_QML_IMPORT_ROOT="$GITHUB_WORKSPACE/deps/meo-kde/qml"
+          -DMEO_SYSTEM_IMPORT_ROOT="$GITHUB_WORKSPACE/deps/build-meosystem/qml"
+
+      - name: Build MeoSettings
+        run: cmake --build build --parallel 2
+
+      - name: Run CTest
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure --timeout 60
+
+      - name: Smoke every Settings route
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ./build/meo-settings --smoke
