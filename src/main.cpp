@@ -45,6 +45,8 @@
 #include <QStringList>
 #include <QTimer>
 #include <QTranslator>
+#include <QUrl>
+#include <QUrlQuery>
 
 #include <cstdio>
 #include <memory>
@@ -130,7 +132,55 @@ int main(int argc, char *argv[])
     parser.addOption(screenshotOption);
     parser.addOption(sessionEntryLayoutEditorOption);
     parser.addOption(uiLanguageOption);
+    parser.addPositionalArgument(QStringLiteral("url"),
+                                 QStringLiteral("Open a trusted meosettings:// deep link."),
+                                 QStringLiteral("[url]"));
     parser.process(app);
+
+    QString deepLinkRoute;
+    QString requestedApplicationId;
+    QString requestedApplicationName;
+    QString requestedApplicationSection;
+    const QStringList positionalArguments = parser.positionalArguments();
+    if (positionalArguments.size() > 1) {
+        qCritical() << "Only one Meo Settings deep link may be opened at a time.";
+        return EXIT_FAILURE;
+    }
+    if (!positionalArguments.isEmpty()) {
+        const QUrl deepLink(positionalArguments.constFirst());
+        if (!deepLink.isValid()
+            || deepLink.scheme() != QStringLiteral("meosettings")
+            || deepLink.host() != QStringLiteral("applications")) {
+            qCritical() << "Unsupported Meo Settings deep link.";
+            return EXIT_FAILURE;
+        }
+        const QUrlQuery query(deepLink);
+        requestedApplicationId = query.queryItemValue(QStringLiteral("appId"));
+        requestedApplicationName = query.queryItemValue(QStringLiteral("appName"));
+        requestedApplicationSection = query.queryItemValue(QStringLiteral("section"));
+        const QRegularExpression appIdExpression(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._+@-]{0,255}$"));
+        if (!requestedApplicationId.isEmpty()
+            && !appIdExpression.match(requestedApplicationId).hasMatch()) {
+            qCritical() << "The Meo Settings application id is invalid.";
+            return EXIT_FAILURE;
+        }
+        if (requestedApplicationName.size() > 256
+            || requestedApplicationName.contains(QRegularExpression(QStringLiteral("[\\x00-\\x1f\\x7f]")))) {
+            qCritical() << "The Meo Settings application name is invalid.";
+            return EXIT_FAILURE;
+        }
+        if (!requestedApplicationSection.isEmpty()
+            && requestedApplicationSection != QStringLiteral("info")
+            && requestedApplicationSection != QStringLiteral("settings")) {
+            qCritical() << "The Meo Settings application section is invalid.";
+            return EXIT_FAILURE;
+        }
+        if (requestedApplicationId.isEmpty() && requestedApplicationName.isEmpty()) {
+            qCritical() << "The application deep link needs an appId or appName.";
+            return EXIT_FAILURE;
+        }
+        deepLinkRoute = QStringLiteral("applications");
+    }
 
     // The default follows the device locale. The command-line choice exists
     // only for isolated validation and is not persisted or written into the
@@ -277,6 +327,9 @@ int main(int argc, char *argv[])
     // the data-only editor. It exposes no system writer or lock-screen state.
     context->setContextProperty(QStringLiteral("sessionEntryLayoutEditorMode"),
                                 parser.isSet(sessionEntryLayoutEditorOption));
+    context->setContextProperty(QStringLiteral("requestedApplicationId"), requestedApplicationId);
+    context->setContextProperty(QStringLiteral("requestedApplicationName"), requestedApplicationName);
+    context->setContextProperty(QStringLiteral("requestedApplicationSection"), requestedApplicationSection);
     QObject::connect(&configBackend, &ConfigBackend::transactionRequested,
                      &systemTransactionBackend, &SystemTransactionBackend::submitConfigurationRequest);
 
@@ -305,8 +358,10 @@ int main(int argc, char *argv[])
     }
     const QString startupRoute = parser.isSet(routeOption)
                                    ? parser.value(routeOption)
-                                   : (parser.isSet(sessionEntryLayoutEditorOption)
-                                      ? QStringLiteral("session-entry") : QString());
+                                   : (!deepLinkRoute.isEmpty()
+                                      ? deepLinkRoute
+                                      : (parser.isSet(sessionEntryLayoutEditorOption)
+                                         ? QStringLiteral("session-entry") : QString()));
     if (!startupRoute.isEmpty()
         && !QMetaObject::invokeMethod(root, "navigate",
                                       Q_ARG(QVariant, QVariant(startupRoute)))) {
