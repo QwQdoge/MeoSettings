@@ -410,6 +410,7 @@ int main(int argc, char *argv[])
             QStringLiteral("category:display-sound"),
             QStringLiteral("display"),
             QStringLiteral("power"),
+            QStringLiteral("performance"),
             QStringLiteral("kcm:kcm_keyboard"),
             QStringLiteral("category:personalization"),
             QStringLiteral("appearance"),
