@@ -474,6 +474,14 @@ Item {
 
                 MeoSettingsGroup {
                     width: parent.width
+                    visible: root.requestedSection === "info"
+                    title: qsTr("App info")
+                    subtitle: qsTr("About this installed application")
+                    model: root.appInfoRows
+                }
+
+                MeoSettingsGroup {
+                    width: parent.width
                     title: qsTr("Configuration (.config)")
                     subtitle: qsTr("The application-name menu opens here. Only paths verified by OmniStore are exposed.")
                     model: root.configurationPathRows
@@ -495,6 +503,7 @@ Item {
 
                 MeoSettingsGroup {
                     width: parent.width
+                    visible: root.requestedSection !== "info"
                     title: qsTr("App info")
                     model: root.appInfoRows
                 }
