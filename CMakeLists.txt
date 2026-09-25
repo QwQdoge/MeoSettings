@@ -550,7 +550,7 @@ if(MEOUI_IMPORT_ROOT AND MEO_KDE_QML_IMPORT_ROOT AND MEO_SYSTEM_IMPORT_ROOT)
     add_test(NAME meo-settings-application-deeplink-smoke
              COMMAND $<TARGET_FILE:meo-settings>
                      --smoke
-                     "meosettings://applications?appId=org.example.App&appName=Example%20App&section=info")
+                     "meosettings://applications?appId=org.example.App&appName=Example%20App&section=config")
     set_property(TEST meo-settings-application-deeplink-smoke APPEND PROPERTY ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen"
         "QT_QUICK_BACKEND=software"
