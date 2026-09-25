@@ -171,9 +171,14 @@ int main(int argc, char *argv[])
         }
         if (!requestedApplicationSection.isEmpty()
             && requestedApplicationSection != QStringLiteral("info")
-            && requestedApplicationSection != QStringLiteral("settings")) {
+            && requestedApplicationSection != QStringLiteral("settings")
+            && requestedApplicationSection != QStringLiteral("config")) {
             qCritical() << "The Meo Settings application section is invalid.";
             return EXIT_FAILURE;
+        }
+        if (requestedApplicationSection == QStringLiteral("settings")) {
+            // Compatibility for the first draft of the panel deep link.
+            requestedApplicationSection = QStringLiteral("config");
         }
         if (requestedApplicationId.isEmpty() && requestedApplicationName.isEmpty()) {
             qCritical() << "The application deep link needs an appId or appName.";
