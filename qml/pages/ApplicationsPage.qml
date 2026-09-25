@@ -198,9 +198,7 @@ Item {
         const requestedName = requestedAppName.trim().toLowerCase()
         const appId = String(app.id || "").toLowerCase()
         const appName = String(app.name || "").toLowerCase()
-        if (requestedId !== "" && (appId === requestedId
-                                   || appId.endsWith("." + requestedId)
-                                   || requestedId.endsWith("." + appId)))
+        if (requestedId !== "" && appId === requestedId)
             return true
         return requestedName !== "" && appName === requestedName
     }
