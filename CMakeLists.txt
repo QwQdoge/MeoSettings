@@ -12,6 +12,7 @@ include(CTest)
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Concurrent Core DBus Gui Qml Quick QuickControls2 Test LinguistTools)
 find_package(KF6CoreAddons REQUIRED)
+find_package(KF6Config REQUIRED)
 find_package(KF6NetworkManagerQt REQUIRED)
 find_package(KF6BluezQt REQUIRED)
 find_package(KF6Solid REQUIRED)
@@ -84,6 +85,8 @@ qt_add_executable(meo-settings
     src/backends/hardwarecapabilityregistry.h
     src/backends/loginauthbackend.cpp
     src/backends/loginauthbackend.h
+    src/backends/lockscreenpresentationbackend.cpp
+    src/backends/lockscreenpresentationbackend.h
     src/backends/recoverybackend.cpp
     src/backends/recoverybackend.h
     src/backends/configbackend.cpp
@@ -260,6 +263,7 @@ target_link_libraries(meo-settings PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     KF6::CoreAddons
+    KF6::ConfigCore
     KF6::NetworkManagerQt
     KF6::BluezQt
     KF6::Solid
@@ -461,6 +465,21 @@ add_executable(meo-settings-configbackend-test
 )
 target_link_libraries(meo-settings-configbackend-test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME meo-settings-configbackend COMMAND meo-settings-configbackend-test)
+
+add_executable(meo-settings-lockscreenpresentationbackend-test
+    tests/tst_lockscreenpresentationbackend.cpp
+    src/core/backendbase.cpp
+    src/core/backendbase.h
+    src/backends/lockscreenpresentationbackend.cpp
+    src/backends/lockscreenpresentationbackend.h
+)
+target_link_libraries(meo-settings-lockscreenpresentationbackend-test PRIVATE
+    Qt6::Core
+    Qt6::Test
+    KF6::ConfigCore
+)
+add_test(NAME meo-settings-lockscreenpresentationbackend
+         COMMAND meo-settings-lockscreenpresentationbackend-test)
 
 add_executable(meo-settings-meoaccountbackend-test
     tests/tst_meoaccountbackend.cpp
