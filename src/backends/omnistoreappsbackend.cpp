@@ -8,6 +8,7 @@
 #include <QJsonValue>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QSet>
 #include <QStandardPaths>
 #include <QTimer>
 
@@ -18,6 +19,7 @@
 namespace
 {
 constexpr auto kSchema = "org.meo.omnistore.installed-usage";
+constexpr auto kManagementSchema = "org.meo.omnistore.app-management";
 constexpr int kSchemaVersion = 1;
 constexpr qsizetype kMaximumPayloadBytes = 4 * 1024 * 1024;
 constexpr int kMaximumApplications = 10'000;
@@ -69,6 +71,192 @@ QString sourceSortName(const QVariant &value)
 {
     return value.toMap().value(QStringLiteral("name")).toString().toCaseFolded();
 }
+
+std::optional<OmniStoreAppsSnapshot> parseManagementSnapshot(const QJsonObject &object, QString *error)
+{
+    const QString generatedAt = object.value(QStringLiteral("generatedAt")).toString();
+    if (generatedAt.size() > 64
+        || (!QDateTime::fromString(generatedAt, Qt::ISODateWithMs).isValid()
+            && !QDateTime::fromString(generatedAt, Qt::ISODate).isValid())) {
+        setParseError(error, QStringLiteral("The app management snapshot has an invalid timestamp."));
+        return std::nullopt;
+    }
+
+    const QJsonValue applicationsValue = object.value(QStringLiteral("applications"));
+    if (!applicationsValue.isArray()) {
+        setParseError(error, QStringLiteral("The app management snapshot is missing applications."));
+        return std::nullopt;
+    }
+    const QJsonArray applicationsArray = applicationsValue.toArray();
+    if (applicationsArray.size() > kMaximumApplications) {
+        setParseError(error, QStringLiteral("The app management snapshot contains too many applications."));
+        return std::nullopt;
+    }
+    const auto declaredCount = nonNegativeInteger(
+        object.value(QStringLiteral("applicationCount")), static_cast<qulonglong>(kMaximumApplications));
+    if (!declaredCount || *declaredCount != static_cast<qulonglong>(applicationsArray.size())) {
+        setParseError(error, QStringLiteral("The app management snapshot has an inconsistent count."));
+        return std::nullopt;
+    }
+
+    const QRegularExpression sourceIdExpression(QStringLiteral("^[a-z0-9][a-z0-9-]{0,63}$"));
+    const QRegularExpression appIdExpression(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._+@-]{0,255}$"));
+    QVariantList applications;
+    applications.reserve(applicationsArray.size());
+    QHash<QString, SourceAccumulator> sourceAccumulators;
+    qulonglong knownSizeBytes = 0;
+    int unknownSizeCount = 0;
+    int exactSizeCount = 0;
+    int reportedSizeCount = 0;
+
+    for (const QJsonValue &value : applicationsArray) {
+        if (!value.isObject()) {
+            setParseError(error, QStringLiteral("The app management snapshot has an invalid application."));
+            return std::nullopt;
+        }
+        const QJsonObject app = value.toObject();
+        const QString id = app.value(QStringLiteral("id")).toString();
+        const QString name = app.value(QStringLiteral("name")).toString();
+        const QString sourceId = app.value(QStringLiteral("sourceId")).toString();
+        const QString sourceName = app.value(QStringLiteral("sourceName")).toString();
+        const QString sizeKind = app.value(QStringLiteral("sizeKind")).toString();
+        if (!appIdExpression.match(id).hasMatch()
+            || !isSafeDisplayText(name, 256)
+            || !sourceIdExpression.match(sourceId).hasMatch()
+            || !isSafeDisplayText(sourceName, 80)
+            || (sizeKind != QLatin1String("exact") && sizeKind != QLatin1String("reported")
+                && sizeKind != QLatin1String("unknown"))) {
+            setParseError(error, QStringLiteral("The app management snapshot has unsafe metadata."));
+            return std::nullopt;
+        }
+
+        QVariantMap row{
+            {QStringLiteral("id"), id},
+            {QStringLiteral("name"), name},
+            {QStringLiteral("sourceId"), sourceId},
+            {QStringLiteral("sourceName"), sourceName},
+            {QStringLiteral("sizeKind"), sizeKind},
+        };
+
+        std::optional<qulonglong> packageSize;
+        if (app.contains(QStringLiteral("packageSizeBytes"))) {
+            packageSize = nonNegativeInteger(app.value(QStringLiteral("packageSizeBytes")), kMaximumSizeBytes);
+            if (!packageSize) {
+                setParseError(error, QStringLiteral("The app management snapshot has an invalid package size."));
+                return std::nullopt;
+            }
+            row.insert(QStringLiteral("sizeBytes"), QVariant::fromValue(*packageSize));
+            row.insert(QStringLiteral("packageSizeBytes"), QVariant::fromValue(*packageSize));
+        }
+        if ((sizeKind == QLatin1String("unknown")) != !packageSize) {
+            setParseError(error, QStringLiteral("The app management snapshot has inconsistent size evidence."));
+            return std::nullopt;
+        }
+
+        const auto storageBytes = nonNegativeInteger(app.value(QStringLiteral("storageBytes")), kMaximumSizeBytes);
+        if (!storageBytes || !app.value(QStringLiteral("storage")).isArray()
+            || !app.value(QStringLiteral("settings")).isObject()
+            || !app.value(QStringLiteral("capabilities")).isObject()) {
+            setParseError(error, QStringLiteral("The app management snapshot is missing management metadata."));
+            return std::nullopt;
+        }
+        row.insert(QStringLiteral("storageBytes"), QVariant::fromValue(*storageBytes));
+        row.insert(QStringLiteral("storageComplete"), app.value(QStringLiteral("storageComplete")).toBool(false));
+        row.insert(QStringLiteral("storage"), app.value(QStringLiteral("storage")).toArray().toVariantList());
+        row.insert(QStringLiteral("settings"), app.value(QStringLiteral("settings")).toObject().toVariantMap());
+        row.insert(QStringLiteral("capabilities"), app.value(QStringLiteral("capabilities")).toObject().toVariantMap());
+        const QString version = app.value(QStringLiteral("version")).toString();
+        if (!version.isEmpty()) {
+            if (!isSafeDisplayText(version, 120)) {
+                setParseError(error, QStringLiteral("The app management snapshot has an invalid version."));
+                return std::nullopt;
+            }
+            row.insert(QStringLiteral("version"), version);
+        }
+
+        auto accumulator = sourceAccumulators.value(sourceId);
+        if (accumulator.applicationCount == 0) {
+            accumulator.id = sourceId;
+            accumulator.name = sourceName;
+        } else if (accumulator.name != sourceName) {
+            setParseError(error, QStringLiteral("The app management snapshot has inconsistent source metadata."));
+            return std::nullopt;
+        }
+        ++accumulator.applicationCount;
+        if (packageSize) {
+            if (*packageSize > kMaximumSizeBytes - knownSizeBytes) {
+                setParseError(error, QStringLiteral("The app management snapshot size total is too large."));
+                return std::nullopt;
+            }
+            knownSizeBytes += *packageSize;
+            accumulator.knownSizeBytes += *packageSize;
+            if (sizeKind == QLatin1String("exact")) {
+                ++exactSizeCount;
+                ++accumulator.exactSizeCount;
+            } else {
+                ++reportedSizeCount;
+                ++accumulator.reportedSizeCount;
+            }
+        } else {
+            ++unknownSizeCount;
+            ++accumulator.unknownSizeCount;
+        }
+        sourceAccumulators.insert(sourceId, accumulator);
+        applications.push_back(row);
+    }
+
+    QVariantList sources;
+    for (auto iterator = sourceAccumulators.cbegin(); iterator != sourceAccumulators.cend(); ++iterator) {
+        const SourceAccumulator &source = iterator.value();
+        sources.push_back(QVariantMap{
+            {QStringLiteral("id"), source.id},
+            {QStringLiteral("name"), source.name},
+            {QStringLiteral("applicationCount"), source.applicationCount},
+            {QStringLiteral("knownSizeBytes"), QVariant::fromValue(source.knownSizeBytes)},
+            {QStringLiteral("unknownSizeCount"), source.unknownSizeCount},
+            {QStringLiteral("exactSizeCount"), source.exactSizeCount},
+            {QStringLiteral("reportedSizeCount"), source.reportedSizeCount},
+            {QStringLiteral("sharePercent"),
+             knownSizeBytes > 0
+                 ? static_cast<double>(source.knownSizeBytes) * 100.0 / static_cast<double>(knownSizeBytes)
+                 : 0.0},
+        });
+    }
+    std::sort(sources.begin(), sources.end(), [](const QVariant &left, const QVariant &right) {
+        const auto first = left.toMap();
+        const auto second = right.toMap();
+        const auto firstSize = first.value(QStringLiteral("knownSizeBytes")).toULongLong();
+        const auto secondSize = second.value(QStringLiteral("knownSizeBytes")).toULongLong();
+        return firstSize == secondSize ? sourceSortName(left) < sourceSortName(right)
+                                       : firstSize > secondSize;
+    });
+
+    QVariantList topApplications = applications;
+    std::sort(topApplications.begin(), topApplications.end(), [](const QVariant &left, const QVariant &right) {
+        const auto first = left.toMap();
+        const auto second = right.toMap();
+        const auto firstSize = first.value(QStringLiteral("sizeBytes")).toULongLong();
+        const auto secondSize = second.value(QStringLiteral("sizeBytes")).toULongLong();
+        if (firstSize != secondSize)
+            return firstSize > secondSize;
+        return first.value(QStringLiteral("name")).toString().localeAwareCompare(
+                   second.value(QStringLiteral("name")).toString()) < 0;
+    });
+    while (topApplications.size() > kMaximumTopApplications)
+        topApplications.removeLast();
+
+    OmniStoreAppsSnapshot snapshot;
+    snapshot.sources = std::move(sources);
+    snapshot.applications = std::move(applications);
+    snapshot.topApplications = std::move(topApplications);
+    snapshot.applicationCount = static_cast<int>(*declaredCount);
+    snapshot.knownSizeBytes = knownSizeBytes;
+    snapshot.unknownSizeCount = unknownSizeCount;
+    snapshot.exactSizeCount = exactSizeCount;
+    snapshot.reportedSizeCount = reportedSizeCount;
+    snapshot.generatedAt = generatedAt;
+    return snapshot;
+}
 } // namespace
 
 std::optional<OmniStoreAppsSnapshot> OmniStoreAppsContract::parse(const QByteArray &payload,
@@ -87,7 +275,13 @@ std::optional<OmniStoreAppsSnapshot> OmniStoreAppsContract::parse(const QByteArr
     }
 
     const QJsonObject object = document.object();
-    if (object.value(QStringLiteral("schema")).toString() != QLatin1String(kSchema)
+    const QString schema = object.value(QStringLiteral("schema")).toString();
+    if (schema == QLatin1String(kManagementSchema)
+        && object.value(QStringLiteral("version")).toInt(-1) == kSchemaVersion
+        && object.value(QStringLiteral("status")).toString() == QLatin1String("success")) {
+        return parseManagementSnapshot(object, error);
+    }
+    if (schema != QLatin1String(kSchema)
         || object.value(QStringLiteral("version")).toInt(-1) != kSchemaVersion
         || object.value(QStringLiteral("status")).toString() != QLatin1String("success")) {
         setParseError(error, QStringLiteral("The app overview uses an unsupported OmniStore contract."));
@@ -260,6 +454,7 @@ std::optional<OmniStoreAppsSnapshot> OmniStoreAppsContract::parse(const QByteArr
 
     OmniStoreAppsSnapshot snapshot;
     snapshot.sources = std::move(sourceRows);
+    snapshot.applications = applicationRows;
     snapshot.topApplications = std::move(applicationRows);
     snapshot.applicationCount = static_cast<int>(*declaredApplicationCount);
     snapshot.knownSizeBytes = knownSizeBytes;
@@ -291,6 +486,11 @@ OmniStoreAppsBackend::OmniStoreAppsBackend(QObject *parent)
 QVariantList OmniStoreAppsBackend::sources() const
 {
     return m_sources;
+}
+
+QVariantList OmniStoreAppsBackend::applications() const
+{
+    return m_applications;
 }
 
 QVariantList OmniStoreAppsBackend::topApplications() const
@@ -343,6 +543,11 @@ bool OmniStoreAppsBackend::exporterAvailable() const
     return !m_exporterPath.isEmpty();
 }
 
+bool OmniStoreAppsBackend::managerAvailable() const
+{
+    return !m_managerPath.isEmpty();
+}
+
 bool OmniStoreAppsBackend::launcherAvailable() const
 {
     return !m_launcherPath.isEmpty();
@@ -366,9 +571,16 @@ void OmniStoreAppsBackend::refresh()
 
     m_standardOutput.clear();
     m_requestActive = true;
+    m_activeAction.clear();
+    m_activeAppId.clear();
     setBusy(true);
-    m_process->setProgram(m_exporterPath);
-    m_process->setArguments(QStringList{});
+    if (managerAvailable()) {
+        m_process->setProgram(m_managerPath);
+        m_process->setArguments(QStringList{QStringLiteral("export")});
+    } else {
+        m_process->setProgram(m_exporterPath);
+        m_process->setArguments(QStringList{});
+    }
     m_process->start();
     m_timeoutTimer->start(20'000);
     Q_EMIT changed();
@@ -393,11 +605,13 @@ bool OmniStoreAppsBackend::openOmniStore()
 void OmniStoreAppsBackend::updateExecutableAvailability()
 {
     const QString exporter = QStandardPaths::findExecutable(QStringLiteral("omnistore-apps-export"));
+    const QString manager = QStandardPaths::findExecutable(QStringLiteral("omnistore-apps"));
     const QString launcher = QStandardPaths::findExecutable(QStringLiteral("omnistore"));
-    if (m_exporterPath == exporter && m_launcherPath == launcher) {
+    if (m_exporterPath == exporter && m_managerPath == manager && m_launcherPath == launcher) {
         return;
     }
     m_exporterPath = exporter;
+    m_managerPath = manager;
     m_launcherPath = launcher;
     Q_EMIT changed();
 }
@@ -432,6 +646,26 @@ void OmniStoreAppsBackend::processFinished(const int exitCode, const QProcess::E
     if (!m_requestActive) {
         return;
     }
+
+    if (!m_activeAction.isEmpty()) {
+        const QString action = m_activeAction;
+        const QString appId = m_activeAppId;
+        m_activeAction.clear();
+        m_activeAppId.clear();
+        if (exitStatus != QProcess::NormalExit || exitCode != 0) {
+            finishWithError(tr("OmniStore could not complete the application action."));
+            Q_EMIT actionFinished(action, appId, false);
+            return;
+        }
+        m_requestActive = false;
+        m_timeoutTimer->stop();
+        setBusy(false);
+        clearError();
+        Q_EMIT actionFinished(action, appId, true);
+        Q_EMIT changed();
+        QTimer::singleShot(0, this, &OmniStoreAppsBackend::refresh);
+        return;
+    }
     if (exitStatus != QProcess::NormalExit || exitCode != 0) {
         finishWithError(tr("OmniStore could not provide a current app overview."));
         return;
@@ -444,6 +678,8 @@ void OmniStoreAppsBackend::processFinished(const int exitCode, const QProcess::E
         return;
     }
     m_requestActive = false;
+    m_activeAction.clear();
+    m_activeAppId.clear();
     m_timeoutTimer->stop();
     setBusy(false);
     applySnapshot(*snapshot);
@@ -469,6 +705,7 @@ void OmniStoreAppsBackend::processTimedOut()
 void OmniStoreAppsBackend::applySnapshot(const OmniStoreAppsSnapshot &snapshot)
 {
     const bool changed = m_sources != snapshot.sources
+        || m_applications != snapshot.applications
         || m_topApplications != snapshot.topApplications
         || m_applicationCount != snapshot.applicationCount
         || m_knownSizeBytes != snapshot.knownSizeBytes
@@ -478,6 +715,7 @@ void OmniStoreAppsBackend::applySnapshot(const OmniStoreAppsSnapshot &snapshot)
         || m_generatedAt != snapshot.generatedAt
         || !m_hasSnapshot;
     m_sources = snapshot.sources;
+    m_applications = snapshot.applications;
     m_topApplications = snapshot.topApplications;
     m_applicationCount = snapshot.applicationCount;
     m_knownSizeBytes = snapshot.knownSizeBytes;
@@ -491,6 +729,67 @@ void OmniStoreAppsBackend::applySnapshot(const OmniStoreAppsSnapshot &snapshot)
     if (changed) {
         Q_EMIT this->changed();
     }
+}
+
+bool OmniStoreAppsBackend::clearCache(const QString &appId, const QString &sourceId)
+{
+    return startAction(QStringLiteral("clear-cache"), appId, sourceId);
+}
+
+bool OmniStoreAppsBackend::resetSettings(const QString &appId, const QString &sourceId)
+{
+    return startAction(QStringLiteral("reset-settings"), appId, sourceId);
+}
+
+bool OmniStoreAppsBackend::clearData(const QString &appId, const QString &sourceId)
+{
+    return startAction(QStringLiteral("clear-data"), appId, sourceId);
+}
+
+bool OmniStoreAppsBackend::uninstall(const QString &appId, const QString &sourceId)
+{
+    return startAction(QStringLiteral("uninstall"), appId, sourceId);
+}
+
+bool OmniStoreAppsBackend::startAction(const QString &action, const QString &appId, const QString &sourceId)
+{
+    if (m_requestActive) {
+        return false;
+    }
+    updateExecutableAvailability();
+    clearError();
+    static const QSet<QString> allowedActions{
+        QStringLiteral("clear-cache"),
+        QStringLiteral("reset-settings"),
+        QStringLiteral("clear-data"),
+        QStringLiteral("uninstall"),
+    };
+    const QRegularExpression appIdExpression(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._+@-]{0,255}$"));
+    const QRegularExpression sourceIdExpression(QStringLiteral("^[a-z0-9][a-z0-9-]{0,63}$"));
+    if (!managerAvailable()) {
+        setError(tr("Update OmniStore to manage application storage and removal."));
+        Q_EMIT changed();
+        return false;
+    }
+    if (!allowedActions.contains(action)
+        || !appIdExpression.match(appId).hasMatch()
+        || !sourceIdExpression.match(sourceId).hasMatch()) {
+        setError(tr("The selected application cannot be managed safely."));
+        Q_EMIT changed();
+        return false;
+    }
+
+    m_standardOutput.clear();
+    m_activeAction = action;
+    m_activeAppId = appId;
+    m_requestActive = true;
+    setBusy(true);
+    m_process->setProgram(m_managerPath);
+    m_process->setArguments(QStringList{action, appId, sourceId});
+    m_process->start();
+    m_timeoutTimer->start(action == QLatin1String("uninstall") ? 120'000 : 30'000);
+    Q_EMIT changed();
+    return true;
 }
 
 void OmniStoreAppsBackend::finishWithError(const QString &error)
