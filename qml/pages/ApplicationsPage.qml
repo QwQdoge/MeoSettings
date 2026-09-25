@@ -9,6 +9,10 @@ Item {
     property var rootMetrics: null
     property var selectedApp: ({})
     property string pendingAction: ""
+    property string requestedAppId: ""
+    property string requestedAppName: ""
+    property string requestedSection: ""
+    property bool requestHandled: false
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
     readonly property var selectedCapabilities: selectedApp.capabilities || ({})
     readonly property var selectedSettings: selectedApp.settings || ({})
@@ -189,6 +193,46 @@ Item {
         appDetails.open()
     }
 
+    function appMatchesRequest(app) {
+        const requestedId = requestedAppId.trim().toLowerCase()
+        const requestedName = requestedAppName.trim().toLowerCase()
+        const appId = String(app.id || "").toLowerCase()
+        const appName = String(app.name || "").toLowerCase()
+        if (requestedId !== "" && (appId === requestedId
+                                   || appId.endsWith("." + requestedId)
+                                   || requestedId.endsWith("." + appId)))
+            return true
+        return requestedName !== "" && appName === requestedName
+    }
+
+    function handleRequestedApp() {
+        if (requestHandled || (requestedAppId.trim() === "" && requestedAppName.trim() === ""))
+            return
+        const apps = OmniStoreAppsBackend.applications || []
+        for (let index = 0; index < apps.length; ++index) {
+            const app = apps[index]
+            if (!appMatchesRequest(app))
+                continue
+            requestHandled = true
+            if (requestedSection === "settings"
+                    && app.settings && app.settings.available
+                    && app.settings.route) {
+                navigateTo(app.settings.route)
+                return
+            }
+            openApp(app)
+            return
+        }
+
+        // AppId and package id are not identical for every native package.
+        // Falling back to the user-visible application name keeps the target
+        // discoverable without guessing a package or filesystem path.
+        if (requestedAppName.trim() !== "")
+            searchBar.text = requestedAppName
+        else if (requestedAppId.trim() !== "")
+            searchBar.text = requestedAppId
+    }
+
     function requestAction(action) {
         pendingAction = action
         actionConfirmation.open()
@@ -255,6 +299,7 @@ Item {
         target: OmniStoreAppsBackend
         function onChanged() {
             root.refreshSelectedApp()
+            root.handleRequestedApp()
         }
         function onActionFinished(action, appId, success) {
             if (success && action === "uninstall" && root.selectedApp.id === appId) {
@@ -263,6 +308,8 @@ Item {
             }
         }
     }
+
+    Component.onCompleted: root.handleRequestedApp()
 
     MeoPageLayout {
         anchors.fill: parent
