@@ -145,6 +145,7 @@ qt_add_qml_module(meo-settings
         qml/pages/ShellPage.qml
         qml/pages/DesktopIntegrationPage.qml
         qml/pages/NotificationsPage.qml
+        qml/pages/ApplicationsPage.qml
         qml/pages/AccountsPage.qml
         qml/pages/PrivacyPage.qml
         qml/pages/SessionEntryPage.qml
