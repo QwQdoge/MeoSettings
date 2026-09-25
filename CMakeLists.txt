@@ -12,6 +12,7 @@ include(CTest)
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Concurrent Core DBus Gui Qml Quick QuickControls2 Test LinguistTools)
 find_package(KF6CoreAddons REQUIRED)
+find_package(KF6Config REQUIRED)
 find_package(KF6NetworkManagerQt REQUIRED)
 find_package(KF6BluezQt REQUIRED)
 find_package(KF6Solid REQUIRED)
@@ -84,6 +85,8 @@ qt_add_executable(meo-settings
     src/backends/hardwarecapabilityregistry.h
     src/backends/loginauthbackend.cpp
     src/backends/loginauthbackend.h
+    src/backends/lockscreenpresentationbackend.cpp
+    src/backends/lockscreenpresentationbackend.h
     src/backends/recoverybackend.cpp
     src/backends/recoverybackend.h
     src/backends/configbackend.cpp
@@ -142,6 +145,7 @@ qt_add_qml_module(meo-settings
         qml/pages/ShellPage.qml
         qml/pages/DesktopIntegrationPage.qml
         qml/pages/NotificationsPage.qml
+        qml/pages/ApplicationsPage.qml
         qml/pages/AccountsPage.qml
         qml/pages/PrivacyPage.qml
         qml/pages/SessionEntryPage.qml
@@ -260,6 +264,7 @@ target_link_libraries(meo-settings PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     KF6::CoreAddons
+    KF6::ConfigCore
     KF6::NetworkManagerQt
     KF6::BluezQt
     KF6::Solid
@@ -462,6 +467,21 @@ add_executable(meo-settings-configbackend-test
 target_link_libraries(meo-settings-configbackend-test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME meo-settings-configbackend COMMAND meo-settings-configbackend-test)
 
+add_executable(meo-settings-lockscreenpresentationbackend-test
+    tests/tst_lockscreenpresentationbackend.cpp
+    src/core/backendbase.cpp
+    src/core/backendbase.h
+    src/backends/lockscreenpresentationbackend.cpp
+    src/backends/lockscreenpresentationbackend.h
+)
+target_link_libraries(meo-settings-lockscreenpresentationbackend-test PRIVATE
+    Qt6::Core
+    Qt6::Test
+    KF6::ConfigCore
+)
+add_test(NAME meo-settings-lockscreenpresentationbackend
+         COMMAND meo-settings-lockscreenpresentationbackend-test)
+
 add_executable(meo-settings-meoaccountbackend-test
     tests/tst_meoaccountbackend.cpp
     src/core/backendbase.cpp
@@ -518,6 +538,20 @@ if(MEOUI_IMPORT_ROOT AND MEO_KDE_QML_IMPORT_ROOT AND MEO_SYSTEM_IMPORT_ROOT)
     # lazy page creation failures cannot hide behind the initial home page.
     add_test(NAME meo-settings-qml-smoke COMMAND $<TARGET_FILE:meo-settings> --smoke)
     set_property(TEST meo-settings-qml-smoke APPEND PROPERTY ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen"
+        "QT_QUICK_BACKEND=software"
+        "QML_IMPORT_PATH=${MEOUI_IMPORT_ROOT}:${MEO_KDE_QML_IMPORT_ROOT}:${MEO_SYSTEM_IMPORT_ROOT}"
+        "QT_FORCE_STDERR_LOGGING=1"
+    )
+
+    # The top-panel app menu enters Settings through this registered URL
+    # scheme. Exercise a representative application deep link offscreen so
+    # URL parsing and the Applications page handoff stay release-gated.
+    add_test(NAME meo-settings-application-deeplink-smoke
+             COMMAND $<TARGET_FILE:meo-settings>
+                     --smoke
+                     "meosettings://applications?appId=org.example.App&appName=Example%20App&section=config")
+    set_property(TEST meo-settings-application-deeplink-smoke APPEND PROPERTY ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen"
         "QT_QUICK_BACKEND=software"
         "QML_IMPORT_PATH=${MEOUI_IMPORT_ROOT}:${MEO_KDE_QML_IMPORT_ROOT}:${MEO_SYSTEM_IMPORT_ROOT}"

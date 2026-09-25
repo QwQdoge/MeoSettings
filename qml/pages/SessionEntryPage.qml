@@ -3,8 +3,9 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import MeoUI
 
-// A data-only, in-session preview. It never loads a credential model, changes
-// KScreenLocker, or writes a display-manager file.
+// In-session presentation settings and preview. It never loads a credential
+// model or writes authentication/display-manager policy; the narrow backend
+// only persists allowlisted Look & Feel keys under KScreenLocker Greeter/LnF.
 Item {
     id: root
 
@@ -12,20 +13,46 @@ Item {
     property var rootMetrics: null
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
     property bool previewWeather: true
-    property bool previewWeatherLocation: true
+    property bool previewWeatherLocation: false
     property bool previewMedia: true
     property bool previewArtwork: true
     property bool previewAudio: true
-    property string previewNotificationPrivacy: "full-content"
-    property bool editingLockScreenLayout: sessionEntryLayoutEditorMode
+    property bool previewPerformance: true
+    property bool previewSystemSummary: true
+    property bool previewSessionControls: true
+    property string previewNotificationPrivacy: "count"
+    readonly property bool editingLockScreenLayout: sessionEntryLayoutEditorMode
 
-    function restorePreviewDefaults() {
-        previewWeather = true
-        previewWeatherLocation = true
-        previewMedia = true
-        previewArtwork = true
-        previewAudio = true
-        previewNotificationPrivacy = "full-content"
+    function loadSavedPreferences() {
+        const values = LockScreenPresentationBackend.settings || {}
+        previewWeather = values.showWeather === undefined ? true : values.showWeather
+        previewWeatherLocation = values.showWeatherLocation === undefined ? false : values.showWeatherLocation
+        previewMedia = values.showMediaControls === undefined ? true : values.showMediaControls
+        previewArtwork = values.showAlbumArtwork === undefined ? true : values.showAlbumArtwork
+        previewAudio = values.showAudioControls === undefined ? true : values.showAudioControls
+        previewPerformance = values.showPerformance === undefined ? true : values.showPerformance
+        previewSystemSummary = values.showSystemSummary === undefined ? true : values.showSystemSummary
+        previewSessionControls = values.showSessionControls === undefined ? true : values.showSessionControls
+        previewNotificationPrivacy = values.notificationVisibility || "count"
+    }
+
+    function savePreferences() {
+        LockScreenPresentationBackend.save({
+            "showWeather": previewWeather,
+            "showWeatherLocation": previewWeatherLocation,
+            "showMediaControls": previewMedia,
+            "showAlbumArtwork": previewArtwork,
+            "showAudioControls": previewAudio,
+            "showPerformance": previewPerformance,
+            "showSystemSummary": previewSystemSummary,
+            "showSessionControls": previewSessionControls,
+            "notificationVisibility": previewNotificationPrivacy
+        })
+    }
+
+    function restorePresentationDefaults() {
+        LockScreenPresentationBackend.resetToDefaults()
+        loadSavedPreferences()
     }
 
     readonly property var privacyOptions: [
@@ -40,7 +67,7 @@ Item {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
         title: root.isCompact ? "" : qsTr("Lock screen & login")
-        subtitle: qsTr("Preview the Meo session entry without changing authentication or current system configuration.")
+        subtitle: qsTr("Customize the Caelestia-style Meo lock-screen presentation. Authentication and lock policy remain with KDE.")
 
         MeoCard {
             visible: !root.editingLockScreenLayout
@@ -52,7 +79,7 @@ Item {
                 MeoIcon { icon: "info"; size: 24; color: MeoTheme.primary }
                 MeoText {
                     Layout.fillWidth: true
-                    text: qsTr("Preview-only draft. A validated MeoKDE writer is required before presentation preferences can be saved. Passwords, PAM, fingerprints, display-manager selection, and screen layout remain with KDE.")
+                    text: qsTr("Only presentation preferences are saved here. Passwords, PAM, fingerprints, lock timing, display-manager selection, and secure input remain controlled by KDE.")
                     typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant; wrapMode: Text.WordWrap
                 }
             }
@@ -161,14 +188,17 @@ Item {
         MeoSettingsGroup {
             visible: !root.editingLockScreenLayout
             width: parent.width
-            title: qsTr("Preview content")
-            subtitle: qsTr("The rich lock-screen profile uses cached weather, current-session media, output volume, and full notification content by default.")
+            title: qsTr("Lock-screen content")
+            subtitle: qsTr("Choose which real cached or current-session surfaces appear around the fixed Caelestia-style center layout.")
             model: [
                 { "id": "weather", "title": qsTr("Weather"), "subtitle": qsTr("Show only cached weather; it never blocks authentication"), "icon": "partly_cloudy_day", "tone": "secondary", "trailingKind": "toggle", "checked": root.previewWeather },
                 { "id": "weather-location", "title": qsTr("Precise weather location"), "subtitle": qsTr("Independent privacy choice"), "icon": "location_on", "tone": "secondary", "trailingKind": "toggle", "checked": root.previewWeatherLocation, "enabled": root.previewWeather },
                 { "id": "media", "title": qsTr("Media controls"), "subtitle": qsTr("Current-session MPRIS controls only"), "icon": "music_note", "tone": "tertiary", "trailingKind": "toggle", "checked": root.previewMedia },
                 { "id": "artwork", "title": qsTr("Album artwork"), "subtitle": qsTr("Independent media privacy choice"), "icon": "album", "tone": "tertiary", "trailingKind": "toggle", "checked": root.previewArtwork, "enabled": root.previewMedia },
-                { "id": "audio", "title": qsTr("Output volume"), "subtitle": qsTr("Volume and mute only; no output-device or microphone controls"), "icon": "volume_up", "tone": "tertiary", "trailingKind": "toggle", "checked": root.previewAudio }
+                { "id": "audio", "title": qsTr("Output volume"), "subtitle": qsTr("Volume and mute only; no output-device or microphone controls"), "icon": "volume_up", "tone": "tertiary", "trailingKind": "toggle", "checked": root.previewAudio },
+                { "id": "system-summary", "title": qsTr("System summary"), "subtitle": qsTr("Show OS, desktop, uptime, battery, connection state, and dynamic palette"), "icon": "terminal", "tone": "primary", "trailingKind": "toggle", "checked": root.previewSystemSummary },
+                { "id": "performance", "title": qsTr("Performance"), "subtitle": qsTr("Show aggregate CPU, memory, storage, and temperature only"), "icon": "monitoring", "tone": "primary", "trailingKind": "toggle", "checked": root.previewPerformance },
+                { "id": "session-controls", "title": qsTr("Session controls"), "subtitle": qsTr("Reveal KDE sleep, hibernate, restart, and shut-down actions when hovering Resources"), "icon": "power_settings_new", "tone": "primary", "trailingKind": "toggle", "checked": root.previewSessionControls, "enabled": root.previewPerformance }
             ]
             onRowToggled: (index, checked, row) => {
                 if (row.id === "weather") { root.previewWeather = checked; if (!checked) root.previewWeatherLocation = false }
@@ -176,6 +206,9 @@ Item {
                 else if (row.id === "media") { root.previewMedia = checked; if (!checked) root.previewArtwork = false }
                 else if (row.id === "artwork") root.previewArtwork = checked
                 else if (row.id === "audio") root.previewAudio = checked
+                else if (row.id === "system-summary") root.previewSystemSummary = checked
+                else if (row.id === "performance") { root.previewPerformance = checked; if (!checked) root.previewSessionControls = false }
+                else if (row.id === "session-controls") root.previewSessionControls = checked
             }
         }
 
@@ -237,7 +270,7 @@ Item {
                 width: parent.width
                 spacing: MeoTheme.space12
                 MeoText { Layout.fillWidth: true; text: qsTr("Notification privacy"); typeRole: "title"; typeSize: "small"; emphasized: true; color: MeoTheme.contentOnSurface }
-                MeoText { Layout.fillWidth: true; text: qsTr("The rich lock-screen default shows full content. This preview uses sample notifications only."); typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant; wrapMode: Text.WordWrap }
+                MeoText { Layout.fillWidth: true; text: qsTr("The privacy-first default shows only the notification count. App names or full content are opt-in."); typeRole: "body"; typeSize: "small"; color: MeoTheme.contentOnSurfaceVariant; wrapMode: Text.WordWrap }
                 MeoExposedDropdown {
                     Layout.fillWidth: true
                     label: qsTr("Visibility")
@@ -250,16 +283,31 @@ Item {
             }
         }
 
+        MeoBanner {
+            visible: !root.editingLockScreenLayout && LockScreenPresentationBackend.error !== ""
+            width: parent.width
+            title: qsTr("Lock-screen presentation settings could not be saved")
+            text: LockScreenPresentationBackend.error
+            icon: "error"
+            tone: "error"
+        }
+
         Flow {
+            visible: !root.editingLockScreenLayout
             width: parent.width
             spacing: MeoTheme.space8
+
             MeoButton {
-                text: root.editingLockScreenLayout ? qsTr("Finish editing") : qsTr("Edit lock-screen layout")
-                icon.name: root.editingLockScreenLayout ? "done" : "dashboard_customize"
-                type: "tonal"
-                onClicked: root.editingLockScreenLayout = !root.editingLockScreenLayout
+                text: qsTr("Save lock-screen appearance")
+                icon.name: "save"
+                type: "filled"
+                onClicked: root.savePreferences()
             }
-            MeoButton { text: qsTr("Restore preview defaults"); type: "text"; onClicked: root.restorePreviewDefaults() }
+            MeoButton {
+                text: qsTr("Restore defaults")
+                type: "text"
+                onClicked: root.restorePresentationDefaults()
+            }
             MeoButton {
                 visible: KcmBridge.isAvailable("kcm_screenlocker")
                 text: qsTr("Open KDE screen lock controls")
@@ -269,9 +317,29 @@ Item {
             }
         }
 
+        MeoText {
+            visible: !root.editingLockScreenLayout
+            width: parent.width
+            text: qsTr("Saved presentation changes are picked up the next time the lock screen is created. Authentication settings are unchanged.")
+            typeRole: "label"
+            typeSize: "small"
+            color: MeoTheme.contentOnSurfaceVariant
+            wrapMode: Text.WordWrap
+        }
+
         MeoLockScreenLayoutEditor {
             visible: root.editingLockScreenLayout
             width: parent.width
         }
     }
+
+    Connections {
+        target: LockScreenPresentationBackend
+        function onChanged() {
+            if (!root.editingLockScreenLayout)
+                root.loadSavedPreferences()
+        }
+    }
+
+    Component.onCompleted: root.loadSavedPreferences()
 }
