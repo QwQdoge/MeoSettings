@@ -355,6 +355,7 @@ int main(int argc, char *argv[])
             QStringLiteral("appearance"),
             QStringLiteral("kcm:kcm_lookandfeel"),
             QStringLiteral("category:apps"),
+            QStringLiteral("applications"),
             QStringLiteral("notifications"),
             QStringLiteral("control-center"),
             QStringLiteral("desktop-integration"),
