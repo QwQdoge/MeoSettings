@@ -143,11 +143,46 @@ Item {
         }
     ]
 
+    readonly property var configurationPathRows: {
+        const rows = []
+        const storage = selectedApp.storage || []
+        for (let index = 0; index < storage.length; ++index) {
+            const item = storage[index]
+            if (item.id !== "config")
+                continue
+            const paths = item.paths || []
+            rows.push({
+                "title": qsTr("Verified configuration"),
+                "subtitle": paths.length > 0
+                            ? paths.join(" · ")
+                            : qsTr("Application configuration location"),
+                "icon": "folder",
+                "tone": "primary",
+                "trailingKind": "status",
+                "trailingText": root.formatBytes(item.bytes),
+                "interactive": false
+            })
+        }
+        if (rows.length === 0) {
+            rows.push({
+                "title": qsTr("No verified .config location"),
+                "subtitle": qsTr("Meo does not guess configuration paths. Add a trusted OmniStore manifest for native apps; Flatpak config is discovered from its sandbox."),
+                "icon": "folder_off",
+                "tone": "neutral",
+                "trailingKind": "none",
+                "interactive": false
+            })
+        }
+        return rows
+    }
+
     readonly property var storageRows: {
         const rows = []
         const storage = selectedApp.storage || []
         for (let index = 0; index < storage.length; ++index) {
             const item = storage[index]
+            if (item.id === "config")
+                continue
             const paths = item.paths || []
             rows.push({
                 "title": root.categoryTitle(item.id),
@@ -163,8 +198,8 @@ Item {
         }
         if (rows.length === 0) {
             rows.push({
-                "title": qsTr("App-scoped storage"),
-                "subtitle": qsTr("OmniStore has no verified storage manifest for this application yet."),
+                "title": qsTr("No additional app storage"),
+                "subtitle": qsTr("No verified cache, data, or state location is registered for this application."),
                 "icon": "folder_off",
                 "tone": "neutral",
                 "trailingKind": "none",
@@ -212,12 +247,9 @@ Item {
             if (!appMatchesRequest(app))
                 continue
             requestHandled = true
-            if (requestedSection === "settings"
-                    && app.settings && app.settings.available
-                    && app.settings.route) {
-                navigateTo(app.settings.route)
-                return
-            }
+            // The top-bar application-name menu always lands on the verified
+            // config view. App-provided File/Edit/View/etc remain owned by the
+            // KDE Global Menu and never get synthesized here.
             openApp(app)
             return
         }
@@ -442,14 +474,16 @@ Item {
 
                 MeoSettingsGroup {
                     width: parent.width
-                    title: qsTr("App info")
-                    model: root.appInfoRows
+                    title: qsTr("Configuration (.config)")
+                    subtitle: qsTr("The application-name menu opens here. Only paths verified by OmniStore are exposed.")
+                    model: root.configurationPathRows
                 }
 
                 MeoSettingsGroup {
                     width: parent.width
-                    title: qsTr("Configuration")
-                    subtitle: qsTr("Apps can provide a trusted settings schema or a route into Meo Settings.")
+                    visible: root.selectedSettings.available === true
+                    title: qsTr("App-provided settings")
+                    subtitle: qsTr("Optional graphical settings supplied through a trusted provider.")
                     model: root.configurationRows
                     onRowActivated: (index, row) => {
                         if (row.route) {
@@ -461,7 +495,13 @@ Item {
 
                 MeoSettingsGroup {
                     width: parent.width
-                    title: qsTr("Storage")
+                    title: qsTr("App info")
+                    model: root.appInfoRows
+                }
+
+                MeoSettingsGroup {
+                    width: parent.width
+                    title: qsTr("Storage & data")
                     subtitle: selectedApp.storageComplete === false
                               ? qsTr("Some directory scans were bounded, so shown sizes can be partial.")
                               : qsTr("Only application-scoped locations verified by OmniStore are shown.")
