@@ -21,6 +21,7 @@ class QTimer;
 struct OmniStoreAppsSnapshot
 {
     QVariantList sources;
+    QVariantList applications;
     QVariantList topApplications;
     int applicationCount = 0;
     qulonglong knownSizeBytes = 0;
@@ -47,6 +48,7 @@ class OmniStoreAppsBackend final : public BackendBase
 {
     Q_OBJECT
     Q_PROPERTY(QVariantList sources READ sources NOTIFY changed)
+    Q_PROPERTY(QVariantList applications READ applications NOTIFY changed)
     Q_PROPERTY(QVariantList topApplications READ topApplications NOTIFY changed)
     Q_PROPERTY(int applicationCount READ applicationCount NOTIFY changed)
     Q_PROPERTY(qulonglong knownSizeBytes READ knownSizeBytes NOTIFY changed)
@@ -56,12 +58,14 @@ class OmniStoreAppsBackend final : public BackendBase
     Q_PROPERTY(QString generatedAt READ generatedAt NOTIFY changed)
     Q_PROPERTY(QString summary READ summary NOTIFY changed)
     Q_PROPERTY(bool exporterAvailable READ exporterAvailable NOTIFY changed)
+    Q_PROPERTY(bool managerAvailable READ managerAvailable NOTIFY changed)
     Q_PROPERTY(bool launcherAvailable READ launcherAvailable NOTIFY changed)
 
 public:
     explicit OmniStoreAppsBackend(QObject *parent = nullptr);
 
     QVariantList sources() const;
+    QVariantList applications() const;
     QVariantList topApplications() const;
     int applicationCount() const;
     qulonglong knownSizeBytes() const;
@@ -71,15 +75,19 @@ public:
     QString generatedAt() const;
     QString summary() const;
     bool exporterAvailable() const;
+    bool managerAvailable() const;
     bool launcherAvailable() const;
 
-    /// Re-runs only OmniStore's documented read-only exporter.
     Q_INVOKABLE void refresh();
-    /// Opens OmniStore only after an explicit user action.
     Q_INVOKABLE bool openOmniStore();
+    Q_INVOKABLE bool clearCache(const QString &appId, const QString &sourceId);
+    Q_INVOKABLE bool resetSettings(const QString &appId, const QString &sourceId);
+    Q_INVOKABLE bool clearData(const QString &appId, const QString &sourceId);
+    Q_INVOKABLE bool uninstall(const QString &appId, const QString &sourceId);
 
 Q_SIGNALS:
     void changed();
+    void actionFinished(const QString &action, const QString &appId, bool success);
 
 private:
     void updateExecutableAvailability();
@@ -90,11 +98,13 @@ private:
     void processTimedOut();
     void applySnapshot(const OmniStoreAppsSnapshot &snapshot);
     void finishWithError(const QString &error);
+    bool startAction(const QString &action, const QString &appId, const QString &sourceId);
 
     QProcess *m_process = nullptr;
     QTimer *m_timeoutTimer = nullptr;
     QByteArray m_standardOutput;
     QVariantList m_sources;
+    QVariantList m_applications;
     QVariantList m_topApplications;
     int m_applicationCount = 0;
     qulonglong m_knownSizeBytes = 0;
@@ -103,7 +113,10 @@ private:
     int m_reportedSizeCount = 0;
     QString m_generatedAt;
     QString m_exporterPath;
+    QString m_managerPath;
     QString m_launcherPath;
+    QString m_activeAction;
+    QString m_activeAppId;
     bool m_hasSnapshot = false;
     bool m_requestActive = false;
 };
