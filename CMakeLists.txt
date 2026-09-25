@@ -145,6 +145,7 @@ qt_add_qml_module(meo-settings
         qml/pages/ShellPage.qml
         qml/pages/DesktopIntegrationPage.qml
         qml/pages/NotificationsPage.qml
+        qml/pages/ApplicationsPage.qml
         qml/pages/AccountsPage.qml
         qml/pages/PrivacyPage.qml
         qml/pages/SessionEntryPage.qml
@@ -537,6 +538,20 @@ if(MEOUI_IMPORT_ROOT AND MEO_KDE_QML_IMPORT_ROOT AND MEO_SYSTEM_IMPORT_ROOT)
     # lazy page creation failures cannot hide behind the initial home page.
     add_test(NAME meo-settings-qml-smoke COMMAND $<TARGET_FILE:meo-settings> --smoke)
     set_property(TEST meo-settings-qml-smoke APPEND PROPERTY ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen"
+        "QT_QUICK_BACKEND=software"
+        "QML_IMPORT_PATH=${MEOUI_IMPORT_ROOT}:${MEO_KDE_QML_IMPORT_ROOT}:${MEO_SYSTEM_IMPORT_ROOT}"
+        "QT_FORCE_STDERR_LOGGING=1"
+    )
+
+    # The top-panel app menu enters Settings through this registered URL
+    # scheme. Exercise a representative application deep link offscreen so
+    # URL parsing and the Applications page handoff stay release-gated.
+    add_test(NAME meo-settings-application-deeplink-smoke
+             COMMAND $<TARGET_FILE:meo-settings>
+                     --smoke
+                     "meosettings://applications?appId=org.example.App&appName=Example%20App&section=config")
+    set_property(TEST meo-settings-application-deeplink-smoke APPEND PROPERTY ENVIRONMENT
         "QT_QPA_PLATFORM=offscreen"
         "QT_QUICK_BACKEND=software"
         "QML_IMPORT_PATH=${MEOUI_IMPORT_ROOT}:${MEO_KDE_QML_IMPORT_ROOT}:${MEO_SYSTEM_IMPORT_ROOT}"

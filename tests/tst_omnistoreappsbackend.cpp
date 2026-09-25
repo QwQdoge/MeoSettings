@@ -11,6 +11,7 @@ class OmniStoreAppsBackendTest final : public QObject
 
 private Q_SLOTS:
     void parsesAValidScopedUsageSnapshot();
+    void parsesAValidManagementSnapshot();
     void rejectsInconsistentOrUnsafePayloads();
 };
 
@@ -47,6 +48,61 @@ void OmniStoreAppsBackendTest::parsesAValidScopedUsageSnapshot()
              QStringLiteral("Flatpak"));
     QCOMPARE(snapshot->sources.first().toMap().value(QStringLiteral("sharePercent")).toDouble(),
              2000.0 / 23.0);
+}
+
+void OmniStoreAppsBackendTest::parsesAValidManagementSnapshot()
+{
+    const QByteArray payload = R"json({
+        "schema": "org.meo.omnistore.app-management",
+        "version": 1,
+        "status": "success",
+        "generatedAt": "2026-09-25T02:00:00Z",
+        "applicationCount": 2,
+        "applications": [
+            {
+                "id": "org.example.App",
+                "name": "Example",
+                "sourceId": "flatpak",
+                "sourceName": "Flatpak",
+                "version": "1.2.3",
+                "sizeKind": "reported",
+                "packageSizeBytes": 4096,
+                "storageBytes": 12,
+                "storageComplete": true,
+                "storage": [
+                    {"id": "config", "bytes": 4, "complete": true, "paths": ["~/.var/app/org.example.App/config"]},
+                    {"id": "cache", "bytes": 8, "complete": true, "paths": ["~/.var/app/org.example.App/cache"]}
+                ],
+                "settings": {"available": true, "provider": "meo-schema", "route": "provider:example", "label": "Example settings"},
+                "capabilities": {"uninstall": true, "clearCache": true, "resetSettings": true, "clearData": true}
+            },
+            {
+                "id": "plain-app",
+                "name": "Plain App",
+                "sourceId": "pacman",
+                "sourceName": "Pacman",
+                "sizeKind": "unknown",
+                "storageBytes": 0,
+                "storageComplete": true,
+                "storage": [],
+                "settings": {"available": false},
+                "capabilities": {"uninstall": true, "clearCache": false, "resetSettings": false, "clearData": false}
+            }
+        ]
+    })json";
+
+    QString error;
+    const auto snapshot = OmniStoreAppsContract::parse(payload, &error);
+    QVERIFY2(snapshot.has_value(), qPrintable(error));
+    QCOMPARE(snapshot->applicationCount, 2);
+    QCOMPARE(snapshot->applications.size(), 2);
+    QCOMPARE(snapshot->knownSizeBytes, 4096ULL);
+    QCOMPARE(snapshot->unknownSizeCount, 1);
+    const QVariantMap example = snapshot->applications.first().toMap();
+    QCOMPARE(example.value(QStringLiteral("id")).toString(), QStringLiteral("org.example.App"));
+    QCOMPARE(example.value(QStringLiteral("storageBytes")).toULongLong(), 12ULL);
+    QVERIFY(example.value(QStringLiteral("settings")).toMap().value(QStringLiteral("available")).toBool());
+    QVERIFY(example.value(QStringLiteral("capabilities")).toMap().value(QStringLiteral("clearCache")).toBool());
 }
 
 void OmniStoreAppsBackendTest::rejectsInconsistentOrUnsafePayloads()
