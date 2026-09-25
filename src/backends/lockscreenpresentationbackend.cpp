@@ -3,6 +3,8 @@
 #include <KConfigGroup>
 #include <KSharedConfig>
 
+#include <QMetaType>
+
 namespace
 {
 constexpr auto kConfigFile = "kscreenlockerrc";
@@ -84,7 +86,19 @@ QVariantMap LockScreenPresentationBackend::normalized(const QVariantMap &input, 
              QStringLiteral("showSystemSummary"),
              QStringLiteral("showSessionControls"),
          }) {
-        result.insert(key, input.contains(key) ? input.value(key).toBool() : fallback.value(key));
+        if (!input.contains(key)) {
+            result.insert(key, fallback.value(key));
+            continue;
+        }
+
+        const QVariant candidate = input.value(key);
+        if (candidate.metaType().id() != QMetaType::Bool) {
+            if (error) {
+                *error = QObject::tr("Lock-screen presentation toggles must be true or false.");
+            }
+            return {};
+        }
+        result.insert(key, candidate.toBool());
     }
 
     // Dependent privacy toggles are normalized here rather than in QML so
