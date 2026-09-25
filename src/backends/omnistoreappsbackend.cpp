@@ -448,13 +448,14 @@ std::optional<OmniStoreAppsSnapshot> OmniStoreAppsContract::parse(const QByteArr
         return first.value(QStringLiteral("sourceId")).toString()
             < second.value(QStringLiteral("sourceId")).toString();
     });
+    QVariantList allApplicationRows = applicationRows;
     while (applicationRows.size() > kMaximumTopApplications) {
         applicationRows.removeLast();
     }
 
     OmniStoreAppsSnapshot snapshot;
     snapshot.sources = std::move(sourceRows);
-    snapshot.applications = applicationRows;
+    snapshot.applications = std::move(allApplicationRows);
     snapshot.topApplications = std::move(applicationRows);
     snapshot.applicationCount = static_cast<int>(*declaredApplicationCount);
     snapshot.knownSizeBytes = knownSizeBytes;
@@ -535,12 +536,14 @@ QString OmniStoreAppsBackend::summary() const
             ? tr("Waiting for OmniStore's read-only app overview")
             : tr("Install OmniStore to view its managed applications");
     }
-    return tr("%n installed application(s) reported by OmniStore", "", m_applicationCount);
+    return managerAvailable()
+        ? tr("%n installed application(s) available to manage", "", m_applicationCount)
+        : tr("%n installed application(s) reported by OmniStore", "", m_applicationCount);
 }
 
 bool OmniStoreAppsBackend::exporterAvailable() const
 {
-    return !m_exporterPath.isEmpty();
+    return !m_managerPath.isEmpty() || !m_exporterPath.isEmpty();
 }
 
 bool OmniStoreAppsBackend::managerAvailable() const
@@ -690,7 +693,13 @@ void OmniStoreAppsBackend::processError()
     if (!m_requestActive) {
         return;
     }
-    finishWithError(tr("OmniStore's app overview exporter could not be started."));
+    const QString action = m_activeAction;
+    const QString appId = m_activeAppId;
+    finishWithError(action.isEmpty()
+                        ? tr("OmniStore's app overview exporter could not be started.")
+                        : tr("OmniStore's application manager could not be started."));
+    if (!action.isEmpty())
+        Q_EMIT actionFinished(action, appId, false);
 }
 
 void OmniStoreAppsBackend::processTimedOut()
@@ -698,8 +707,14 @@ void OmniStoreAppsBackend::processTimedOut()
     if (!m_requestActive) {
         return;
     }
+    const QString action = m_activeAction;
+    const QString appId = m_activeAppId;
     m_process->kill();
-    finishWithError(tr("OmniStore took too long to provide an app overview."));
+    finishWithError(action.isEmpty()
+                        ? tr("OmniStore took too long to provide an app overview.")
+                        : tr("OmniStore took too long to complete the application action."));
+    if (!action.isEmpty())
+        Q_EMIT actionFinished(action, appId, false);
 }
 
 void OmniStoreAppsBackend::applySnapshot(const OmniStoreAppsSnapshot &snapshot)
@@ -795,6 +810,8 @@ bool OmniStoreAppsBackend::startAction(const QString &action, const QString &app
 void OmniStoreAppsBackend::finishWithError(const QString &error)
 {
     m_requestActive = false;
+    m_activeAction.clear();
+    m_activeAppId.clear();
     m_timeoutTimer->stop();
     setBusy(false);
     if (!m_hasSnapshot) {
