@@ -9,7 +9,12 @@ constexpr auto kConfigFile = "kscreenlockerrc";
 
 KConfigGroup presentationGroup(const KSharedConfig::Ptr &config)
 {
-    return config->group(QStringLiteral("Greeter")).group(QStringLiteral("LnF"));
+    // KScreenLocker seeds KConfigLoader with Greeter/LnF as the base group.
+    // The Meo lock-screen config.xml then declares <group name="General">,
+    // so the actual persisted keys live one level deeper.
+    return config->group(QStringLiteral("Greeter"))
+        .group(QStringLiteral("LnF"))
+        .group(QStringLiteral("General"));
 }
 
 bool readBool(const KConfigGroup &group, const char *key, bool fallback)
