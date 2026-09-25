@@ -32,7 +32,7 @@ jobs:
             qt6-base qt6-declarative qt6-tools qt6-shadertools \
             kcoreaddons kconfig ki18n kguiaddons kirigami \
             networkmanager-qt bluez-qt solid pulseaudio-qt libkscreen \
-            libplasma plasma-workspace
+            libplasma libksysguard plasma-workspace
           mkdir -p "$HOME"
 
       - name: Check out MeoSettings
