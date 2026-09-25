@@ -7,9 +7,8 @@ namespace
 {
 constexpr auto kConfigFile = "kscreenlockerrc";
 
-KConfigGroup presentationGroup()
+KConfigGroup presentationGroup(const KSharedConfig::Ptr &config)
 {
-    const auto config = KSharedConfig::openConfig(QString::fromLatin1(kConfigFile));
     return config->group(QStringLiteral("Greeter")).group(QStringLiteral("LnF"));
 }
 
@@ -105,7 +104,8 @@ QVariantMap LockScreenPresentationBackend::normalized(const QVariantMap &input, 
 
 void LockScreenPresentationBackend::refresh()
 {
-    const KConfigGroup group = presentationGroup();
+    const auto config = KSharedConfig::openConfig(QString::fromLatin1(kConfigFile));
+    const KConfigGroup group = presentationGroup(config);
     QVariantMap loaded = defaults();
     loaded[QStringLiteral("showWeather")] =
         readBool(group, "showWeather", loaded.value(QStringLiteral("showWeather")).toBool());
@@ -151,7 +151,8 @@ void LockScreenPresentationBackend::save(const QVariantMap &input)
         return;
     }
 
-    KConfigGroup group = presentationGroup();
+    const auto config = KSharedConfig::openConfig(QString::fromLatin1(kConfigFile));
+    KConfigGroup group = presentationGroup(config);
     group.writeEntry(QStringLiteral("showWeather"), values.value(QStringLiteral("showWeather")).toBool());
     group.writeEntry(QStringLiteral("showWeatherLocation"), values.value(QStringLiteral("showWeatherLocation")).toBool());
     group.writeEntry(QStringLiteral("showMediaControls"), values.value(QStringLiteral("showMediaControls")).toBool());
