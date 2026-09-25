@@ -72,7 +72,7 @@ private Q_SLOTS:
         QFile config(configPath);
         QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
         const QString text = QString::fromUtf8(config.readAll());
-        QVERIFY(text.contains(QStringLiteral("[Greeter][LnF]")));
+        QVERIFY(text.contains(QStringLiteral("[Greeter][LnF][General]")));
         QVERIFY(!text.contains(QStringLiteral("Authenticator")));
         QVERIFY(!text.contains(QStringLiteral("Autolock")));
     }
