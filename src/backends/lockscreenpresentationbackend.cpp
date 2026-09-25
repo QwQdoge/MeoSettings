@@ -173,7 +173,8 @@ void LockScreenPresentationBackend::save(const QVariantMap &input)
 
 void LockScreenPresentationBackend::resetToDefaults()
 {
-    KConfigGroup group = presentationGroup();
+    const auto config = KSharedConfig::openConfig(QString::fromLatin1(kConfigFile));
+    KConfigGroup group = presentationGroup(config);
     for (const QString &key : {
              QStringLiteral("showWeather"),
              QStringLiteral("showWeatherLocation"),
