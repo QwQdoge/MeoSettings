@@ -1,6 +1,7 @@
 #include "../src/backends/lockscreenpresentationbackend.h"
 
 #include <QDir>
+#include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
 
