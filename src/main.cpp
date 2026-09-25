@@ -11,6 +11,7 @@
 #include "backends/hardwarecapabilityregistry.h"
 #include "backends/kcmbridge.h"
 #include "backends/loginauthbackend.h"
+#include "backends/lockscreenpresentationbackend.h"
 #include "backends/meoaccountbackend.h"
 #include "backends/networkbackend.h"
 #include "backends/omnistoreappsbackend.h"
@@ -201,6 +202,7 @@ int main(int argc, char *argv[])
     DisplayBackend displayBackend;
     HardwareCapabilityRegistry hardwareCapabilityRegistry;
     LoginAuthBackend loginAuthBackend;
+    LockScreenPresentationBackend lockScreenPresentationBackend;
     RecoveryBackend recoveryBackend;
     ConfigBackend configBackend;
     FingerprintBackend fingerprintBackend;
@@ -250,6 +252,8 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("DisplayBackend"), &displayBackend);
     context->setContextProperty(QStringLiteral("HardwareCapabilities"), &hardwareCapabilityRegistry);
     context->setContextProperty(QStringLiteral("LoginAuthBackend"), &loginAuthBackend);
+    context->setContextProperty(QStringLiteral("LockScreenPresentationBackend"),
+                                &lockScreenPresentationBackend);
     context->setContextProperty(QStringLiteral("RecoveryBackend"), &recoveryBackend);
     context->setContextProperty(QStringLiteral("ConfigBackend"), &configBackend);
     context->setContextProperty(QStringLiteral("FingerprintBackend"), &fingerprintBackend);
