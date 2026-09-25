@@ -270,7 +270,11 @@ ApplicationWindow {
             "navigateTo": root.navigate,
             "rootMetrics": rootMetrics
         }
-        if (route.startsWith("category:") && route !== "category:privacy") {
+        if (route === "applications") {
+            common.requestedAppId = requestedApplicationId
+            common.requestedAppName = requestedApplicationName
+            common.requestedSection = requestedApplicationSection
+        } else if (route.startsWith("category:") && route !== "category:privacy") {
             common.categoryId = route.slice("category:".length)
         } else if (route.startsWith("kcm:")) {
             const entry = entryForRoute(route)
