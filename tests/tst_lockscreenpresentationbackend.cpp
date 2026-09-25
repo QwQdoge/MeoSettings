@@ -44,6 +44,15 @@ private Q_SLOTS:
         QCOMPARE(values.value(QStringLiteral("showAlbumArtwork")).toBool(), false);
     }
 
+    void rejectsNonBooleanToggle()
+    {
+        QVariantMap input = LockScreenPresentationBackend::defaults();
+        input[QStringLiteral("showWeather")] = QStringLiteral("false");
+        QString error;
+        QVERIFY(LockScreenPresentationBackend::normalized(input, &error).isEmpty());
+        QVERIFY(!error.isEmpty());
+    }
+
     void rejectsUnknownPrivacyMode()
     {
         QVariantMap input = LockScreenPresentationBackend::defaults();
