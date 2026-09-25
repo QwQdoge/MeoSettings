@@ -246,6 +246,7 @@ ApplicationWindow {
         case "language-region": return Qt.resolvedUrl("pages/LanguageRegionPage.qml")
         case "appearance": return Qt.resolvedUrl("pages/AppearancePage.qml")
         case "notifications": return Qt.resolvedUrl("pages/NotificationsPage.qml")
+        case "applications": return Qt.resolvedUrl("pages/ApplicationsPage.qml")
         case "accounts": return Qt.resolvedUrl("pages/AccountsPage.qml")
         case "session-entry": return Qt.resolvedUrl("pages/SessionEntryPage.qml")
         case "control-center": return Qt.resolvedUrl("pages/ControlCenterPage.qml")
