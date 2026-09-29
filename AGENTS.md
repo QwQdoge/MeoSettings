@@ -1,21 +1,42 @@
-# Meo Settings Agent Rules
+# Meo Settings agent rules
+
+## Start here
+
+Meo Settings owns application pages and their real Qt/KDE/Meo.System backends. Inspect `git status`, the affected page/backend, and its nearest tests/contracts before editing. Read only task-relevant docs.
 
 ## Ownership
 
-Meo Settings owns its pages, C++ backends, Meo-owned settings flows, and explicit integrations. Reuse shared controls/tokens from MeoUI via `$MEO_UI_ROOT`; Plasma-specific runtime integration belongs in `meo-kde`.
+- `qml/`: Settings and Welcome UI/routes.
+- `src/`: C++ backends, models, and platform integration.
+- `data/`: versioned app data/desktop metadata.
+- `tests/`: C++/QML contracts.
+- Shared reusable controls/tokens/motion belong in MeoUI.
+- Plasma-specific implementation belongs in meo-kde.
 
-Use stable Qt/KDE/Meo.System APIs. NetworkManager, BlueZ, PipeWire, KScreen, PowerDevil, KWin, package management, credentials, privileged/destructive storage work, and recovery remain with their authoritative service or maintained KCM unless this repository has a verified native contract. Do not fake local state.
+Use stable Qt/KDE/Meo.System APIs. Do not replace NetworkManager, BlueZ, PipeWire, KScreen, PowerDevil, KWin, package management, credentials, privilege, storage, or recovery authorities with fake local state or generic shell-command toggles. Use a maintained native backend/KCM handoff when that is the real authority.
 
-## Validation
+## Validation matrix
 
-Inspect the relevant source/contract and `git status`, then run the smallest applicable checks.
+For normal Settings changes, mirror `.github/workflows/arch-tests.yml`:
 
-- Normal Settings C++/QML change: mirror `.github/workflows/arch-tests.yml`—configure, build, `ctest --test-dir build --output-on-failure --timeout 60`, then `./build/meo-settings --smoke`.
-- Welcome change: also mirror `.github/workflows/welcome-validation.yml` and smoke both English and Chinese routes.
-- Shared UI change: implement it in MeoUI; follow MeoUI's QML coverage plus Showcase/checklist evidence rules instead of duplicating the component here.
+1. Build the required MeoUI and Meo.System dependencies.
+2. Configure this repo with `BUILD_TESTING=ON` and the real import roots.
+3. `cmake --build build --parallel 2`
+4. `QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure --timeout 60`
+5. `QT_QPA_PLATFORM=offscreen ./build/meo-settings --smoke`
 
-Compile/static/offscreen tests do not prove real Plasma-session, hardware, service, privilege, or recovery behavior.
+For Welcome-only work, also run the English and zh_CN smoke paths from `.github/workflows/welcome-validation.yml`.
 
-Use `$MEO_DOCS_ROOT/Projects/meo-settings/` for plans/audits/decisions and `$MEO_OUTPUT_ROOT/meo-settings/{build,install,validation,packages,tmp}/` for new output. Do not add new results to legacy `out/`.
+Do not assume dependency branches; follow the repository's current workflow/contract when a pinned dependency ref exists.
 
-Preserve unrelated dirty work. Do not mutate live system settings or privileged state merely to validate a change unless explicitly authorized.
+A compile/offscreen smoke does not prove a live Plasma session, hardware, service, privilege, destructive storage, or recovery path.
+
+## Cross-repository rule
+
+If the change should be reusable by other Meo apps, implement the primitive in MeoUI first. If it changes Plasma/KWin/Meo.System behavior, implement that integration in meo-kde and consume its public contract here.
+
+## Files and generated output
+
+Keep maintained contracts in `docs/`. Project records belong under `$MEO_DOCS_ROOT/Projects/meo-settings/`; generated output under `$MEO_OUTPUT_ROOT/meo-settings/{build,install,validation,packages,tmp}/`. Do not invent machine-specific paths if those roots are unset.
+
+Preserve unrelated dirty work and avoid destructive cleanup or unapproved live-system changes.
