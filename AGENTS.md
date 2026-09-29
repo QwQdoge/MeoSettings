@@ -37,6 +37,6 @@ If the change should be reusable by other Meo apps, implement the primitive in M
 
 ## Files and generated output
 
-Keep maintained contracts in `docs/`. Project records belong under `$MEO_DOCS_ROOT/Projects/meo-settings/`; generated output under `$MEO_OUTPUT_ROOT/meo-settings/{build,install,validation,packages,tmp}/`. Do not invent machine-specific paths if those roots are unset.
+Keep maintained contracts in `docs/`. Project records belong under `$MEO_DOCS_ROOT/Projects/meo-settings/`. Existing workflows may use an ephemeral local `build/`; retained evidence and deliverables belong under `$MEO_OUTPUT_ROOT/meo-settings/{build,install,validation,packages,tmp}/`. Do not invent machine-specific paths if those roots are unset.
 
 Preserve unrelated dirty work and avoid destructive cleanup or unapproved live-system changes.
