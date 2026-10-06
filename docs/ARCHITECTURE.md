@@ -81,7 +81,7 @@ to navigation as follows:
 | Large | Persistent search-first Settings index beside the page. |
 | Extra large | Persistent search-first Settings index with the widest content allowance. |
 
-The desktop index is `MeoSettingsSidebar`, owned by MeoUI. Search remains at
+The desktop index is `MeoSidebar`, owned by MeoUI. Search remains at
 the top, route rows are connected into semantic groups, and the selected route
 is automatically scrolled into view. The index uses the shared 360dp Settings
 width, dynamic Material roles, and `MeoSettingsGroup` row geometry; Meo

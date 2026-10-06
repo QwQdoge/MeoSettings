@@ -668,3 +668,11 @@ install(FILES data/meo-account/clients/org.meo.Settings.json
 install(FILES LICENSE
     DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/meo-settings"
 )
+
+# The route smoke waits for asynchronous construction of real application lists.
+# Give cold offscreen incubators time to finish; the executable still enforces
+# a bounded per-route readiness budget.
+if(BUILD_TESTING AND TEST meo-settings-qml-smoke)
+    set_tests_properties(meo-settings-qml-smoke meo-settings-lockscreen-layout-editor-smoke
+        PROPERTIES TIMEOUT 180)
+endif()

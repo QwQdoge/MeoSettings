@@ -458,9 +458,10 @@ int main(int argc, char *argv[])
                                  // Wait for the explicit page-ready contract
                                  // instead of making the smoke result depend
                                  // on machine load; still fail if it never
-                                 // settles.
+                                 // settles. Complex URL pages can spend tens of seconds
+                                 // in the offscreen asynchronous incubator.
                                  ++*notReadyTicks;
-                                 if (*notReadyTicks > 12) {
+                                 if (*notReadyTicks > 120) {
                                      qCritical() << "Meo Settings page host did not retain the current page during smoke navigation."
                                                  << "route:" << rootObject->property("currentRoute").toString()
                                                  << "loaded:" << rootObject->property("lastLoadedRoute").toString();

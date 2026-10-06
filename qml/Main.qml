@@ -205,10 +205,10 @@ ApplicationWindow {
     ]
 
     readonly property var desktopSearchRows: {
-        if (!desktopSidebar || desktopSidebar.searchText.trim() === "")
+        if (!navigation || navigation.searchText.trim() === "")
             return []
         const rows = []
-        const results = SettingsRegistry.search(desktopSidebar.searchText)
+        const results = SettingsRegistry.search(navigation.searchText)
         for (let index = 0; index < results.length; ++index) {
             const entry = results[index]
             if (!root.capabilityAvailable(entry.capability))
@@ -363,46 +363,35 @@ ApplicationWindow {
         id: navigation
         anchors.left: parent.left
         anchors.top: parent.top
-        width: root.usesDesktopSettingsIndex ? 0 : (isCompact ? parent.width : implicitWidth)
+        width: isCompact ? parent.width : implicitWidth
         height: parent.height
-        visible: !root.usesDesktopSettingsIndex
+        visible: true
         availableWidth: root.width
         model: SettingsRegistry.sidebarEntries
         currentIndex: root.sidebarIndexForRoute(root.currentRoute)
+        selectedRoute: root.desktopSelectionRoute(root.currentRoute)
+        groups: root.desktopSidebarGroups
+        sidebarTitle: qsTr("Settings")
+        showSidebarTitle: false
+        searchResults: root.desktopSearchRows
         compactNavigationLimit: 5
-        compactPresentation: "drawer"
-        preferPersistentDrawer: true
-        navigationVisualStyle: "settings"
+        compactPresentation: "sidebar"
         // A medium-width rail is deliberately icon-first. It avoids squeezing
         // category labels such as “Privacy & security” into an 80 dp column;
-        // the full persistent drawer returns at the large window class.
+        // the full searchable sidebar returns at the expanded window class.
         labelType: rootMetrics.isMediumWidth ? "none" : "always"
         onClicked: (index) => root.navigate(SettingsRegistry.sidebarEntries[index].route)
-    }
-
-    MeoSettingsSidebar {
-        id: desktopSidebar
-        objectName: "meoSettingsDesktopSidebar"
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        width: root.usesDesktopSettingsIndex ? MeoTheme.settingsSidebarWidth : 0
-        visible: root.usesDesktopSettingsIndex
-        showTitle: false
-        groups: root.desktopSidebarGroups
-        searchResults: root.desktopSearchRows
-        selectedRoute: root.desktopSelectionRoute(root.currentRoute)
         onRouteActivated: (route, row) => {
             root.navigate(route)
-            if (searching)
-                searchText = ""
+            if (navigation.searchText.trim() !== "")
+                navigation.searchText = ""
         }
     }
 
     Item {
         id: contentHost
         anchors.left: parent.left
-        anchors.leftMargin: root.usesDesktopSettingsIndex ? desktopSidebar.width
+        anchors.leftMargin: root.usesDesktopSettingsIndex ? navigation.width
                                                          : (navigation.isCompact ? 0 : navigation.width)
         anchors.right: parent.right
         anchors.top: parent.top
@@ -415,7 +404,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            visible: navigation.isCompact
+            visible: navigation.isCompact || rootMetrics.isMediumWidth
             title: root.currentRoute === "home" ? qsTr("Settings")
                   : (root.currentRoute === "display" ? qsTr("Display & touch")
                                                       : root.titleForRoute(root.currentRoute))
@@ -428,7 +417,7 @@ ApplicationWindow {
                                      : qsTr("Back to settings category")
                     onClicked: {
                         if (root.currentRoute === "home")
-                            navigation.openOverflow()
+                            navigation.openSidebar()
                         else
                             root.navigateBack()
                     }
@@ -440,7 +429,7 @@ ApplicationWindow {
             id: pageHost
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: navigation.isCompact ? compactTopBar.bottom : parent.top
+            anchors.top: compactTopBar.visible ? compactTopBar.bottom : parent.top
             anchors.bottom: parent.bottom
             transitionDistance: 32 * MeoTheme.globalScale
             loadingPlaceholder: settingsPageLoadingPlaceholder
