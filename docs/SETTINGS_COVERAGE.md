@@ -478,6 +478,323 @@ Destructive reset/recovery actions require explicit confirmation and should live
 
 ---
 
+# Additional required coverage
+
+The areas below close common desktop gaps that are easy to miss when Settings is built page-by-page. They are part of the long-term Meo Settings product contract even when the first implementation is still an explicitly marked advanced compatibility handoff.
+
+## Lock screen & login
+
+Lock screen and login must have a first-class Meo Settings workflow. The detailed security and presentation boundary is defined by `docs/SESSION_ENTRY_SETTINGS.md`; this section defines the normal user-facing coverage expected by the overall Settings product.
+
+Normal lock-screen coverage should include:
+
+- automatic lock timing;
+- lock after suspend/resume;
+- lock behavior after lid close when applicable;
+- whether authentication is required immediately or after a supported grace period;
+- current lock-screen wallpaper and whether it follows the desktop wallpaper;
+- clock/date presentation options intentionally exposed by the Meo lock schema;
+- weather and upcoming-event visibility where supported;
+- media information and playback-control visibility;
+- battery and network status visibility without exposing secrets;
+- notification policy: count only, hide sensitive content, show allowed content, or hide notifications;
+- album-art privacy independently from media-control availability;
+- per-display lock presentation/layout policy when supported;
+- reduced-motion integration;
+- fingerprint availability/status as reported by the real authentication authority;
+- password fallback status;
+- in-session preview/test of presentation settings;
+- restore Meo lock-screen defaults.
+
+Normal login-screen coverage should include only settings supported safely by the Meo Login Manager, such as:
+
+- greeter appearance/presentation owned by Meo;
+- user/avatar presentation;
+- session choice/default where the login manager exposes a maintained interface;
+- safe keyboard-layout selection;
+- power actions exposed by the greeter;
+- automatic-login configuration only after a password-preserving, tested privileged transaction exists.
+
+Meo Settings must never verify passwords itself, edit PAM configuration directly, store a credential in QML state, or treat Meo Account/cloud identity as a replacement for local session authentication.
+
+## Advanced network configuration
+
+The native Network & internet workflow should eventually cover common connection editing instead of stopping at connection status.
+
+Where NetworkManager exposes a maintained interface, include:
+
+- IPv4 DHCP/static configuration;
+- IPv6 automatic/static/disabled modes;
+- DNS servers and search domains;
+- connection priority and automatic-connect behavior;
+- metered connection state;
+- Wi-Fi security details without revealing saved secrets by default;
+- MAC-address randomization/privacy options where safely exposed;
+- VPN import/remove and common connection state;
+- hotspot name, password, band/security mode and connected-client summary where supported;
+- captive-portal status and sign-in handoff;
+- connection diagnostics and a direct path to the matching Repair category.
+
+Specialist enterprise authentication and unusual VPN/plugin configuration may remain an advanced handoff until Meo has a complete safe editor.
+
+## Sharing and remote access
+
+Meo Settings should provide one understandable place for intentionally exposing the device to other devices or users.
+
+Long-term supported controls may include:
+
+- remote desktop/screen sharing;
+- remote-control permission separately from view-only sharing where the backend supports that distinction;
+- SSH/remote-shell enablement only through a maintained system service contract;
+- local-network file/folder sharing where a supported Samba/KIO or equivalent backend exists;
+- media/device sharing only when MeoArch deliberately supports a maintained service;
+- nearby-device transfer/discovery if Meo adopts a supported backend;
+- current listening/sharing status and network scope;
+- authenticated-user/access policy where the real backend exposes it;
+- firewall impact shown before enabling a service;
+- a visible one-action stop/disable path.
+
+Remote access and sharing should default to off unless the installation/profile explicitly defines otherwise. Settings must not silently open a firewall port or start a network-facing daemon as a side effect of opening the page.
+
+## Printers & scanners
+
+Connected devices should include normal printing/scanning workflows rather than requiring the user to know CUPS or SANE terminology.
+
+At minimum, when supported backends are installed, provide:
+
+- discovered printers;
+- add/remove printer;
+- default printer;
+- print queue/status;
+- pause/resume/cancel jobs where safely exposed;
+- common paper, duplex, color and quality defaults supplied by the printer backend;
+- network-printer discovery and manual address entry through the maintained print stack;
+- driverless/IPP preference where supported;
+- detected scanners;
+- scanner availability/status and a maintained scan-application handoff or native basic scan workflow;
+- contextual install of required trusted printer/scanner support packages when resolvable through the shared package service.
+
+CUPS, SANE and device-specific maintained services remain authoritative. Arbitrary vendor installers remain outside the normal Meo workflow.
+
+## Peripheral and device-specific controls
+
+Common hardware that is not well represented by only “Bluetooth” should still have a discoverable Settings home.
+
+Coverage should include, when hardware and stable backends are present:
+
+- keyboard backlight level/timeout;
+- drawing tablet/stylus mapping, pressure and button basics;
+- game-controller discovery, battery and input test;
+- Thunderbolt/USB4 authorization and security state;
+- USB device summary where useful;
+- dock/adapter status where exposed;
+- device battery/charging information;
+- firmware/update status through the supported firmware authority;
+- safe vendor-independent hardware toggles exposed by the kernel/desktop stack.
+
+Vendor tuning suites, overclocking and undocumented device writes remain advanced/external unless Meo explicitly adopts and tests a backend.
+
+## Display color management and capture
+
+In addition to resolution/scale/HDR controls, display coverage should eventually include:
+
+- per-display ICC/color-profile assignment where the active compositor supports it;
+- profile status and reset-to-system/default behavior;
+- safe color-management/HDR interaction reporting;
+- screen rotation/orientation sensor behavior on convertible hardware;
+- screen casting/wireless-display entry points only when a maintained backend exists.
+
+Screen capture and recording are permissions/privacy concerns as well as display features. Settings should surface app or portal screen-capture/input-capture permissions when the desktop permission model can report and revoke them safely.
+
+## Performance & gaming
+
+The existing Performance surface should be treated as a supported Settings capability, not only a monitoring utility.
+
+Normal coverage may include:
+
+- CPU/GPU/memory/storage/network utilization;
+- temperatures, fan information and clocks only when exposed read-only by trusted hardware interfaces;
+- current power/performance profile;
+- supported performance/balanced/power-saver selection;
+- GameMode or Meo performance-policy state when installed and intentionally supported;
+- per-application performance preference only through a maintained scheduler/policy API;
+- battery/performance trade-off explanation on portable devices;
+- thermal or throttling warnings when the source is trustworthy.
+
+Do not expose unsafe overclocking, voltage control or arbitrary kernel/sysfs writes as normal Settings controls.
+
+## Startup, session and background services
+
+Normal users should not have to use several different KDE modules to understand what starts with their session.
+
+Meo Settings should eventually cover:
+
+- user startup applications;
+- enable/disable supported autostart entries;
+- application background permission/state where Meo can enforce it;
+- supported Meo session components and their health;
+- user-session restore behavior;
+- startup/session restore choice;
+- default desktop session where a maintained authority safely exposes it;
+- background services with a clear distinction between user services, Meo components and system services;
+- restart/reload of a supported failed user component when that action is bounded and safe;
+- direct Repair handoff for broken session components.
+
+Do not turn this page into a generic systemd service editor. Arbitrary root service enable/disable belongs outside normal Settings.
+
+## Search & indexing
+
+Desktop search affects privacy, battery usage and Launcher behavior and therefore needs an understandable normal settings surface.
+
+Coverage should include, when the maintained indexing backend supports it:
+
+- file/content indexing on/off;
+- indexed locations;
+- excluded locations/file types where practical;
+- current index status/progress;
+- rebuild/reset with an explanation of cost and effect;
+- privacy implications of content indexing;
+- Launcher search providers/sources owned by Meo;
+- recent/history search behavior where Meo owns that state.
+
+Baloo or another adopted indexer remains authoritative; Meo Settings should not maintain a second index database.
+
+## Removable media and volume behavior
+
+Storage coverage should include the ordinary behavior of USB drives, SD cards and other removable volumes:
+
+- connected removable volume summary;
+- mount/unmount/eject;
+- auto-mount preference where supported;
+- what to do when common media types are inserted;
+- encrypted-volume unlock handoff through the trusted desktop storage stack;
+- filesystem/read-only/error status;
+- safe capacity/usage information;
+- low-space or failing-device warnings when backed by trustworthy data.
+
+Formatting, partition-table editing, filesystem repair and destructive SMART/storage operations may remain in a dedicated trusted disk/recovery tool rather than being recreated casually inside Settings.
+
+## Camera, microphone and privacy permissions
+
+Privacy & security should distinguish physical device state from per-application permissions.
+
+Normal coverage should include where the permission stack exposes authoritative state:
+
+- camera devices and whether a hardware/privacy switch makes them unavailable;
+- microphone devices and mute/privacy state;
+- per-application camera permission;
+- per-application microphone permission;
+- location permission;
+- screen-capture/screen-recording permission;
+- input-capture/remote-control permission where supported;
+- notification and background permission links for the same application;
+- active privacy indicators and a way to identify the application currently using a sensitive device when the platform can provide that reliably;
+- portal permission reset/revoke actions with clear scope.
+
+Do not claim control over unrestricted native applications when the underlying Linux permission model cannot actually enforce a permission.
+
+## Device security and authentication status
+
+Privacy & security should also provide a comprehensible read-only security summary and safe actions where maintained authorities exist.
+
+Useful coverage includes:
+
+- Secure Boot status;
+- TPM presence/status;
+- disk/root encryption status;
+- firewall status/profile;
+- fingerprint hardware and enrollment status;
+- password/authentication health entry point;
+- screen-lock health;
+- system update/security-update status;
+- repository/signature trust warnings surfaced by the package system;
+- credential-wallet/keyring status where Meo intentionally supports management;
+- Thunderbolt/USB authorization state where relevant;
+- warnings for known unsupported security configurations.
+
+Displaying status is not permission to rewrite boot, PAM, LUKS, firmware or key material. Security-sensitive changes require their owning reviewed transaction/recovery flow.
+
+## Accessibility expansion
+
+The accessibility page should grow beyond generic text scale/reduced motion when stable desktop APIs exist.
+
+Long-term common coverage includes:
+
+- screen reader enable/status;
+- magnifier/zoom;
+- high contrast and color/contrast assistance;
+- color filters when the compositor exposes them;
+- reduced motion;
+- large text/interface scaling;
+- cursor size/visibility assistance;
+- sticky keys;
+- slow keys;
+- bounce keys;
+- mouse keys;
+- dwell/automatic click where supported;
+- mono audio and visual alert alternatives where the audio/notification stack supports them;
+- keyboard focus visibility and other Meo-owned accessibility presentation preferences.
+
+Assistive applications with substantial specialist configuration may keep a clearly marked advanced/open-app workflow.
+
+## Backup, snapshots and recovery
+
+Storage & backup / System should provide one place to understand whether recoverable state exists.
+
+When MeoArch adopts maintained backends, coverage should include:
+
+- backup provider/status;
+- last successful backup;
+- included/excluded locations;
+- create/run backup action;
+- local snapshot/restore-point status where the installed filesystem supports a maintained snapshot workflow;
+- restore entry point with a clear description of what will change;
+- recovery media / Live recovery guidance;
+- factory/reset/reinstall entry point only through the dedicated destructive recovery flow;
+- export of diagnostics before destructive recovery where practical.
+
+Do not show a “backup enabled” state unless a real scheduled or user-triggered backend can prove that recoverable data exists.
+
+## System identity, firmware and hardware
+
+System/About should support common device-administration tasks without turning into a hardware-tuning utility.
+
+Coverage should include:
+
+- device name/hostname with validation and the correct privileged backend;
+- MeoArch version/channel/build;
+- kernel and desktop/session version;
+- CPU/GPU/memory summary;
+- storage and battery summary;
+- firmware version/UEFI mode where available;
+- firmware update availability/status through a maintained firmware service;
+- installed graphics/important driver status;
+- virtualization/container capability summary only if useful to normal users;
+- copy/export system information for support;
+- restart-required state.
+
+Raw DMI/PCI dumps and vendor-specific tuning remain advanced diagnostics rather than the main user experience.
+
+## Default applications, file associations and link handling
+
+The Applications page should make the common “what opens this?” decisions native and understandable.
+
+Coverage should include:
+
+- default browser;
+- default mail client where applicable;
+- default file manager;
+- default terminal when Meo exposes it as a supported user preference;
+- default media/image/PDF handlers;
+- file-type/MIME associations;
+- URL/protocol handlers;
+- reset to recommended defaults;
+- application-by-application supported defaults/permissions summary.
+
+The UI should write through maintained XDG/KDE association authorities rather than editing configuration fragments ad hoc from QML.
+
+---
+
 # Navigation target
 
 The long-term top-level information architecture should be understandable without knowledge of KDE module names.
@@ -493,16 +810,22 @@ Sound
 Notifications
 Appearance
 Desktop & multitasking
+Lock screen & login
 Keyboard, mouse & input
 Language & region
 Applications
 Power & battery
-Storage
+Performance
+Storage & backup
+Sharing
 Privacy & security
 Accessibility
 Accounts & users
 System
+Updates & support
 ```
+
+Printers/scanners, drawing tablets, controllers and Thunderbolt/USB4 can live under Connected devices. Search/indexing, startup/session/background services and date/time can live under System unless the information architecture later proves that a dedicated top-level destination is clearer.
 
 The exact responsive navigation presentation belongs to MeoUI/Meo Settings design. The category names above define capability ownership, not a requirement to copy an Android Settings sidebar literally.
 
