@@ -15,6 +15,18 @@ Meo Settings owns application pages and their real Qt/KDE/Meo.System backends. I
 
 Use stable Qt/KDE/Meo.System APIs. Do not replace NetworkManager, BlueZ, PipeWire, KScreen, PowerDevil, KWin, package management, credentials, privilege, storage, or recovery authorities with fake local state or generic shell-command toggles. Use a maintained native backend/KCM handoff when that is the real authority.
 
+## Runtime system information
+
+Treat system/device information as runtime state, not UI copy. If a value can vary by machine, installation, session, connected hardware, installed software, account, service, or current configuration, read it from the authoritative runtime source whenever practical instead of hard-coding it in QML/C++.
+
+- Prefer the owning Qt/KDE/native API or a documented Meo.System contract; use stable read-only system interfaces only when no suitable native API exists.
+- Do not guess or ship plausible placeholder hardware/system facts. If a value cannot be detected reliably, report it as unavailable/unknown, hide the hardware-specific row, or disable the related capability with an explanation.
+- Keep mutable state reactive where practical and provide an explicit refresh path for snapshot/expensive information. After state-changing actions, re-read the owner rather than assuming the requested result.
+- Test/preview fixtures may contain deterministic fake values only behind explicit test/preview paths. Production startup must never silently fall back to them.
+- Static values are appropriate only for genuine product constants such as branding, UI copy, design tokens, protocol identifiers, or the compile-time version of the exact binary being run.
+
+The detailed contract is `docs/RUNTIME_SYSTEM_INFORMATION.md`. `SystemInfoBackend` owns About/device facts; QML must consume backend values rather than inventing machine facts locally. Apply the same rule to storage, power, display, audio, network, Bluetooth, update, account, capability, and other system-backed pages.
+
 ## Validation matrix
 
 For normal Settings changes, mirror `.github/workflows/arch-tests.yml`:
