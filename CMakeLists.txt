@@ -67,6 +67,10 @@ qt_add_executable(meo-settings
     src/core/qmlimportpolicy.h
     src/core/settingsregistry.cpp
     src/core/settingsregistry.h
+    src/core/sessionentrydocument.cpp
+    src/core/sessionentrydocument.h
+    src/core/lockscreenconfigstore.cpp
+    src/core/lockscreenconfigstore.h
     src/backends/networkbackend.cpp
     src/backends/networkbackend.h
     src/backends/bluetoothbackend.cpp
@@ -473,6 +477,10 @@ add_executable(meo-settings-lockscreenpresentationbackend-test
     tests/tst_lockscreenpresentationbackend.cpp
     src/core/backendbase.cpp
     src/core/backendbase.h
+    src/core/sessionentrydocument.cpp
+    src/core/sessionentrydocument.h
+    src/core/lockscreenconfigstore.cpp
+    src/core/lockscreenconfigstore.h
     src/backends/lockscreenpresentationbackend.cpp
     src/backends/lockscreenpresentationbackend.h
 )
