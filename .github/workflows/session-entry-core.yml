@@ -28,7 +28,7 @@ jobs:
       - name: Install focused build dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --needed --noconfirm cmake ninja qt6-base
+          pacman -S --needed --noconfirm base-devel cmake ninja qt6-base
 
       - name: Check out MeoSettings
         uses: actions/checkout@v6
