@@ -1,12 +1,15 @@
 #pragma once
 
 #include "../core/backendbase.h"
+#include "../core/lockscreenconfigstore.h"
 
 #include <QVariantMap>
 
-// Narrow, user-scoped writer for Meo Look & Feel presentation preferences.
-// Authentication policy, PAM, lock timing, and display-manager configuration
-// deliberately remain outside this backend.
+// User-scoped presentation adapter for the Meo Session Lock v1 document.
+//
+// QML sees only the small set of controls the current lock runtime consumes.
+// Authentication, PAM, lock timing, the system login document and package
+// installation remain outside this backend.
 class LockScreenPresentationBackend final : public BackendBase
 {
     Q_OBJECT
@@ -29,5 +32,6 @@ Q_SIGNALS:
     void saved();
 
 private:
+    LockScreenConfigStore m_store;
     QVariantMap m_settings;
 };
