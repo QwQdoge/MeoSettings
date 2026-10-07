@@ -109,8 +109,19 @@ void SystemTransactionBackend::inspect(const QString &kind, const QVariantMap &r
                 }
 
                 m_lastPlan = plan;
-                m_phase = QStringLiteral("planned");
-                clearError();
+                const bool ok = plan.value(QStringLiteral("ok"), false).toBool();
+                const QString state = plan.value(QStringLiteral("state")).toString().trimmed();
+                m_phase = state.isEmpty()
+                    ? (ok ? QStringLiteral("planned") : QStringLiteral("rejected"))
+                    : state;
+                if (!ok) {
+                    const QString message = plan.value(QStringLiteral("message")).toString().trimmed();
+                    setError(message.isEmpty()
+                                 ? tr("The Meo transaction service rejected the inspection request.")
+                                 : message);
+                } else {
+                    clearError();
+                }
                 Q_EMIT changed();
             });
 }
