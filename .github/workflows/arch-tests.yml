@@ -49,9 +49,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: QwQdoge/meo-kde
-          # This Settings branch consumes the Shelf/Launcher contracts from
-          # meo-kde #8 until that dependency lands on main.
-          ref: codex/shelf-launcher-settings
+          ref: main
           path: deps/meo-kde
 
       - name: Build MeoUI runtime
