@@ -4,17 +4,42 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
-#include <QObject>
 #include <QRegularExpression>
 #include <QSet>
-#include <QStringList>
 
 namespace
 {
 using Scope = SessionEntryDocument::Scope;
-using Result = SessionEntryDocument::ValidationResult;
+using ValidationResult = SessionEntryDocument::ValidationResult;
 
-class DocumentValidator final
+ValidationResult parseFailure(const QString &error)
+{
+    ValidationResult result;
+    result.error = error;
+    result.path = QStringLiteral("$");
+    return result;
+}
+
+bool containsControlCharacter(const QString &value)
+{
+    for (const QChar character : value) {
+        if (character.category() == QChar::Other_Control) {
+            return true;
+        }
+    }
+    return false;
+}
+
+QVariantMap wallpaperDefaults()
+{
+    return {
+        {QStringLiteral("source"), QStringLiteral("system-default")},
+        {QStringLiteral("assetId"), QString()},
+        {QStringLiteral("fillMode"), QStringLiteral("cover")},
+    };
+}
+
+class DocumentValidator
 {
 public:
     explicit DocumentValidator(std::optional<Scope> expectedScope)
@@ -22,7 +47,7 @@ public:
     {
     }
 
-    Result validate(const QJsonObject &root)
+    ValidationResult validate(const QJsonObject &root)
     {
         if (!exactShape(root,
                         {QStringLiteral("schemaVersion"), QStringLiteral("scope"),
@@ -30,32 +55,31 @@ public:
                          QStringLiteral("privacy"), QStringLiteral("layout"),
                          QStringLiteral("motion")},
                         QStringLiteral("$"))) {
-            return m_result;
+            return result();
         }
 
-        const QJsonValue schemaVersion = root.value(QStringLiteral("schemaVersion"));
-        if (!schemaVersion.isDouble() || schemaVersion.toDouble() != 1.0) {
-            return fail(QStringLiteral("$.schemaVersion"),
-                        QObject::tr("Only session-entry schema version 1 is supported."));
+        const QJsonValue version = root.value(QStringLiteral("schemaVersion"));
+        if (!version.isDouble() || version.toInt(-1) != 1 || version.toDouble() != 1.0) {
+            fail(QStringLiteral("$.schemaVersion"), QObject::tr("Unsupported schema version."));
+            return result();
         }
 
-        const QJsonValue scopeValue = root.value(QStringLiteral("scope"));
-        if (!scopeValue.isString()) {
-            return fail(QStringLiteral("$.scope"), QObject::tr("Expected a scope name."));
+        QString scopeText;
+        if (!stringValue(root, QStringLiteral("scope"), QStringLiteral("$"), &scopeText)) {
+            return result();
         }
-
         Scope scope;
-        const QString scopeText = scopeValue.toString();
         if (scopeText == QLatin1String("lockscreen")) {
             scope = Scope::LockScreen;
         } else if (scopeText == QLatin1String("login")) {
             scope = Scope::Login;
         } else {
-            return fail(QStringLiteral("$.scope"), QObject::tr("Unsupported session-entry scope."));
+            fail(QStringLiteral("$.scope"), QObject::tr("Unknown session-entry scope."));
+            return result();
         }
-        if (m_expectedScope.has_value() && *m_expectedScope != scope) {
-            return fail(QStringLiteral("$.scope"),
-                        QObject::tr("Document scope does not match this writer."));
+        if (m_expectedScope && *m_expectedScope != scope) {
+            fail(QStringLiteral("$.scope"), QObject::tr("Document scope does not match this writer."));
+            return result();
         }
 
         QJsonObject appearance;
@@ -73,19 +97,27 @@ public:
             || !validatePrivacy(privacy, scope)
             || !validateLayout(layout, scope)
             || !validateMotion(motion)) {
-            return m_result;
+            return result();
         }
 
         m_result.ok = true;
         m_result.document = root.toVariantMap();
-        return m_result;
+        return result();
     }
 
 private:
-    Result fail(const QString &path, const QString &message)
+    ValidationResult result() const
     {
-        m_result = {false, path, message, {}};
         return m_result;
+    }
+
+    void fail(const QString &path, const QString &message)
+    {
+        if (!m_result.error.isEmpty()) {
+            return;
+        }
+        m_result.path = path;
+        m_result.error = message;
     }
 
     bool failBool(const QString &path, const QString &message)
@@ -94,89 +126,80 @@ private:
         return false;
     }
 
-    bool exactShape(const QJsonObject &object, const QStringList &keys, const QString &path)
+    bool exactShape(const QJsonObject &object, const QSet<QString> &expected, const QString &path)
     {
-        QSet<QString> allowed;
-        for (const QString &key : keys) {
-            allowed.insert(key);
-            if (!object.contains(key)) {
-                return failBool(path + QLatin1Char('.') + key,
-                                QObject::tr("Required setting is missing."));
+        for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+            if (!expected.contains(it.key())) {
+                return failBool(path == QLatin1String("$")
+                                    ? path + QStringLiteral(".") + it.key()
+                                    : path + QStringLiteral(".") + it.key(),
+                                QObject::tr("Unknown field."));
             }
         }
-        for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
-            if (!allowed.contains(it.key())) {
-                return failBool(path + QLatin1Char('.') + it.key(),
-                                QObject::tr("Unknown settings are not accepted."));
+        for (const QString &key : expected) {
+            if (!object.contains(key)) {
+                return failBool(path + QStringLiteral(".") + key, QObject::tr("Missing required field."));
             }
         }
         return true;
     }
 
-    bool objectValue(const QJsonObject &parent,
-                     const QString &key,
-                     const QString &parentPath,
+    bool objectValue(const QJsonObject &object, const QString &key, const QString &path,
                      QJsonObject *value)
     {
-        const QJsonValue candidate = parent.value(key);
+        const QJsonValue candidate = object.value(key);
         if (!candidate.isObject()) {
-            return failBool(parentPath + QLatin1Char('.') + key, QObject::tr("Expected an object."));
+            return failBool(path + QStringLiteral(".") + key, QObject::tr("Expected an object."));
         }
         *value = candidate.toObject();
+        return true;
+    }
+
+    bool stringValue(const QJsonObject &object, const QString &key, const QString &path,
+                     QString *value)
+    {
+        const QJsonValue candidate = object.value(key);
+        if (!candidate.isString()) {
+            return failBool(path + QStringLiteral(".") + key, QObject::tr("Expected a string."));
+        }
+        *value = candidate.toString();
         return true;
     }
 
     bool booleanValue(const QJsonObject &object, const QString &key, const QString &path)
     {
         if (!object.value(key).isBool()) {
-            return failBool(path + QLatin1Char('.') + key,
-                            QObject::tr("Expected true or false."));
+            return failBool(path + QStringLiteral(".") + key, QObject::tr("Expected true or false."));
         }
         return true;
     }
 
-    bool stringValue(const QJsonObject &object,
-                     const QString &key,
-                     const QString &path,
-                     QString *value)
+    bool enumValue(const QJsonObject &object, const QString &key, const QString &path,
+                   const QSet<QString> &allowed, QString *value = nullptr)
     {
-        if (!object.value(key).isString()) {
-            return failBool(path + QLatin1Char('.') + key, QObject::tr("Expected text."));
-        }
-        *value = object.value(key).toString();
-        return true;
-    }
-
-    bool enumValue(const QJsonObject &object,
-                   const QString &key,
-                   const QString &path,
-                   const QSet<QString> &allowed,
-                   QString *value = nullptr)
-    {
-        QString candidate;
-        if (!stringValue(object, key, path, &candidate)) {
+        QString text;
+        if (!stringValue(object, key, path, &text)) {
             return false;
         }
-        if (!allowed.contains(candidate)) {
-            return failBool(path + QLatin1Char('.') + key,
-                            QObject::tr("Unsupported setting value."));
+        if (!allowed.contains(text)) {
+            return failBool(path + QStringLiteral(".") + key, QObject::tr("Unsupported value."));
         }
         if (value) {
-            *value = candidate;
+            *value = text;
         }
         return true;
     }
 
-    static bool containsControlCharacter(const QString &value)
+    bool safeAssetId(const QString &assetId)
     {
-        static const QRegularExpression controls(QStringLiteral("[\\x00-\\x1f\\x7f]"));
-        return value.contains(controls);
-    }
-
-    static bool safeAssetId(const QString &assetId)
-    {
-        static const QRegularExpression syntax(
-            QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$"));
+        if (assetId.isEmpty() || assetId.size() > 256 || containsControlCharacter(assetId)) {
+            return false;
+        }
+        if (assetId.contains(QLatin1Char(':')) || assetId.startsWith(QLatin1Char('/'))
+            || assetId.startsWith(QLatin1Char('~'))) {
+            return false;
+        }
+        static const QRegularExpression syntax(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$"));
         if (!syntax.match(assetId).hasMatch()) {
             return false;
         }
@@ -396,23 +419,9 @@ private:
     }
 
     std::optional<Scope> m_expectedScope;
-    Result m_result;
+    ValidationResult m_result;
 };
-
-QVariantMap wallpaperDefaults()
-{
-    return {
-        {QStringLiteral("source"), QStringLiteral("system-default")},
-        {QStringLiteral("assetId"), QString()},
-        {QStringLiteral("fillMode"), QStringLiteral("cover")},
-    };
 }
-
-Result parseFailure(const QString &message)
-{
-    return {false, QStringLiteral("$"), message, {}};
-}
-} // namespace
 
 QString SessionEntryDocument::scopeName(Scope scope)
 {
@@ -442,7 +451,7 @@ QVariantMap SessionEntryDocument::defaults(Scope scope)
         {QStringLiteral("privacy"), QVariantMap{
              {QStringLiteral("notificationVisibility"),
               login ? QStringLiteral("hidden") : QStringLiteral("count")},
-             {QStringLiteral("showAlbumArtwork"), !login},
+             {QStringLiteral("showAlbumArtwork"), false},
              {QStringLiteral("weatherLocation"),
               login ? QStringLiteral("hidden") : QStringLiteral("city")},
          }},
