@@ -7,11 +7,48 @@
 
 #include <QtMath>
 
+#include <memory>
+
+namespace {
+
+QString displayModeLabel(const KScreen::ModePtr &mode)
+{
+    if (!mode) {
+        return {};
+    }
+
+    const QSize size = mode->size();
+    return DisplayBackend::tr("%1 × %2 · %3 Hz")
+        .arg(size.width())
+        .arg(size.height())
+        .arg(QString::number(mode->refreshRate(), 'f', 1));
+}
+
+} // namespace
+
 DisplayBackend::DisplayBackend(QObject *parent)
     : BackendBase(parent)
 {
     connect(KScreen::ConfigMonitor::instance(), &KScreen::ConfigMonitor::configurationChanged,
             this, &DisplayBackend::refresh);
+
+    m_modeConfirmationTimer.setInterval(1000);
+    connect(&m_modeConfirmationTimer, &QTimer::timeout, this, [this] {
+        if (!m_modeConfirmationPending || busy()) {
+            return;
+        }
+
+        if (m_modeConfirmationSecondsRemaining > 1) {
+            --m_modeConfirmationSecondsRemaining;
+            Q_EMIT modeConfirmationChanged();
+            return;
+        }
+
+        m_modeConfirmationSecondsRemaining = 0;
+        Q_EMIT modeConfirmationChanged();
+        revertModeChange();
+    });
+
     refresh();
 }
 
@@ -26,6 +63,21 @@ QString DisplayBackend::summary() const
         return available() ? tr("No connected displays") : tr("Display service unavailable");
     }
     return tr("%n connected display(s)", "", m_outputs.size());
+}
+
+bool DisplayBackend::modeConfirmationPending() const
+{
+    return m_modeConfirmationPending;
+}
+
+int DisplayBackend::modeConfirmationSecondsRemaining() const
+{
+    return m_modeConfirmationSecondsRemaining;
+}
+
+QString DisplayBackend::modeConfirmationLabel() const
+{
+    return m_modeConfirmationLabel;
 }
 
 void DisplayBackend::refresh()
@@ -123,19 +175,51 @@ void DisplayBackend::setMode(const int outputId, const QString &modeId)
         setError(tr("Choose a valid display mode."));
         return;
     }
+    if (m_modeConfirmationPending) {
+        setError(tr("Keep or revert the current display mode before changing another display setting."));
+        return;
+    }
 
-    mutateOutput(outputId,
-                 [modeId](const KScreen::ConfigPtr &, const KScreen::OutputPtr &output, QString *error) {
-                     const auto mode = output->mode(modeId);
-                     if (!mode) {
-                         if (error) {
-                             *error = DisplayBackend::tr("The selected display mode is no longer available.");
-                         }
-                         return false;
-                     }
-                     output->setCurrentModeId(mode->id());
-                     return true;
-                 });
+    auto previousModeId = std::make_shared<QString>();
+    auto targetLabel = std::make_shared<QString>();
+
+    mutateOutput(
+        outputId,
+        [modeId, previousModeId, targetLabel](const KScreen::ConfigPtr &,
+                                              const KScreen::OutputPtr &output,
+                                              QString *error) {
+            const auto mode = output->mode(modeId);
+            if (!mode) {
+                if (error) {
+                    *error = DisplayBackend::tr("The selected display mode is no longer available.");
+                }
+                return false;
+            }
+
+            if (output->currentModeId().isEmpty()) {
+                if (error) {
+                    *error = DisplayBackend::tr("The current display mode is unknown, so a safe rollback cannot be prepared.");
+                }
+                return false;
+            }
+
+            if (output->currentModeId() == mode->id()) {
+                if (error) {
+                    *error = DisplayBackend::tr("That display mode is already active.");
+                }
+                return false;
+            }
+
+            *previousModeId = output->currentModeId();
+            *targetLabel = displayModeLabel(mode);
+            output->setCurrentModeId(mode->id());
+            return true;
+        },
+        [this, outputId, previousModeId, targetLabel](const bool success) {
+            if (success) {
+                beginModeConfirmation(outputId, *previousModeId, *targetLabel);
+            }
+        });
 }
 
 void DisplayBackend::setPrimary(const int outputId)
@@ -153,10 +237,76 @@ void DisplayBackend::setPrimary(const int outputId)
                  });
 }
 
-void DisplayBackend::mutateOutput(const int outputId, const OutputMutation &mutation)
+void DisplayBackend::confirmModeChange()
 {
+    if (!m_modeConfirmationPending || busy()) {
+        return;
+    }
+
+    clearModeConfirmation();
+}
+
+void DisplayBackend::revertModeChange()
+{
+    if (!m_modeConfirmationPending) {
+        return;
+    }
+    if (busy()) {
+        setError(tr("The display service is still refreshing. Try reverting again in a moment."));
+        return;
+    }
+
+    const int outputId = m_modeConfirmationOutputId;
+    const QString previousModeId = m_modeConfirmationPreviousModeId;
+
+    mutateOutput(
+        outputId,
+        [previousModeId](const KScreen::ConfigPtr &,
+                         const KScreen::OutputPtr &output,
+                         QString *error) {
+            const auto previousMode = output->mode(previousModeId);
+            if (!previousMode) {
+                if (error) {
+                    *error = DisplayBackend::tr("The previous display mode is no longer available for automatic rollback.");
+                }
+                return false;
+            }
+            output->setCurrentModeId(previousMode->id());
+            return true;
+        },
+        [this](const bool success) {
+            if (success) {
+                clearModeConfirmation();
+                return;
+            }
+
+            // Do not loop an automatic rollback forever if the output was
+            // disconnected or its old mode disappeared. Keep the confirmation
+            // state visible so the user can retry or explicitly keep the mode.
+            m_modeConfirmationTimer.stop();
+            m_modeConfirmationSecondsRemaining = 0;
+            Q_EMIT modeConfirmationChanged();
+        },
+        true);
+}
+
+void DisplayBackend::mutateOutput(const int outputId,
+                                  const OutputMutation &mutation,
+                                  const MutationCompletion &completion,
+                                  const bool allowDuringModeConfirmation)
+{
+    if (m_modeConfirmationPending && !allowDuringModeConfirmation) {
+        setError(tr("Keep or revert the current display mode before changing another display setting."));
+        if (completion) {
+            completion(false);
+        }
+        return;
+    }
     if (busy()) {
         setError(tr("Another display change is still being applied."));
+        if (completion) {
+            completion(false);
+        }
         return;
     }
 
@@ -165,11 +315,14 @@ void DisplayBackend::mutateOutput(const int outputId, const OutputMutation &muta
 
     auto *getOperation = new KScreen::GetConfigOperation(KScreen::ConfigOperation::NoEDID, this);
     connect(getOperation, &KScreen::ConfigOperation::finished, this,
-            [this, getOperation, outputId, mutation](KScreen::ConfigOperation *finished) {
+            [this, getOperation, outputId, mutation, completion](KScreen::ConfigOperation *finished) {
                 if (finished->hasError() || !finished->config()) {
                     failMutation(finished->hasError()
                                      ? finished->errorString()
                                      : tr("No display configuration was returned."));
+                    if (completion) {
+                        completion(false);
+                    }
                     getOperation->deleteLater();
                     return;
                 }
@@ -178,6 +331,9 @@ void DisplayBackend::mutateOutput(const int outputId, const OutputMutation &muta
                 const auto output = config->output(outputId);
                 if (!output || !output->isConnected()) {
                     failMutation(tr("The selected display is no longer connected."));
+                    if (completion) {
+                        completion(false);
+                    }
                     getOperation->deleteLater();
                     return;
                 }
@@ -187,6 +343,9 @@ void DisplayBackend::mutateOutput(const int outputId, const OutputMutation &muta
                     failMutation(mutationError.isEmpty()
                                      ? tr("The requested display change is not available.")
                                      : mutationError);
+                    if (completion) {
+                        completion(false);
+                    }
                     getOperation->deleteLater();
                     return;
                 }
@@ -195,18 +354,27 @@ void DisplayBackend::mutateOutput(const int outputId, const OutputMutation &muta
                         config,
                         KScreen::Config::ValidityFlag::RequireAtLeastOneEnabledScreen)) {
                     failMutation(tr("This display configuration cannot be applied safely."));
+                    if (completion) {
+                        completion(false);
+                    }
                     getOperation->deleteLater();
                     return;
                 }
 
                 auto *setOperation = new KScreen::SetConfigOperation(config, this);
                 connect(setOperation, &KScreen::ConfigOperation::finished, this,
-                        [this, setOperation](KScreen::ConfigOperation *applied) {
+                        [this, setOperation, completion](KScreen::ConfigOperation *applied) {
                             setBusy(false);
                             if (applied->hasError()) {
                                 setError(applied->errorString());
                                 Q_EMIT changed();
+                                if (completion) {
+                                    completion(false);
+                                }
                             } else {
+                                if (completion) {
+                                    completion(true);
+                                }
                                 refresh();
                             }
                             setOperation->deleteLater();
@@ -220,4 +388,35 @@ void DisplayBackend::failMutation(const QString &message)
     setBusy(false);
     setError(message);
     Q_EMIT changed();
+}
+
+void DisplayBackend::beginModeConfirmation(const int outputId,
+                                           const QString &previousModeId,
+                                           const QString &targetLabel)
+{
+    m_modeConfirmationPending = true;
+    m_modeConfirmationOutputId = outputId;
+    m_modeConfirmationPreviousModeId = previousModeId;
+    m_modeConfirmationLabel = targetLabel;
+    m_modeConfirmationSecondsRemaining = 15;
+    m_modeConfirmationTimer.start();
+    Q_EMIT modeConfirmationChanged();
+}
+
+void DisplayBackend::clearModeConfirmation()
+{
+    if (!m_modeConfirmationPending
+        && m_modeConfirmationOutputId < 0
+        && m_modeConfirmationPreviousModeId.isEmpty()
+        && m_modeConfirmationLabel.isEmpty()) {
+        return;
+    }
+
+    m_modeConfirmationTimer.stop();
+    m_modeConfirmationPending = false;
+    m_modeConfirmationOutputId = -1;
+    m_modeConfirmationSecondsRemaining = 0;
+    m_modeConfirmationPreviousModeId.clear();
+    m_modeConfirmationLabel.clear();
+    Q_EMIT modeConfirmationChanged();
 }
