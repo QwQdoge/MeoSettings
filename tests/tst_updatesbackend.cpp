@@ -59,6 +59,12 @@ void UpdatesBackendTest::readsOfficialPackageCatalogWithoutPrefixInference()
     QVERIFY(SystemUpdatesContract::officialPackageNames(
                 QByteArrayLiteral("{\"schemaVersion\": 1, \"officialPackages\": [\"meo-settings\"]}"))
                 .isEmpty());
+    QCOMPARE(SystemUpdatesContract::officialPackageNames(
+                 QByteArrayLiteral("{\"schemaVersion\":1,\"packages\":{\"meo-settings\":{},\"omnistore-bin\":{}}}")),
+             QStringList({QStringLiteral("meo-settings"), QStringLiteral("omnistore-bin")}));
+    QVERIFY(SystemUpdatesContract::officialPackageNames(
+                QByteArrayLiteral("{\"schemaVersion\":1,\"packages\":{\"meo-settings\":true}}"))
+                .isEmpty());
     for (const QByteArray &invalid : {
              QByteArrayLiteral("{\"schemaVersion\":2.5,\"officialPackages\":[\"meo-settings\"]}"),
              QByteArrayLiteral("{\"schemaVersion\":\"2\",\"officialPackages\":[\"meo-settings\"]}"),

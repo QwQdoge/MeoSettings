@@ -186,16 +186,38 @@ QVariantMap SystemUpdatesContract::syncInfoForPackage(const QByteArray &output, 
 QStringList SystemUpdatesContract::officialPackageNames(const QByteArray &catalog)
 {
     const QJsonDocument document = QJsonDocument::fromJson(catalog);
-    if (!document.isObject() || document.object().value(QStringLiteral("schemaVersion")).toDouble(-1) != 2) {
+    if (!document.isObject()) {
         return {};
     }
-    const QJsonValue value = document.object().value(QStringLiteral("officialPackages"));
-    if (!value.isArray() || value.toArray().size() > 4096) {
+    const QJsonObject object = document.object();
+    const double version = object.value(QStringLiteral("schemaVersion")).toDouble(-1);
+    QStringList candidates;
+    if (version == 1 && object.value(QStringLiteral("packages")).isObject()) {
+        // Current meo-release publishes a unified package map, not the older
+        // compact officialPackages list from the release branch.
+        const QJsonObject packages = object.value(QStringLiteral("packages")).toObject();
+        for (auto entry = packages.begin(); entry != packages.end(); ++entry) {
+            if (!entry.value().isObject()) {
+                return {};
+            }
+            candidates.push_back(entry.key());
+        }
+    } else if (version == 2 && object.value(QStringLiteral("officialPackages")).isArray()) {
+        for (const QJsonValue &entry : object.value(QStringLiteral("officialPackages")).toArray()) {
+            if (!entry.isString()) {
+                return {};
+            }
+            candidates.push_back(entry.toString());
+        }
+    } else {
+        return {};
+    }
+    if (candidates.isEmpty() || candidates.size() > 4096) {
         return {};
     }
     QStringList names;
-    for (const QJsonValue &entry : value.toArray()) {
-        const QString name = safeText(entry.toString(), 128).toCaseFolded();
+    for (const QString &entry : candidates) {
+        const QString name = safeText(entry, 128).toCaseFolded();
         if (!kPackageNameExpression.match(name).hasMatch() || names.contains(name)) {
             return {};
         }
