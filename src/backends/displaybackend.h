@@ -2,7 +2,12 @@
 
 #include "../core/backendbase.h"
 
+#include <KScreen/Config>
+#include <KScreen/Output>
+
 #include <QVariantList>
+
+#include <functional>
 
 class DisplayBackend final : public BackendBase
 {
@@ -17,10 +22,20 @@ public:
     QString summary() const;
 
     Q_INVOKABLE void refresh();
+    Q_INVOKABLE void setScale(int outputId, qreal scale);
+    Q_INVOKABLE void setMode(int outputId, const QString &modeId);
+    Q_INVOKABLE void setPrimary(int outputId);
 
 Q_SIGNALS:
     void changed();
 
 private:
+    using OutputMutation = std::function<bool(const KScreen::ConfigPtr &,
+                                              const KScreen::OutputPtr &,
+                                              QString *)>;
+
+    void mutateOutput(int outputId, const OutputMutation &mutation);
+    void failMutation(const QString &message);
+
     QVariantList m_outputs;
 };
