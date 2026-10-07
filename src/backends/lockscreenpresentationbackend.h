@@ -1,12 +1,13 @@
 #pragma once
 
 #include "../core/backendbase.h"
+#include "../core/lockscreenconfigstore.h"
 
 #include <QVariantMap>
 
-// Narrow, user-scoped writer for Meo Look & Feel presentation preferences.
-// Authentication policy, PAM, lock timing, and display-manager configuration
-// deliberately remain outside this backend.
+// User-scoped editor/writer for the versioned Meo session-entry presentation
+// document. Authentication policy, PAM, lock timing, display-manager state and
+// the privileged login-scope writer deliberately remain outside this backend.
 class LockScreenPresentationBackend final : public BackendBase
 {
     Q_OBJECT
@@ -29,5 +30,12 @@ Q_SIGNALS:
     void saved();
 
 private:
+    static QVariantMap settingsFromDocument(const QVariantMap &document);
+    static bool mergeSettingsIntoDocument(QVariantMap *document,
+                                          const QVariantMap &settings,
+                                          QString *error);
+
+    LockScreenConfigStore m_store;
+    QVariantMap m_document;
     QVariantMap m_settings;
 };
