@@ -1,27 +1,20 @@
 #include "lockscreenpresentationbackend.h"
 
-#include <KConfigGroup>
-#include <KSharedConfig>
+#include "../core/sessionentrydocument.h"
 
 #include <QMetaType>
+#include <QSet>
 
 namespace
 {
-constexpr auto kConfigFile = "kscreenlockerrc";
-
-KConfigGroup presentationGroup(const KSharedConfig::Ptr &config)
+QVariantMap nestedMap(const QVariantMap &parent, const QString &key)
 {
-    // KScreenLocker seeds KConfigLoader with Greeter/LnF as the base group.
-    // The Meo lock-screen config.xml then declares <group name="General">,
-    // so the actual persisted keys live one level deeper.
-    return config->group(QStringLiteral("Greeter"))
-        .group(QStringLiteral("LnF"))
-        .group(QStringLiteral("General"));
+    return parent.value(key).toMap();
 }
 
-bool readBool(const KConfigGroup &group, const char *key, bool fallback)
+void replaceNestedMap(QVariantMap *parent, const QString &key, QVariantMap child)
 {
-    return group.readEntry(QString::fromLatin1(key), fallback);
+    parent->insert(key, std::move(child));
 }
 
 QString normalizedPrivacy(const QVariant &value, QString *error)
@@ -39,6 +32,43 @@ QString normalizedPrivacy(const QVariant &value, QString *error)
     }
     return {};
 }
+
+QVariantMap flatSettingsFromDocument(const QVariantMap &document)
+{
+    const QVariantMap modules = nestedMap(document, QStringLiteral("modules"));
+    const QVariantMap privacy = nestedMap(document, QStringLiteral("privacy"));
+    return {
+        {QStringLiteral("showWeather"), modules.value(QStringLiteral("weather")).toBool()},
+        {QStringLiteral("showWeatherLocation"),
+         privacy.value(QStringLiteral("weatherLocation")).toString() != QLatin1String("hidden")},
+        {QStringLiteral("showMediaControls"), modules.value(QStringLiteral("media")).toBool()},
+        {QStringLiteral("showAlbumArtwork"), privacy.value(QStringLiteral("showAlbumArtwork")).toBool()},
+        {QStringLiteral("showAudioControls"), modules.value(QStringLiteral("audio")).toBool()},
+        {QStringLiteral("notificationVisibility"),
+         privacy.value(QStringLiteral("notificationVisibility")).toString()},
+    };
+}
+
+QVariantMap documentWithSettings(QVariantMap document, const QVariantMap &settings)
+{
+    QVariantMap modules = nestedMap(document, QStringLiteral("modules"));
+    modules[QStringLiteral("weather")] = settings.value(QStringLiteral("showWeather")).toBool();
+    modules[QStringLiteral("media")] = settings.value(QStringLiteral("showMediaControls")).toBool();
+    modules[QStringLiteral("audio")] = settings.value(QStringLiteral("showAudioControls")).toBool();
+    replaceNestedMap(&document, QStringLiteral("modules"), modules);
+
+    QVariantMap privacy = nestedMap(document, QStringLiteral("privacy"));
+    privacy[QStringLiteral("weatherLocation")] =
+        settings.value(QStringLiteral("showWeatherLocation")).toBool()
+            ? QStringLiteral("city") : QStringLiteral("hidden");
+    privacy[QStringLiteral("showAlbumArtwork")] =
+        settings.value(QStringLiteral("showAlbumArtwork")).toBool();
+    privacy[QStringLiteral("notificationVisibility")] =
+        settings.value(QStringLiteral("notificationVisibility")).toString();
+    replaceNestedMap(&document, QStringLiteral("privacy"), privacy);
+
+    return document;
+}
 }
 
 LockScreenPresentationBackend::LockScreenPresentationBackend(QObject *parent)
@@ -55,17 +85,8 @@ QVariantMap LockScreenPresentationBackend::settings() const
 
 QVariantMap LockScreenPresentationBackend::defaults()
 {
-    return {
-        {QStringLiteral("showWeather"), true},
-        {QStringLiteral("showWeatherLocation"), false},
-        {QStringLiteral("showMediaControls"), true},
-        {QStringLiteral("showAlbumArtwork"), true},
-        {QStringLiteral("showAudioControls"), true},
-        {QStringLiteral("showPerformance"), true},
-        {QStringLiteral("showSystemSummary"), true},
-        {QStringLiteral("showSessionControls"), true},
-        {QStringLiteral("notificationVisibility"), QStringLiteral("count")},
-    };
+    return flatSettingsFromDocument(
+        SessionEntryDocument::defaults(SessionEntryDocument::Scope::LockScreen));
 }
 
 QVariantMap LockScreenPresentationBackend::normalized(const QVariantMap &input, QString *error)
@@ -75,6 +96,23 @@ QVariantMap LockScreenPresentationBackend::normalized(const QVariantMap &input, 
     }
 
     const QVariantMap fallback = defaults();
+    const QSet<QString> allowedKeys{
+        QStringLiteral("showWeather"),
+        QStringLiteral("showWeatherLocation"),
+        QStringLiteral("showMediaControls"),
+        QStringLiteral("showAlbumArtwork"),
+        QStringLiteral("showAudioControls"),
+        QStringLiteral("notificationVisibility"),
+    };
+    for (auto it = input.constBegin(); it != input.constEnd(); ++it) {
+        if (!allowedKeys.contains(it.key())) {
+            if (error) {
+                *error = QObject::tr("Unsupported lock-screen presentation setting: %1").arg(it.key());
+            }
+            return {};
+        }
+    }
+
     QVariantMap result;
     for (const QString &key : {
              QStringLiteral("showWeather"),
@@ -82,9 +120,6 @@ QVariantMap LockScreenPresentationBackend::normalized(const QVariantMap &input, 
              QStringLiteral("showMediaControls"),
              QStringLiteral("showAlbumArtwork"),
              QStringLiteral("showAudioControls"),
-             QStringLiteral("showPerformance"),
-             QStringLiteral("showSystemSummary"),
-             QStringLiteral("showSessionControls"),
          }) {
         if (!input.contains(key)) {
             result.insert(key, fallback.value(key));
@@ -101,8 +136,8 @@ QVariantMap LockScreenPresentationBackend::normalized(const QVariantMap &input, 
         result.insert(key, candidate.toBool());
     }
 
-    // Dependent privacy toggles are normalized here rather than in QML so
-    // every caller preserves the same contract.
+    // Dependent privacy choices are enforced below QML so every caller reaches
+    // the same safe document state.
     if (!result.value(QStringLiteral("showWeather")).toBool()) {
         result[QStringLiteral("showWeatherLocation")] = false;
     }
@@ -123,31 +158,15 @@ QVariantMap LockScreenPresentationBackend::normalized(const QVariantMap &input, 
 
 void LockScreenPresentationBackend::refresh()
 {
-    const auto config = KSharedConfig::openConfig(QString::fromLatin1(kConfigFile));
-    const KConfigGroup group = presentationGroup(config);
-    QVariantMap loaded = defaults();
-    loaded[QStringLiteral("showWeather")] =
-        readBool(group, "showWeather", loaded.value(QStringLiteral("showWeather")).toBool());
-    loaded[QStringLiteral("showWeatherLocation")] =
-        readBool(group, "showWeatherLocation", loaded.value(QStringLiteral("showWeatherLocation")).toBool());
-    loaded[QStringLiteral("showMediaControls")] =
-        readBool(group, "showMediaControls", loaded.value(QStringLiteral("showMediaControls")).toBool());
-    loaded[QStringLiteral("showAlbumArtwork")] =
-        readBool(group, "showAlbumArtwork", loaded.value(QStringLiteral("showAlbumArtwork")).toBool());
-    loaded[QStringLiteral("showAudioControls")] =
-        readBool(group, "showAudioControls", loaded.value(QStringLiteral("showAudioControls")).toBool());
-    loaded[QStringLiteral("showPerformance")] =
-        readBool(group, "showPerformance", loaded.value(QStringLiteral("showPerformance")).toBool());
-    loaded[QStringLiteral("showSystemSummary")] =
-        readBool(group, "showSystemSummary", loaded.value(QStringLiteral("showSystemSummary")).toBool());
-    loaded[QStringLiteral("showSessionControls")] =
-        readBool(group, "showSessionControls", loaded.value(QStringLiteral("showSessionControls")).toBool());
-    loaded[QStringLiteral("notificationVisibility")] =
-        group.readEntry(QStringLiteral("lockScreenNotificationVisibility"),
-                        loaded.value(QStringLiteral("notificationVisibility")).toString());
+    const auto loaded = m_store.load();
+    if (!loaded.ok) {
+        setError(loaded.error);
+        return;
+    }
 
+    const QVariantMap flat = flatSettingsFromDocument(loaded.document);
     QString error;
-    const QVariantMap sanitized = normalized(loaded, &error);
+    const QVariantMap sanitized = normalized(flat, &error);
     if (sanitized.isEmpty()) {
         setError(error);
         return;
@@ -170,19 +189,24 @@ void LockScreenPresentationBackend::save(const QVariantMap &input)
         return;
     }
 
-    const auto config = KSharedConfig::openConfig(QString::fromLatin1(kConfigFile));
-    KConfigGroup group = presentationGroup(config);
-    group.writeEntry(QStringLiteral("showWeather"), values.value(QStringLiteral("showWeather")).toBool());
-    group.writeEntry(QStringLiteral("showWeatherLocation"), values.value(QStringLiteral("showWeatherLocation")).toBool());
-    group.writeEntry(QStringLiteral("showMediaControls"), values.value(QStringLiteral("showMediaControls")).toBool());
-    group.writeEntry(QStringLiteral("showAlbumArtwork"), values.value(QStringLiteral("showAlbumArtwork")).toBool());
-    group.writeEntry(QStringLiteral("showAudioControls"), values.value(QStringLiteral("showAudioControls")).toBool());
-    group.writeEntry(QStringLiteral("showPerformance"), values.value(QStringLiteral("showPerformance")).toBool());
-    group.writeEntry(QStringLiteral("showSystemSummary"), values.value(QStringLiteral("showSystemSummary")).toBool());
-    group.writeEntry(QStringLiteral("showSessionControls"), values.value(QStringLiteral("showSessionControls")).toBool());
-    group.writeEntry(QStringLiteral("lockScreenNotificationVisibility"),
-                     values.value(QStringLiteral("notificationVisibility")).toString());
-    group.sync();
+    // Preserve appearance/layout/motion and any future validated fields owned
+    // by the v1 document. The Settings page only projects the subset it owns.
+    const auto loaded = m_store.load();
+    if (!loaded.ok) {
+        setError(loaded.error);
+        return;
+    }
+    QVariantMap document = documentWithSettings(loaded.document, values);
+    const auto validated = SessionEntryDocument::validate(
+        document, SessionEntryDocument::Scope::LockScreen);
+    if (!validated.ok) {
+        setError(validated.path + QStringLiteral(": ") + validated.error);
+        return;
+    }
+    if (!m_store.save(validated.document, &error)) {
+        setError(error);
+        return;
+    }
 
     m_settings = values;
     clearError();
@@ -192,22 +216,13 @@ void LockScreenPresentationBackend::save(const QVariantMap &input)
 
 void LockScreenPresentationBackend::resetToDefaults()
 {
-    const auto config = KSharedConfig::openConfig(QString::fromLatin1(kConfigFile));
-    KConfigGroup group = presentationGroup(config);
-    for (const QString &key : {
-             QStringLiteral("showWeather"),
-             QStringLiteral("showWeatherLocation"),
-             QStringLiteral("showMediaControls"),
-             QStringLiteral("showAlbumArtwork"),
-             QStringLiteral("showAudioControls"),
-             QStringLiteral("showPerformance"),
-             QStringLiteral("showSystemSummary"),
-             QStringLiteral("showSessionControls"),
-             QStringLiteral("lockScreenNotificationVisibility"),
-         }) {
-        group.deleteEntry(key);
+    QString error;
+    if (!m_store.resetToDefaults(&error)) {
+        setError(error);
+        return;
     }
-    group.sync();
     refresh();
-    Q_EMIT saved();
+    if (this->error().isEmpty()) {
+        Q_EMIT saved();
+    }
 }
