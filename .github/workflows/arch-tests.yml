@@ -49,9 +49,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: QwQdoge/meo-kde
-          # Temporary dependency pin for the native InputMethods singleton.
-          # Return this to main after meo-kde #39 lands.
-          ref: chat/input-method-controller-20261007
+          ref: main
           path: deps/meo-kde
 
       - name: Build MeoUI runtime
