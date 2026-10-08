@@ -38,8 +38,8 @@ Item {
             })
         }
         rows.push({
-                "title": qsTr("Screen timeout"),
-                "subtitle": qsTr("Choose when the display turns off"),
+            "title": qsTr("Screen timeout"),
+            "subtitle": qsTr("Choose when the display turns off"),
             "icon": "timer",
             "tone": "secondary",
             "route": "power",
@@ -86,8 +86,8 @@ Item {
         }
         if (KcmBridge.isAvailable("kcm_kscreen")) {
             rows.push({
-                "title": qsTr("Display layout and modes"),
-                "subtitle": qsTr("Resolution, scale, refresh rate, HDR, VRR, and arrangement"),
+                "title": qsTr("Advanced display layout"),
+                "subtitle": qsTr("HDR, VRR, arrangement, output enablement, and recovery tools"),
                 "icon": "monitor",
                 "tone": "secondary",
                 "route": "kcm:kcm_kscreen",
@@ -121,7 +121,7 @@ Item {
             MeoBanner {
                 width: parent.width
                 title: qsTr("Display needs attention")
-                text: qsTr("Check that the display is connected, then refresh the display list.")
+                text: qsTr("Check the current display state, then try the setting again.")
                 icon: "error"
                 tone: "error"
             }
@@ -133,6 +133,12 @@ Item {
                 typeSize: "small"
                 color: MeoTheme.contentOnSurfaceVariant
                 wrapMode: Text.WordWrap
+            }
+            MeoButton {
+                text: qsTr("Dismiss")
+                type: "text"
+                size: "s"
+                onClicked: DisplayBackend.clearError()
             }
         }
 
@@ -244,7 +250,7 @@ Item {
                 MeoIcon { icon: "info"; size: 24; color: MeoTheme.primary }
                 MeoText {
                     width: parent.width - 36 * MeoTheme.globalScale
-                    text: qsTr("This device does not make brightness or Night Light available here. More display settings are available below when installed.")
+                    text: qsTr("This device does not make brightness or Night Light available here. Connected display scale and mode are still configurable below.")
                     typeRole: "body"
                     typeSize: "medium"
                     color: MeoTheme.contentOnSurfaceVariant
@@ -257,9 +263,9 @@ Item {
             width: parent.width
             spacing: 8 * MeoTheme.globalScale
             MeoButton {
-                text: DisplayBackend.busy ? qsTr("Refreshing…") : qsTr("Refresh")
+                text: DisplayBackend.busy ? qsTr("Applying…") : qsTr("Refresh")
                 type: "tonal"
-                enabled: !DisplayBackend.busy
+                enabled: !DisplayBackend.busy && !DisplayBackend.modeConfirmationPending
                 onClicked: DisplayBackend.refresh()
             }
         }
@@ -273,6 +279,71 @@ Item {
             visible: DisplayBackend.available
         }
 
+        MeoCard {
+            width: parent.width
+            type: "outlined"
+            visible: DisplayBackend.modeConfirmationPending
+
+            Column {
+                width: parent.width
+                spacing: 8 * MeoTheme.globalScale
+
+                MeoText {
+                    width: parent.width
+                    text: qsTr("Keep this display mode?")
+                    typeRole: "title"
+                    typeSize: "small"
+                    emphasized: true
+                    color: MeoTheme.contentOnSurface
+                }
+
+                MeoText {
+                    width: parent.width
+                    text: DisplayBackend.modeConfirmationLabel !== ""
+                          ? qsTr("The display is now using %1.").arg(DisplayBackend.modeConfirmationLabel)
+                          : qsTr("The new resolution or refresh rate is active.")
+                    typeRole: "body"
+                    typeSize: "medium"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+
+                MeoText {
+                    width: parent.width
+                    text: DisplayBackend.busy
+                          ? qsTr("Checking the display configuration…")
+                          : DisplayBackend.modeConfirmationSecondsRemaining > 0
+                            ? qsTr("Reverting automatically in %n second(s).", "", DisplayBackend.modeConfirmationSecondsRemaining)
+                            : qsTr("Automatic rollback could not finish. Revert again or keep the current mode.")
+                    typeRole: "body"
+                    typeSize: "small"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+
+                Flow {
+                    width: parent.width
+                    spacing: 8 * MeoTheme.globalScale
+
+                    MeoButton {
+                        text: qsTr("Keep")
+                        type: "filled"
+                        size: "s"
+                        enabled: !DisplayBackend.busy
+                        onClicked: DisplayBackend.confirmModeChange()
+                    }
+
+                    MeoButton {
+                        text: qsTr("Revert")
+                        type: "tonal"
+                        size: "s"
+                        enabled: !DisplayBackend.busy
+                        onClicked: DisplayBackend.revertModeChange()
+                    }
+                }
+            }
+        }
+
         GridLayout {
             width: parent.width
             columns: Math.max(1, Math.min(3, page.contentPreferredColumns))
@@ -284,11 +355,32 @@ Item {
                 model: DisplayBackend.outputs
 
                 delegate: MeoCard {
+                    id: displayCard
                     required property var modelData
+                    readonly property var modeOptions: {
+                        const source = modelData.modes || []
+                        const options = []
+                        for (let index = 0; index < source.length; ++index) {
+                            const mode = source[index]
+                            const refresh = Number(mode.refreshRate)
+                            let refreshText = refresh.toFixed(1)
+                            if (refreshText.endsWith(".0"))
+                                refreshText = refreshText.slice(0, -2)
+                            let label = qsTr("%1 × %2 · %3 Hz")
+                                          .arg(mode.width)
+                                          .arg(mode.height)
+                                          .arg(refreshText)
+                            if (mode.preferred)
+                                label += qsTr(" · Recommended")
+                            options.push({ "label": label, "value": String(mode.id) })
+                        }
+                        return options
+                    }
+
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1
                     Layout.minimumWidth: 0
-                    Layout.preferredHeight: 162 * MeoTheme.globalScale
+                    Layout.preferredHeight: 370 * MeoTheme.globalScale
                     type: "elevated"
                     interactive: false
 
@@ -321,25 +413,73 @@ Item {
                                 }
                             }
                         }
-                        MeoText {
+
+                        MeoExposedDropdown {
+                            id: modeDropdown
                             width: parent.width
-                            text: modelData.width > 0
-                                  ? qsTr("%1 × %2 · %3 Hz · %4× scale")
-                                        .arg(modelData.width)
-                                        .arg(modelData.height)
-                                        .arg(Math.round(modelData.refreshRate))
-                                        .arg(Number(modelData.scale).toFixed(2))
-                                  : qsTr("Mode information unavailable")
-                            typeRole: "body"
-                            typeSize: "medium"
-                            color: MeoTheme.contentOnSurfaceVariant
-                            wrapMode: Text.WordWrap
+                            label: qsTr("Resolution & refresh rate")
+                            model: displayCard.modeOptions
+                            textRole: "label"
+                            valueRole: "value"
+                            currentValue: String(modelData.currentModeId)
+                            enabled: !DisplayBackend.busy
+                                     && !DisplayBackend.modeConfirmationPending
+                                     && modelData.enabled
+                                     && displayCard.modeOptions.length > 0
                         }
-                        MeoText {
-                            text: modelData.enabled ? qsTr("Enabled") : qsTr("Disabled")
-                            typeRole: "label"
-                            typeSize: "medium"
-                            color: modelData.enabled ? MeoTheme.primary : MeoTheme.contentOnSurfaceVariant
+
+                        MeoButton {
+                            text: qsTr("Apply display mode")
+                            type: "tonal"
+                            size: "s"
+                            enabled: !DisplayBackend.busy
+                                     && !DisplayBackend.modeConfirmationPending
+                                     && modelData.enabled
+                                     && modeDropdown.currentValue !== undefined
+                                     && String(modeDropdown.currentValue) !== String(modelData.currentModeId)
+                            onClicked: DisplayBackend.setMode(modelData.id, String(modeDropdown.currentValue))
+                        }
+
+                        MeoSteppedSlider {
+                            id: scaleSlider
+                            width: parent.width
+                            title: qsTr("Scale")
+                            supportingText: qsTr("Apply a fractional scale to this display")
+                            from: 0.5
+                            to: 4.0
+                            value: Number(modelData.scale)
+                            stepSize: 0.05
+                            discrete: true
+                            showValueLabel: true
+                            valueText: Math.round(value * 100) + "%"
+                            enabled: !DisplayBackend.busy
+                                     && !DisplayBackend.modeConfirmationPending
+                                     && modelData.enabled
+                        }
+
+                        Flow {
+                            width: parent.width
+                            spacing: 8 * MeoTheme.globalScale
+
+                            MeoButton {
+                                text: qsTr("Apply scale")
+                                type: "tonal"
+                                size: "s"
+                                enabled: !DisplayBackend.busy
+                                         && !DisplayBackend.modeConfirmationPending
+                                         && modelData.enabled
+                                         && Math.abs(Number(scaleSlider.value) - Number(modelData.scale)) > 0.001
+                                onClicked: DisplayBackend.setScale(modelData.id, scaleSlider.value)
+                            }
+
+                            MeoButton {
+                                visible: modelData.enabled && !modelData.primary
+                                text: qsTr("Make primary")
+                                type: "text"
+                                size: "s"
+                                enabled: !DisplayBackend.busy && !DisplayBackend.modeConfirmationPending
+                                onClicked: DisplayBackend.setPrimary(modelData.id)
+                            }
                         }
                     }
                 }
@@ -361,7 +501,7 @@ Item {
             width: parent.width
             visible: root.advancedRows.length > 0
             title: qsTr("Advanced display configuration")
-            subtitle: qsTr("Use these tools for display options that need device-specific recovery or scheduling.")
+            subtitle: qsTr("Use this for HDR, VRR, arrangement, output enablement, and recovery-sensitive changes that are not native here yet.")
             model: root.advancedRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }
