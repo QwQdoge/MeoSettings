@@ -84,6 +84,11 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build --output-on-failure --timeout 60
 
+      - name: Smoke Language & Region input-method surface
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ./build/meo-settings --route language-region --screenshot /tmp/meo-settings-language-region.png
+
       - name: Smoke every Settings route
         env:
           QT_QPA_PLATFORM: offscreen
