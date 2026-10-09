@@ -309,11 +309,10 @@ Item {
                 onClicked: root.restorePresentationDefaults()
             }
             MeoButton {
-                visible: KcmBridge.isAvailable("kcm_screenlocker")
-                text: qsTr("Open KDE screen lock controls")
+                text: qsTr("Screen lock timing")
                 icon.name: "open_in_new"
                 type: "tonal"
-                onClicked: root.navigateTo("kcm:kcm_screenlocker")
+                onClicked: root.navigateTo("screen-lock")
             }
         }
 

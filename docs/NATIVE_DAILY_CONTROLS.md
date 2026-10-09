@@ -15,12 +15,13 @@ real session operations remain subject to runtime acceptance.
 | Appearance | Installed Meo desktop owner tools: matched modes, preset and configuration recovery. The preset does not reset panels or enable input frameworks. A restored configuration may require signing out to reload all components. |
 | Wallpaper | Plasma's public desktop scripting API: local image and supported layout for all screens or a selected screen. The library contains installed wallpaper images and managed imported copies; removing an active image is rejected. |
 | Fonts | KDE font roles through KConfig and the KDE font-change notification. Installed families and styles only. |
-| Keyboard, mouse, touchpad | Meo.System: XKB layout inventory and KWin's actual input devices/capabilities. Unsupported vendor properties are not synthesized. |
+| Keyboard, mouse, touchpad | Meo.System: XKB layouts, KWin-observed keyboard repeat preferences, and actual input devices/capabilities including supported device enable/disable. Unsupported vendor properties are not synthesized. |
 | Input methods | Meo.System: typed Fcitx5 group, method inventory and group membership APIs. Opening the page does not start a framework. |
 | Language/region | Installed libc locales and Plasma locale configuration. Language changes explicitly require a new session. |
 | Date/time | systemd-timedated: timezone, NTP and validated manual time, with authorization handled by the service. |
 | Default applications | KService/KApplicationTrader: actual installed MIME handlers, cache refresh and preferred-service readback. |
 | Removable storage | Solid/UDisks: actual removable filesystem volumes and mount/unmount. Root and home unmounts are rejected. Existing usage scans remain bounded. |
+| Screen lock | Meo.System: automatic lock, idle timeout, resume/start lock and authentication grace timing. Reduced protection and device disable actions request confirmation. Authentication policy remains with the screen locker; failed apply attempts restore the saved preferences. |
 | Privacy | XDG PermissionStore: existing camera, microphone, speakers, notification and background decisions. Unsupported records are read-only. This does not revoke direct native device access or terminate active capture. |
 | Accessibility | KDE accessibility configuration and KWin's supported effects. Reduced motion uses the shared KDE animation factor. |
 

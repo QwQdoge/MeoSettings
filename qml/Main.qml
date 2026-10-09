@@ -262,6 +262,7 @@ ApplicationWindow {
         case "filetypes": return Qt.resolvedUrl("pages/DefaultAppsPage.qml")
         case "applications": return Qt.resolvedUrl("pages/ApplicationsPage.qml")
         case "accounts": return Qt.resolvedUrl("pages/AccountsPage.qml")
+        case "screen-lock": return Qt.resolvedUrl("pages/ScreenLockPage.qml")
         case "session-entry": return Qt.resolvedUrl("pages/SessionEntryPage.qml")
         case "control-center": return Qt.resolvedUrl("pages/ControlCenterPage.qml")
         case "shell": return Qt.resolvedUrl("pages/ShellPage.qml")

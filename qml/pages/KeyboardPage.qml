@@ -17,6 +17,33 @@ Item {
         metricsOverride: root.rootMetrics
         title: qsTr("Keyboard")
         MeoBanner { width: parent.width; visible: InputDevices.error !== ""; title: qsTr("Keyboard setting needs attention"); text: InputDevices.error; tone: "error" }
+        Column {
+            width: parent.width; spacing: MeoTheme.space8
+            visible: InputDevices.keyRepeat.available
+            property string repeatMode: InputDevices.keyRepeat.mode
+            MeoExposedDropdown {
+                width: parent.width; label: qsTr("When holding a key")
+                model: [qsTr("Repeat the character"), qsTr("Do not repeat")].concat(InputDevices.keyRepeat.accentAvailable ? [qsTr("Use the input method's accent menu")] : [])
+                text: model[["repeat", "none", "accent"].indexOf(parent.repeatMode)] || parent.repeatMode
+                enabled: InputDevices.keyRepeat.writable && !InputDevices.busy
+                onSelected: (index, value) => parent.repeatMode = ["repeat", "none", "accent"][index]
+            }
+            MeoTextField {
+                id: repeatDelay; width: parent.width; label: qsTr("Repeat delay (milliseconds)")
+                text: String(InputDevices.keyRepeat.delay)
+                validator: IntValidator { bottom: 100; top: 5000 }
+            }
+            MeoTextField {
+                id: repeatRate; width: parent.width; label: qsTr("Repeat rate (characters per second)")
+                text: String(InputDevices.keyRepeat.rate)
+                validator: DoubleValidator { bottom: 0.2; top: 200; decimals: 1; locale: "C" }
+            }
+            MeoButton {
+                text: qsTr("Apply key repeat"); type: "tonal"
+                enabled: InputDevices.keyRepeat.writable && !InputDevices.busy && repeatDelay.acceptableInput && repeatRate.acceptableInput
+                onClicked: InputDevices.configureKeyRepeat(parent.repeatMode, Number(repeatDelay.text), Number(repeatRate.text))
+            }
+        }
         MeoExposedDropdown {
             width: parent.width
             label: qsTr("Active layout")

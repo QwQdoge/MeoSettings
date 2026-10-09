@@ -23,25 +23,16 @@ Item {
         return qsTr("Enabled; waiting for its schedule")
     }
 
-    // These stay as verified handoffs: the desktop KCM owns lock policy and
-    // the Power page owns timeout policy, so this page never renders a
-    // decorative switch that cannot change the real session.
+    // Dedicated native pages own screen-lock and display-idle policies.
     readonly property var lockDisplayRows: {
         const rows = []
-        if (KcmBridge.isAvailable("kcm_screenlocker")) {
-            rows.push({
-                "title": qsTr("Lock screen"),
-                "subtitle": qsTr("Open screen lock settings"),
-                "icon": "lock",
-                "tone": "secondary",
-                "route": "kcm:kcm_screenlocker",
-                "trailingKind": "choice",
-                "trailingText": qsTr("Advanced")
-            })
-        }
         rows.push({
-                "title": qsTr("Screen timeout"),
-                "subtitle": qsTr("Choose when the display turns off"),
+            "title": qsTr("Screen lock"), "subtitle": qsTr("Configure automatic lock and resume behavior"),
+            "icon": "lock", "tone": "secondary", "route": "screen-lock", "trailingKind": "navigation"
+        })
+        rows.push({
+            "title": qsTr("Screen timeout"),
+            "subtitle": qsTr("Choose when the display turns off"),
             "icon": "timer",
             "tone": "secondary",
             "route": "power",

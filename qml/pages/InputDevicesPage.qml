@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 import MeoUI
 import Meo.System 1.0
 
@@ -8,11 +9,13 @@ Item {
     property var navigateTo: function(route) {}
     property var rootMetrics: null
     property string deviceFilter: "all"
+    property string disableDeviceId: ""
     readonly property var visibleDevices: InputDevices.devices.filter(device =>
         deviceFilter === "touchpad" ? device.touchpad : deviceFilter === "mouse" ? !device.touchpad : true)
 
     function optionRows(device) {
         const options = [
+            ["enabled", qsTr("Enable this input device")],
             ["leftHanded", qsTr("Left-handed buttons")],
             ["naturalScroll", qsTr("Natural scrolling")],
             ["tapToClick", qsTr("Tap to click")],
@@ -34,6 +37,14 @@ Item {
         }))
     }
 
+    MeoSettingsTaskSheet {
+        id: disableDevice; popupParent: Overlay.overlay
+        title: qsTr("Disable this pointing device?")
+        subtitle: qsTr("Use another pointing device or keyboard navigation to enable it again. This change takes effect immediately.")
+        acceptText: qsTr("Disable"); rejectText: qsTr("Cancel")
+        onAccepted: InputDevices.setValue(root.disableDeviceId, "enabled", false)
+        onRejected: InputDevices.refresh()
+    }
     MeoPageLayout {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
@@ -62,7 +73,10 @@ Item {
                     width: parent.width
                     title: modelData.name
                     model: root.optionRows(modelData)
-                    onRowToggled: (index, checked, row) => InputDevices.setValue(modelData.id, row.id, checked)
+                    onRowToggled: (index, checked, row) => {
+                        if (row.id === "enabled" && !checked) { root.disableDeviceId = modelData.id; disableDevice.open() }
+                        else InputDevices.setValue(modelData.id, row.id, checked)
+                    }
                 }
                 MeoSteppedSlider {
                     width: parent.width

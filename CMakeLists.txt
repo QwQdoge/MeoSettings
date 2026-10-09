@@ -161,6 +161,7 @@ qt_add_qml_module(meo-settings
         qml/pages/SoundPage.qml
         qml/pages/DisplayPage.qml
         qml/pages/InputDevicesPage.qml
+        qml/pages/ScreenLockPage.qml
         qml/pages/KeyboardPage.qml
         qml/pages/InputMethodsPage.qml
         qml/pages/PowerPage.qml

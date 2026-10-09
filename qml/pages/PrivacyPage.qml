@@ -227,8 +227,7 @@ Item {
             title: qsTr("Security controls")
             subtitle: qsTr("These protected workflows retain their established system owner")
             model: [
-                root.moduleRow("kcm_screenlocker", qsTr("Screen lock"),
-                               qsTr("Lock screen behavior and security"), "lock"),
+                {"title": qsTr("Screen lock"), "subtitle": qsTr("Idle, resume, and authentication grace timing"), "icon": "lock", "route": "screen-lock", "enabled": true, "trailingKind": "navigation"},
                 root.moduleRow("kcm_firewall", qsTr("Firewall"),
                                qsTr("Network firewall rules and status"), "security"),
                 root.moduleRow("kcm_firmware_security", qsTr("Device security"),
