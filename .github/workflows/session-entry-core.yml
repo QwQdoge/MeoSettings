@@ -1,0 +1,48 @@
+name: Session-entry core
+
+on:
+  pull_request:
+    paths:
+      - "src/core/sessionentrydocument.*"
+      - "src/core/lockscreenconfigstore.*"
+      - "tests/tst_sessionentrydocument.cpp"
+      - "tests/sessionentry/**"
+      - ".github/workflows/session-entry-core.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: session-entry-core-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-test:
+    name: Validate session-entry document core
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Install focused build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --needed --noconfirm base-devel cmake ninja qt6-base
+
+      - name: Check out MeoSettings
+        uses: actions/checkout@v6
+
+      - name: Configure focused tests
+        run: >-
+          cmake --fresh
+          -S tests/sessionentry
+          -B build-session-entry
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+      - name: Build focused tests
+        run: cmake --build build-session-entry --parallel 2
+
+      - name: Run focused tests
+        run: ctest --test-dir build-session-entry --output-on-failure --timeout 30

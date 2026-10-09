@@ -2,10 +2,18 @@
 
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
+#include <QDBusError>
+#include <QDBusInterface>
+#include <QDBusPendingCall>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
 
 namespace
 {
 constexpr auto kService = "org.meo.SystemTransaction1";
+constexpr auto kPath = "/org/meo/SystemTransaction1";
+constexpr auto kInterface = "org.meo.SystemTransaction1";
+constexpr auto kInspectMethod = "Inspect";
 }
 
 SystemTransactionBackend::SystemTransactionBackend(QObject *parent)
@@ -43,19 +51,88 @@ void SystemTransactionBackend::inspect(const QString &kind, const QVariantMap &r
     if (!m_serviceAvailable) {
         return;
     }
-    // The service owns all privileged inspection.  The client stores only the
-    // structured request, never a command string or a password.
-    m_phase = QStringLiteral("inspect");
-    m_lastPlan = {{QStringLiteral("kind"), kind}, {QStringLiteral("request"), request},
-                  {QStringLiteral("state"), QStringLiteral("requested")}};
+    if (m_phase == QLatin1String("inspecting")) {
+        setError(tr("A system configuration request is already being inspected."));
+        return;
+    }
+
+    QDBusInterface transaction(QString::fromLatin1(kService),
+                               QString::fromLatin1(kPath),
+                               QString::fromLatin1(kInterface),
+                               QDBusConnection::systemBus());
+    if (!transaction.isValid()) {
+        m_phase = QStringLiteral("error");
+        setError(transaction.lastError().message().isEmpty()
+                     ? tr("The Meo transaction service could not be opened.")
+                     : transaction.lastError().message());
+        Q_EMIT changed();
+        return;
+    }
+
+    // Inspection is deliberately the only operation exposed by this client at
+    // this stage. The privileged service validates the closed request and
+    // returns a structured, non-executing plan. Authorization and Apply remain
+    // separate service operations so showing a preview can never mutate state.
+    m_phase = QStringLiteral("inspecting");
+    m_lastPlan = {
+        {QStringLiteral("kind"), kind},
+        {QStringLiteral("request"), request},
+        {QStringLiteral("state"), QStringLiteral("inspecting")},
+    };
+    clearError();
     Q_EMIT changed();
+
+    auto *watcher = new QDBusPendingCallWatcher(
+        transaction.asyncCall(QString::fromLatin1(kInspectMethod), kind, request), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *finished) {
+                QDBusPendingReply<QVariantMap> reply = *finished;
+                finished->deleteLater();
+
+                if (reply.isError()) {
+                    m_phase = QStringLiteral("error");
+                    m_lastPlan.insert(QStringLiteral("state"), QStringLiteral("error"));
+                    setError(reply.error().message().isEmpty()
+                                 ? tr("The Meo transaction service rejected the inspection request.")
+                                 : reply.error().message());
+                    Q_EMIT changed();
+                    return;
+                }
+
+                const QVariantMap plan = reply.value();
+                if (plan.isEmpty()) {
+                    m_phase = QStringLiteral("error");
+                    m_lastPlan.insert(QStringLiteral("state"), QStringLiteral("error"));
+                    setError(tr("The Meo transaction service returned an empty plan."));
+                    Q_EMIT changed();
+                    return;
+                }
+
+                m_lastPlan = plan;
+                const bool ok = plan.value(QStringLiteral("ok"), false).toBool();
+                const QString state = plan.value(QStringLiteral("state")).toString().trimmed();
+                m_phase = state.isEmpty()
+                    ? (ok ? QStringLiteral("planned") : QStringLiteral("rejected"))
+                    : state;
+                if (!ok) {
+                    const QString message = plan.value(QStringLiteral("message")).toString().trimmed();
+                    setError(message.isEmpty()
+                                 ? tr("The Meo transaction service rejected the inspection request.")
+                                 : message);
+                } else {
+                    clearError();
+                }
+                Q_EMIT changed();
+            });
 }
 
 void SystemTransactionBackend::submitConfigurationRequest(const QString &configurationId,
                                                           const QString &operation,
                                                           const QVariantMap &payload)
 {
-    inspect(QStringLiteral("configuration"), {{QStringLiteral("configurationId"), configurationId},
-                                                {QStringLiteral("operation"), operation},
-                                                {QStringLiteral("payload"), payload}});
+    inspect(QStringLiteral("configuration"), {
+        {QStringLiteral("configurationId"), configurationId},
+        {QStringLiteral("operation"), operation},
+        {QStringLiteral("payload"), payload},
+    });
 }

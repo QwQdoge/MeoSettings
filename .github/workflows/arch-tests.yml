@@ -49,9 +49,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: QwQdoge/meo-kde
-          # This Settings branch consumes the Shelf/Launcher contracts from
-          # meo-kde #8 until that dependency lands on main.
-          ref: codex/shelf-launcher-settings
+          ref: main
           path: deps/meo-kde
 
       - name: Build MeoUI runtime
@@ -85,6 +83,11 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build --output-on-failure --timeout 60
+
+      - name: Smoke Language & Region input-method surface
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ./build/meo-settings --route language-region --screenshot /tmp/meo-settings-language-region.png
 
       - name: Smoke every Settings route
         env:

@@ -24,6 +24,7 @@ DisplayBackend::DisplayBackend(QObject *parent)
 {
     connect(KScreen::ConfigMonitor::instance(), &KScreen::ConfigMonitor::configurationChanged,
             this, &DisplayBackend::refresh);
+    connect(this, &DisplayBackend::changed, this, &DisplayBackend::modeConfirmationChanged);
     m_confirmationTimer.setInterval(1000);
     connect(&m_confirmationTimer, &QTimer::timeout, this, [this] {
         m_confirmationSeconds = qMax(0, m_confirmationSeconds - 1);
@@ -83,12 +84,14 @@ void DisplayBackend::refresh()
                         if (!candidate) continue;
                         modes.append(QVariantMap{{"id", candidate->id()}, {"width", candidate->size().width()},
                             {"height", candidate->size().height()}, {"refreshRate", candidate->refreshRate()},
+                            {"current", candidate->id() == output->currentModeId()}, {"preferred", output->preferredModes().contains(candidate->id())},
                             {"label", tr("%1 × %2 · %3 Hz").arg(candidate->size().width()).arg(candidate->size().height()).arg(candidate->refreshRate(), 0, 'f', 2)}});
                     }
                     nextOutputs.push_back(QVariantMap{
                         {QStringLiteral("id"), output->id()},
                         {QStringLiteral("modes"), modes},
                         {QStringLiteral("modeId"), output->currentModeId()},
+                        {QStringLiteral("currentModeId"), output->currentModeId()},
                         {QStringLiteral("rotation"), int(output->rotation())},
                         {QStringLiteral("x"), output->pos().x()},
                         {QStringLiteral("y"), output->pos().y()},
@@ -222,3 +225,7 @@ void DisplayBackend::revertChanges()
     ::shutdown(m_transactionSocket, SHUT_WR);
     m_confirmationTimer.stop(); m_confirmationPending = false; Q_EMIT changed();
 }
+
+void DisplayBackend::setScale(int outputId, qreal scale) { applyOutput(outputId, {{"scale", scale}}); }
+void DisplayBackend::setMode(int outputId, const QString &modeId) { applyOutput(outputId, {{"modeId", modeId}}); }
+void DisplayBackend::setPrimary(int outputId) { applyOutput(outputId, {{"primary", true}}); }

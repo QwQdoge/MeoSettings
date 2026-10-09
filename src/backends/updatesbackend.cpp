@@ -21,16 +21,13 @@ namespace
 constexpr qsizetype kMaximumOutputBytes = 2 * 1024 * 1024;
 constexpr int kMaximumUpdates = 256;
 constexpr int kStageTimeoutMs = 15'000;
-constexpr auto kPacmanConfiguration = "/etc/pacman.conf";
+constexpr auto kMeoReleaseCatalog = "/usr/share/meo-release/package-catalog.json";
 constexpr auto kPacmanSyncDirectory = "/var/lib/pacman/sync";
 
 const QRegularExpression kPackageNameExpression(
     QStringLiteral("^[A-Za-z0-9@._+:-]{1,128}$"));
 const QRegularExpression kUpdateLineExpression(
     QStringLiteral("^([A-Za-z0-9@._+:-]+)\\s+([^\\s]+)\\s+->\\s+([^\\s]+)\\s*$"));
-const QRegularExpression kRepositoryHeaderExpression(
-    QStringLiteral("^\\s*\\[([A-Za-z0-9@._+:-]+)\\]\\s*(?:#.*)?$"));
-
 QString safeText(const QString &value, const int maximum)
 {
     const QString trimmed = value.trimmed();
@@ -60,18 +57,10 @@ bool isKdePackage(const QString &name)
     });
 }
 
-bool isMeoPackage(const QString &name)
-{
-    const QString normalized = name.toCaseFolded();
-    return normalized == QLatin1String("meoarch") || normalized.startsWith(QLatin1String("meo-"))
-        || normalized.startsWith(QLatin1String("meoarch-"));
-}
-
 bool isMeoRepository(const QString &repository)
 {
     const QString normalized = repository.toCaseFolded();
-    return normalized == QLatin1String("meo") || normalized.startsWith(QLatin1String("meo-"))
-        || normalized.startsWith(QLatin1String("meoarch"));
+    return normalized == QLatin1String("meo") || normalized == QLatin1String("meo-beta");
 }
 
 bool isDistributionRepository(const QString &repository)
@@ -194,28 +183,47 @@ QVariantMap SystemUpdatesContract::syncInfoForPackage(const QByteArray &output, 
     return flushRecord();
 }
 
-QStringList SystemUpdatesContract::configuredRepositoryNames(const QByteArray &pacmanConfig)
+QStringList SystemUpdatesContract::officialPackageNames(const QByteArray &catalog)
 {
-    QStringList repositories;
-    const auto lines = QString::fromUtf8(pacmanConfig).split(QLatin1Char('\n'));
-    for (const QString &rawLine : lines) {
-        const QString line = rawLine.trimmed();
-        if (line.startsWith(QLatin1Char('#')) || line.isEmpty()) {
-            continue;
-        }
-        const auto match = kRepositoryHeaderExpression.match(line);
-        if (!match.hasMatch()) {
-            continue;
-        }
-        const QString name = match.captured(1).toCaseFolded();
-        if (name == QLatin1String("options")) {
-            continue;
-        }
-        if (!repositories.contains(name)) {
-            repositories.push_back(name);
-        }
+    const QJsonDocument document = QJsonDocument::fromJson(catalog);
+    if (!document.isObject()) {
+        return {};
     }
-    return repositories;
+    const QJsonObject object = document.object();
+    const double version = object.value(QStringLiteral("schemaVersion")).toDouble(-1);
+    QStringList candidates;
+    if (version == 1 && object.value(QStringLiteral("packages")).isObject()) {
+        // Current meo-release publishes a unified package map, not the older
+        // compact officialPackages list from the release branch.
+        const QJsonObject packages = object.value(QStringLiteral("packages")).toObject();
+        for (auto entry = packages.begin(); entry != packages.end(); ++entry) {
+            if (!entry.value().isObject()) {
+                return {};
+            }
+            candidates.push_back(entry.key());
+        }
+    } else if (version == 2 && object.value(QStringLiteral("officialPackages")).isArray()) {
+        for (const QJsonValue &entry : object.value(QStringLiteral("officialPackages")).toArray()) {
+            if (!entry.isString()) {
+                return {};
+            }
+            candidates.push_back(entry.toString());
+        }
+    } else {
+        return {};
+    }
+    if (candidates.isEmpty() || candidates.size() > 4096) {
+        return {};
+    }
+    QStringList names;
+    for (const QString &entry : candidates) {
+        const QString name = safeText(entry, 128).toCaseFolded();
+        if (!kPackageNameExpression.match(name).hasMatch() || names.contains(name)) {
+            return {};
+        }
+        names.push_back(name);
+    }
+    return names;
 }
 
 QString SystemUpdatesContract::channelForRepositories(const QStringList &repositories)
@@ -231,11 +239,12 @@ QString SystemUpdatesContract::channelForRepositories(const QStringList &reposit
 
 QString SystemUpdatesContract::updateFamily(const QString &packageName, const QString &repository,
                                              const QStringList &foreignPackages,
-                                             const QStringList &configuredRepositories)
+                                             const QStringList &configuredRepositories,
+                                             const QStringList &officialPackages)
 {
     const QString name = packageName.toCaseFolded();
     const QString sourceRepository = repository.toCaseFolded();
-    if (isMeoPackage(name) || isMeoRepository(sourceRepository)) {
+    if (officialPackages.contains(name) && isMeoRepository(sourceRepository)) {
         return QStringLiteral("meo");
     }
     if (foreignPackages.contains(name)) {
@@ -390,18 +399,18 @@ void UpdatesBackend::refresh()
     m_orchestratorCheckedAt.clear();
     m_orchestratorSources.clear();
     setAvailable(true);
+    loadOfficialPackageNames();
     if (orchestratorAvailable()) {
         startStage(Stage::SharedState, m_orchestratorPath, {QStringLiteral("status")});
         return;
     }
-    // pacman-conf is pacman's own parser, including Include files.  Keep the
-    // old header-only reader solely as a safe fallback for minimal systems.
+    // Only pacman's resolved Include ordering can establish a channel.
     if (!m_pacmanConfPath.isEmpty()) {
         startStage(Stage::ConfiguredRepositories, m_pacmanConfPath,
                    {QStringLiteral("--repo-list")});
         return;
     }
-    updateConfiguredRepositories();
+    setConfiguredRepositoryNames({}, false);
     startStage(Stage::NativeUpdates, m_pacmanPath, {QStringLiteral("-Qu")});
 }
 
@@ -441,18 +450,19 @@ void UpdatesBackend::updateRuntimeAvailability()
     Q_EMIT changed();
 }
 
-void UpdatesBackend::updateConfiguredRepositories()
+void UpdatesBackend::loadOfficialPackageNames()
 {
-    QFile config(QString::fromLatin1(kPacmanConfiguration));
+    QFile catalog(QString::fromLatin1(kMeoReleaseCatalog));
     QByteArray contents;
-    if (config.open(QIODevice::ReadOnly)) {
-        contents = config.read(1024 * 1024);
+    if (catalog.open(QIODevice::ReadOnly)) {
+        if (catalog.size() <= 1024 * 1024) {
+            contents = catalog.read(1024 * 1024);
+        }
     }
-    const QStringList names = SystemUpdatesContract::configuredRepositoryNames(contents);
-    setConfiguredRepositoryNames(names);
+    m_officialPackageNames = SystemUpdatesContract::officialPackageNames(contents);
 }
 
-void UpdatesBackend::setConfiguredRepositoryNames(const QStringList &names)
+void UpdatesBackend::setConfiguredRepositoryNames(const QStringList &names, const bool resolved)
 {
     QVariantList nextRepositories;
     nextRepositories.reserve(names.size());
@@ -465,7 +475,8 @@ void UpdatesBackend::setConfiguredRepositoryNames(const QStringList &names)
             {QStringLiteral("description"), repositoryDescription(kind)},
         });
     }
-    const QString nextChannel = SystemUpdatesContract::channelForRepositories(names);
+    const QString nextChannel = resolved ? SystemUpdatesContract::channelForRepositories(names)
+                                         : QStringLiteral("unavailable");
     if (m_configuredRepositories == nextRepositories && m_updateChannel == nextChannel) {
         return;
     }
@@ -536,16 +547,14 @@ void UpdatesBackend::finishStage(const int exitCode, const QProcess::ExitStatus 
             startStage(Stage::ConfiguredRepositories, m_pacmanConfPath,
                        {QStringLiteral("--repo-list")});
         } else {
-            updateConfiguredRepositories();
+            setConfiguredRepositoryNames({}, false);
             startStage(Stage::NativeUpdates, m_pacmanPath, {QStringLiteral("-Qu")});
         }
         return;
     }
     if (m_stage == Stage::ConfiguredRepositories) {
         if (exitCode != 0) {
-            // This fallback does not modify configuration; it only preserves
-            // read-only display on systems that lack a usable pacman-conf.
-            updateConfiguredRepositories();
+            setConfiguredRepositoryNames({}, false);
         } else {
             QStringList names;
             for (const QString &rawName : QString::fromUtf8(output).split(QLatin1Char('\n'), Qt::SkipEmptyParts)) {
@@ -692,7 +701,8 @@ void UpdatesBackend::applyNativeUpdates()
         const QVariantMap info = SystemUpdatesContract::syncInfoForPackage(m_standardOutput, name);
         const QString repository = info.value(QStringLiteral("repository")).toString();
         const QString family = SystemUpdatesContract::updateFamily(name, repository,
-                                                                     m_foreignPackageNames, repositories);
+                                                                     m_foreignPackageNames, repositories,
+                                                                     m_officialPackageNames);
         update.insert(QStringLiteral("repository"), repository);
         update.insert(QStringLiteral("family"), family);
         update.insert(QStringLiteral("source"), family == QLatin1String("aur")

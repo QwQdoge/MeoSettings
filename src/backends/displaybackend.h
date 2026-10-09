@@ -13,6 +13,9 @@ class DisplayBackend final : public BackendBase
     Q_PROPERTY(QString summary READ summary NOTIFY changed)
     Q_PROPERTY(bool confirmationPending READ confirmationPending NOTIFY changed)
     Q_PROPERTY(int confirmationSeconds READ confirmationSeconds NOTIFY changed)
+    Q_PROPERTY(bool modeConfirmationPending READ confirmationPending NOTIFY modeConfirmationChanged)
+    Q_PROPERTY(int modeConfirmationSecondsRemaining READ confirmationSeconds NOTIFY modeConfirmationChanged)
+    Q_PROPERTY(QString modeConfirmationLabel READ summary NOTIFY modeConfirmationChanged)
 
 public:
     explicit DisplayBackend(QObject *parent = nullptr);
@@ -23,6 +26,11 @@ public:
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void applyOutput(int outputId, const QVariantMap &changes);
+    Q_INVOKABLE void setScale(int outputId, qreal scale);
+    Q_INVOKABLE void setMode(int outputId, const QString &modeId);
+    Q_INVOKABLE void setPrimary(int outputId);
+    Q_INVOKABLE void confirmModeChange() { keepChanges(); }
+    Q_INVOKABLE void revertModeChange() { revertChanges(); }
     Q_INVOKABLE void keepChanges();
     Q_INVOKABLE void revertChanges();
     bool confirmationPending() const { return m_confirmationPending; }
@@ -30,6 +38,7 @@ public:
 
 Q_SIGNALS:
     void changed();
+    void modeConfirmationChanged();
 
 private:
     QVariantList m_outputs;
