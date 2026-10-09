@@ -20,6 +20,7 @@ real session operations remain subject to runtime acceptance.
 | Input methods | Meo.System: typed Fcitx5 group, method inventory and group membership APIs. Opening the page does not start a framework. |
 | Language/region | Installed libc locales and Plasma locale configuration. Language changes explicitly require a new session. |
 | Date/time | systemd-timedated: timezone, NTP and validated manual time, with authorization handled by the service. |
+| Autostart | XDG autostart desktop entries: precedence-aware listing, Hidden permission toggles, installed-app addition and personal entry removal/system-default restoration. Writes atomically replace personal files only, preserve other desktop-entry keys, reject immutable settings and avoid following personal file symlinks. No application is executed or stopped. Provider conditions, script hooks, session restoration and independently managed services remain separate. |
 | Default applications | KService/KApplicationTrader: actual installed MIME handlers, cache refresh and preferred-service readback. |
 | Removable storage | Solid/UDisks: actual removable filesystem volumes and mount/unmount. Root and home unmounts are rejected. Existing usage scans remain bounded. |
 | Screen lock | Meo.System: automatic lock, idle timeout, resume/start lock and authentication grace timing. Reduced protection and device disable actions request confirmation. Authentication policy remains with the screen locker; failed apply attempts restore the saved preferences. |
@@ -62,6 +63,8 @@ KWin schema with `Constant` / `DarkLight` modes; older numeric enums are not
 interpreted as that schema.
 
 ## Authority references
+
+- [XDG Desktop Application Autostart specification](https://specifications.freedesktop.org/autostart/latest/)
 
 - [Plasma wallpaper owner implementation](https://invent.kde.org/plasma/plasma-workspace/-/blob/master/wallpapers/image/plasma-apply-wallpaperimage.cpp)
 - [XDG PermissionStore tables](https://github.com/flatpak/xdg-desktop-portal/wiki/The-Permission-Store)

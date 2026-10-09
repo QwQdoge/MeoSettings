@@ -291,6 +291,10 @@ void SettingsRegistryTest::exposesNativeAccountAndUpdateRoutes()
 {
     SettingsRegistry registry;
 
+    const auto autostart = registry.entry(QStringLiteral("autostart"));
+    QCOMPARE(autostart.value(QStringLiteral("route")).toString(), QStringLiteral("autostart"));
+    QVERIFY(autostart.value(QStringLiteral("direct")).toBool());
+
     const auto accounts = registry.entry(QStringLiteral("accounts"));
     QCOMPARE(accounts.value(QStringLiteral("route")).toString(), QStringLiteral("accounts"));
     QVERIFY(accounts.value(QStringLiteral("direct")).toBool());

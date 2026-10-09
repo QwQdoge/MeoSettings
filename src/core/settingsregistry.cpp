@@ -272,9 +272,9 @@ SettingsRegistry::SettingsRegistry(QObject *parent)
                 {QStringLiteral("mime"), QStringLiteral("file"), QStringLiteral("association")},
                 true, QStringLiteral("control"), QStringLiteral("system"), QStringLiteral("primary")),
         setting(QStringLiteral("autostart"), tr("Autostart"), tr("Applications that run when you sign in"),
-                QStringLiteral("play_circle"), QStringLiteral("kcm:kcm_autostart"), QStringLiteral("apps"), tr("Apps & notifications"),
+                QStringLiteral("play_circle"), QStringLiteral("autostart"), QStringLiteral("apps"), tr("Apps & notifications"),
                 {QStringLiteral("startup"), QStringLiteral("autostart"), QStringLiteral("login")},
-                false, QStringLiteral("handoff"), QStringLiteral("system"), QStringLiteral("primary")),
+                true, QStringLiteral("control"), QStringLiteral("reversible"), QStringLiteral("primary")),
 
         setting(QStringLiteral("accounts"), tr("Meo Account"), tr("Connect your cloud profile, then manage the local device account from one page"),
                 QStringLiteral("account_circle"), QStringLiteral("accounts"), QStringLiteral("accounts"), tr("Accounts & sync"),

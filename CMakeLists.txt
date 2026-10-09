@@ -92,6 +92,8 @@ qt_add_executable(meo-settings
     src/backends/wallpaperbackend.h
     src/backends/powerpolicybackend.cpp
     src/backends/powerpolicybackend.h
+    src/backends/autostartbackend.cpp
+    src/backends/autostartbackend.h
     src/backends/fontsettingsbackend.cpp
     src/backends/fontsettingsbackend.h
     src/backends/defaultappsbackend.cpp
@@ -169,6 +171,7 @@ qt_add_qml_module(meo-settings
         qml/pages/LanguageRegionPage.qml
         qml/pages/AccessibilityPage.qml
         qml/pages/WallpaperPage.qml
+        qml/pages/AutostartPage.qml
         qml/pages/CursorsPage.qml
         qml/pages/FontsPage.qml
         qml/pages/DefaultAppsPage.qml
@@ -373,6 +376,15 @@ add_executable(meo-settings-powerbackend-test
 )
 target_link_libraries(meo-settings-powerbackend-test PRIVATE Qt6::Core Qt6::Test KF6::Solid)
 add_test(NAME meo-settings-powerbackend COMMAND meo-settings-powerbackend-test)
+
+add_executable(meo-settings-autostartbackend-test
+    tests/tst_autostartbackend.cpp
+    src/core/backendbase.cpp src/core/backendbase.h
+    src/backends/autostartbackend.cpp src/backends/autostartbackend.h
+)
+target_link_libraries(meo-settings-autostartbackend-test PRIVATE Qt6::Core Qt6::Test KF6::ConfigCore KF6::Service)
+add_test(NAME meo-settings-autostartbackend COMMAND meo-settings-autostartbackend-test)
+
 
 find_program(MEO_SETTINGS_DBUS_RUN_SESSION dbus-run-session REQUIRED)
 add_executable(meo-settings-powerpolicybackend-test

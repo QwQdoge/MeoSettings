@@ -9,6 +9,7 @@
 #include "backends/regionalbackend.h"
 #include "backends/defaultappsbackend.h"
 #include "backends/fontsettingsbackend.h"
+#include "backends/autostartbackend.h"
 #include "backends/powerpolicybackend.h"
 #include "backends/wallpaperbackend.h"
 #include "backends/appearancebackend.h"
@@ -271,6 +272,7 @@ int main(int argc, char *argv[])
     AppearanceBackend appearanceBackend;
     PowerPolicyBackend powerPolicyBackend;
     FontSettingsBackend fontSettingsBackend;
+    AutostartBackend autostartBackend;
     DefaultAppsBackend defaultAppsBackend;
     RegionalBackend regionalBackend;
     HardwareCapabilityRegistry hardwareCapabilityRegistry;
@@ -334,6 +336,7 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("AppearanceBackend"), &appearanceBackend);
     context->setContextProperty(QStringLiteral("PowerPolicyBackend"), &powerPolicyBackend);
     context->setContextProperty(QStringLiteral("FontSettingsBackend"), &fontSettingsBackend);
+    context->setContextProperty(QStringLiteral("AutostartBackend"), &autostartBackend);
     context->setContextProperty(QStringLiteral("DefaultAppsBackend"), &defaultAppsBackend);
     context->setContextProperty(QStringLiteral("RegionalBackend"), &regionalBackend);
     context->setContextProperty(QStringLiteral("HardwareCapabilities"), &hardwareCapabilityRegistry);
@@ -445,9 +448,11 @@ int main(int argc, char *argv[])
             QStringLiteral("kcm:kcm_keyboard"),
             QStringLiteral("category:personalization"),
             QStringLiteral("appearance"),
+            QStringLiteral("cursors"),
             QStringLiteral("kcm:kcm_lookandfeel"),
             QStringLiteral("category:apps"),
             QStringLiteral("applications"),
+            QStringLiteral("autostart"),
             QStringLiteral("notifications"),
             QStringLiteral("control-center"),
             QStringLiteral("desktop-integration"),
@@ -464,6 +469,7 @@ int main(int argc, char *argv[])
             QStringLiteral("category:privacy"),
             QStringLiteral("privacy"),
             QStringLiteral("session-entry"),
+            QStringLiteral("screen-lock"),
             QStringLiteral("category:accessibility"),
             QStringLiteral("category:updates"),
             QStringLiteral("updates"),
