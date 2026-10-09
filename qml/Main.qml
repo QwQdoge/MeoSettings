@@ -255,6 +255,7 @@ ApplicationWindow {
         case "language-region": return Qt.resolvedUrl("pages/LanguageRegionPage.qml")
         case "accessibility": return Qt.resolvedUrl("pages/AccessibilityPage.qml")
         case "wallpaper": return Qt.resolvedUrl("pages/WallpaperPage.qml")
+        case "cursors": return Qt.resolvedUrl("pages/CursorsPage.qml")
         case "fonts": return Qt.resolvedUrl("pages/FontsPage.qml")
         case "appearance": return Qt.resolvedUrl("pages/AppearancePage.qml")
         case "notifications": return Qt.resolvedUrl("pages/NotificationsPage.qml")

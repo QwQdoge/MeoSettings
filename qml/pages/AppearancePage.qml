@@ -191,7 +191,7 @@ Item {
         root.moduleRow("kcm_style", qsTr("Application style"), qsTr("Widget style, toolbar labels, and application behavior"), "web_asset"),
         root.moduleRow("kcm_desktoptheme", qsTr("Plasma style"), qsTr("Panel, widget, popup, and notification appearance"), "dashboard"),
         root.moduleRow("kcm_icons", qsTr("System icon theme"), qsTr("Installed platform icon themes for apps and the workspace"), "apps"),
-        root.moduleRow("kcm_cursortheme", qsTr("Cursors"), qsTr("Pointer theme, size, and animation"), "mouse"),
+        ({"title": qsTr("Cursors"), "subtitle": qsTr("Installed pointer themes and sizes"), "icon": "mouse", "route": "cursors", "enabled": true, "trailingKind": "chevron"}),
         ({"title": qsTr("Fonts"), "subtitle": qsTr("Interface, fixed width, menus and window titles"), "icon": "format_size", "route": "fonts", "enabled": true, "trailingKind": "chevron"}),
         root.moduleRow("kcm_kwindecoration", qsTr("Window decorations"), qsTr("Title bars, borders, buttons, and decoration themes"), "select_window"),
         root.moduleRow("kcm_splashscreen", qsTr("Welcome screen"), qsTr("Plasma session startup animation"), "animation"),

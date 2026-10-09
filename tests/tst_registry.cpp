@@ -313,7 +313,6 @@ void SettingsRegistryTest::exposesCompleteAppearanceAndIntegrationRoutes()
     const QStringList appearanceEntries{
         QStringLiteral("application-style"),
         QStringLiteral("plasma-style"),
-        QStringLiteral("cursors"),
         QStringLiteral("window-decorations"),
         QStringLiteral("welcome-screen"),
         QStringLiteral("sound-theme"),
@@ -324,6 +323,12 @@ void SettingsRegistryTest::exposesCompleteAppearanceAndIntegrationRoutes()
         QCOMPARE(entry.value(QStringLiteral("categoryId")).toString(), QStringLiteral("personalization"));
         QCOMPARE(entry.value(QStringLiteral("authority")).toString(), QStringLiteral("kde"));
     }
+
+    const auto cursors = registry.entry(QStringLiteral("cursors"));
+    QCOMPARE(cursors.value(QStringLiteral("route")).toString(), QStringLiteral("cursors"));
+    QCOMPARE(cursors.value(QStringLiteral("categoryId")).toString(), QStringLiteral("personalization"));
+    QVERIFY(cursors.value(QStringLiteral("direct")).toBool());
+    QCOMPARE(cursors.value(QStringLiteral("risk")).toString(), QStringLiteral("reversible"));
 
     const auto integration = registry.entry(QStringLiteral("desktop-integration"));
     QCOMPARE(integration.value(QStringLiteral("route")).toString(), QStringLiteral("desktop-integration"));

@@ -169,6 +169,7 @@ qt_add_qml_module(meo-settings
         qml/pages/LanguageRegionPage.qml
         qml/pages/AccessibilityPage.qml
         qml/pages/WallpaperPage.qml
+        qml/pages/CursorsPage.qml
         qml/pages/FontsPage.qml
         qml/pages/DefaultAppsPage.qml
         qml/pages/DateTimePage.qml
