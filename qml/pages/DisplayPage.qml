@@ -9,6 +9,8 @@ Item {
 
     property var navigateTo: function(route) {}
     property var rootMetrics: null
+    Component.onDestruction: DisplayBackend.revertChanges()
+
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
 
     readonly property string nightLightSummary: {
@@ -104,6 +106,27 @@ Item {
         metricsOverride: root.rootMetrics
         title: root.isCompact ? "" : qsTr("Display & touch")
         subtitle: ""
+
+        MeoCard {
+            width: parent.width
+            visible: DisplayBackend.confirmationPending
+            type: "filled"
+            ColumnLayout {
+                anchors.fill: parent
+                MeoText {
+                    Layout.fillWidth: true
+                    text: qsTr("Keep these display settings? Reverting in %1 seconds.").arg(DisplayBackend.confirmationSeconds)
+                    wrapMode: Text.WordWrap
+                    Accessible.role: Accessible.AlertMessage
+                }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: MeoTheme.space8
+                    MeoButton { text: qsTr("Keep changes"); onClicked: DisplayBackend.keepChanges() }
+                    MeoButton { text: qsTr("Revert"); type: "tonal"; onClicked: DisplayBackend.revertChanges() }
+                }
+            }
+        }
 
         MeoSettingsGroup {
             width: parent.width
@@ -233,6 +256,34 @@ Item {
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }
 
+        Column {
+            width: parent.width; spacing: MeoTheme.space8
+            visible: Platform.nightLightAvailable && Object.keys(Platform.nightLightSettings).length > 0
+            property var settings: Platform.nightLightSettings
+            property int chosenMode: settings.mode === undefined ? 1 : settings.mode
+            MeoExposedDropdown {
+                width: parent.width; label: qsTr("Night Light schedule")
+                model: [qsTr("Constant warm color"), qsTr("Follow the system day/night schedule")]
+                text: model[parent.chosenMode]
+                onSelected: (index, value) => parent.chosenMode = index
+            }
+            MeoTextField {
+                id: dayTemperature; width: parent.width; label: qsTr("Day temperature (K)")
+                text: String(parent.settings.dayTemperature || 6500)
+                validator: IntValidator { bottom: 1000; top: 6500 }
+            }
+            MeoTextField {
+                id: nightTemperature; width: parent.width; label: qsTr("Night temperature (K)")
+                text: String(parent.settings.nightTemperature || 4500)
+                validator: IntValidator { bottom: 1000; top: 6500 }
+            }
+            MeoButton {
+                text: qsTr("Apply Night Light settings"); type: "tonal"
+                enabled: dayTemperature.acceptableInput && nightTemperature.acceptableInput
+                onClicked: Platform.configureNightLight(parent.chosenMode, Number(dayTemperature.text), Number(nightTemperature.text))
+            }
+        }
+
         MeoCard {
             width: parent.width
             type: "outlined"
@@ -288,13 +339,14 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1
                     Layout.minimumWidth: 0
-                    Layout.preferredHeight: 162 * MeoTheme.globalScale
+                    Layout.preferredHeight: displayControls.implicitHeight + 2 * MeoTheme.space16
                     type: "elevated"
                     interactive: false
 
                     Column {
+                        id: displayControls
                         anchors.fill: parent
-                        spacing: 10 * MeoTheme.globalScale
+                        spacing: MeoTheme.space12
 
                         RowLayout {
                             width: parent.width
@@ -340,6 +392,74 @@ Item {
                             typeRole: "label"
                             typeSize: "medium"
                             color: modelData.enabled ? MeoTheme.primary : MeoTheme.contentOnSurfaceVariant
+                        }
+                        MeoExposedDropdown {
+                            width: parent.width
+                            label: qsTr("Resolution & refresh rate")
+                            model: modelData.modes
+                            textRole: "label"
+                            valueRole: "id"
+                            currentValue: modelData.modeId
+                            enabled: !DisplayBackend.busy && modelData.enabled
+                            onSelected: (index, value) => DisplayBackend.applyOutput(modelData.id, {"modeId": value})
+                        }
+                        MeoExposedDropdown {
+                            width: parent.width
+                            label: qsTr("Scale")
+                            visible: modelData.scaleSupported
+                            model: ["75%", "100%", "125%", "150%", "175%", "200%", "250%", "300%"]
+                            text: Math.round(Number(modelData.scale) * 100) + "%"
+                            enabled: !DisplayBackend.busy && modelData.enabled
+                            onSelected: (index, value) => DisplayBackend.applyOutput(modelData.id, {"scale": parseInt(value) / 100})
+                        }
+                        MeoExposedDropdown {
+                            width: parent.width
+                            label: qsTr("Orientation")
+                            model: [qsTr("Landscape"), qsTr("Portrait"), qsTr("Landscape, inverted"), qsTr("Portrait, inverted")]
+                            currentIndex: [1, 2, 4, 8].indexOf(Number(modelData.rotation))
+                            enabled: !DisplayBackend.busy && modelData.enabled
+                            onSelected: (index, value) => DisplayBackend.applyOutput(modelData.id, {"rotation": [1, 2, 4, 8][index]})
+                        }
+                        RowLayout {
+                            width: parent.width
+                            MeoTextField {
+                                id: positionX
+                                Layout.fillWidth: true
+                                label: qsTr("Horizontal position")
+                                text: String(modelData.x)
+                                validator: IntValidator { bottom: -16384; top: 16384 }
+                                enabled: !DisplayBackend.busy && modelData.enabled
+                            }
+                            MeoTextField {
+                                id: positionY
+                                Layout.fillWidth: true
+                                label: qsTr("Vertical position")
+                                text: String(modelData.y)
+                                validator: IntValidator { bottom: -16384; top: 16384 }
+                                enabled: !DisplayBackend.busy && modelData.enabled
+                            }
+                        }
+                        Flow {
+                            width: parent.width
+                            spacing: MeoTheme.space8
+                            MeoButton {
+                                text: qsTr("Apply position")
+                                type: "tonal"
+                                enabled: !DisplayBackend.busy && modelData.enabled && positionX.acceptableInput && positionY.acceptableInput
+                                onClicked: DisplayBackend.applyOutput(modelData.id, {"x": Number(positionX.text), "y": Number(positionY.text)})
+                            }
+                            MeoButton {
+                                text: modelData.primary ? qsTr("Primary display") : qsTr("Make primary")
+                                type: "tonal"
+                                enabled: !DisplayBackend.busy && modelData.enabled && !modelData.primary
+                                onClicked: DisplayBackend.applyOutput(modelData.id, {"primary": true})
+                            }
+                            MeoButton {
+                                text: modelData.enabled ? qsTr("Disable display") : qsTr("Enable display")
+                                type: "text"
+                                enabled: !DisplayBackend.busy
+                                onClicked: DisplayBackend.applyOutput(modelData.id, {"enabled": !modelData.enabled})
+                            }
                         }
                     }
                 }

@@ -3,6 +3,9 @@
 #include "../core/backendbase.h"
 
 #include <QVariantList>
+#include <QHash>
+#include <QPointer>
+class QAudioSink;
 
 namespace PulseAudioQt
 {
@@ -14,6 +17,10 @@ class Source;
 class AudioBackend final : public BackendBase
 {
     Q_OBJECT
+    Q_PROPERTY(QVariantList streams READ streams NOTIFY changed)
+    Q_PROPERTY(QVariantList cards READ cards NOTIFY changed)
+    Q_PROPERTY(QVariantMap notificationSound READ notificationSound NOTIFY changed)
+    Q_PROPERTY(bool testingSound READ testingSound NOTIFY changed)
     Q_PROPERTY(int outputVolume READ outputVolume WRITE setOutputVolume NOTIFY changed)
     Q_PROPERTY(bool outputMuted READ outputMuted WRITE setOutputMuted NOTIFY changed)
     Q_PROPERTY(QString outputName READ outputName NOTIFY changed)
@@ -28,6 +35,19 @@ class AudioBackend final : public BackendBase
 public:
     explicit AudioBackend(QObject *parent = nullptr);
 
+    QVariantMap notificationSound() const;
+    bool testingSound() const { return !m_testAudio.isNull(); }
+    Q_INVOKABLE void setNotificationSound(int volume, bool muted);
+    Q_INVOKABLE void testSound();
+    Q_INVOKABLE void stopTestSound();
+    QVariantList streams() const;
+    QVariantList cards() const;
+    Q_INVOKABLE void setStreamVolume(const QString &id, int percent);
+    Q_INVOKABLE void setStreamMuted(const QString &id, bool muted);
+    Q_INVOKABLE void setStreamDevice(const QString &id, const QString &deviceId);
+    Q_INVOKABLE void setCardProfile(const QString &id, int profile);
+    Q_INVOKABLE void setDevicePort(const QString &id, bool input, int port);
+    Q_INVOKABLE void setChannelVolume(const QString &id, bool input, int channel, int percent);
     int outputVolume() const;
     bool outputMuted() const;
     QString outputName() const;
@@ -55,6 +75,9 @@ private:
     void bindDefaultSource();
     void publishChanged();
 
+    void watchObject(QObject *object);
+    QHash<QObject *, QObject *> m_watchers;
+    QPointer<QAudioSink> m_testAudio;
     PulseAudioQt::Context *m_context = nullptr;
     PulseAudioQt::Sink *m_sink = nullptr;
     PulseAudioQt::Source *m_source = nullptr;

@@ -323,6 +323,14 @@ Item {
         title: root.isCompact ? "" : qsTr("Storage & applications")
         subtitle: qsTr("See mounted storage separately from the personal folders you choose to scan, so each total stays clear.")
 
+        MeoBanner { width: parent.width; visible: StorageBackend.error !== ""; title: qsTr("Storage operation needs attention"); text: StorageBackend.error; tone: "error" }
+        MeoSettingsGroup {
+            width: parent.width; title: qsTr("Removable storage")
+            visible: StorageBackend.removableVolumes.length > 0
+            model: StorageBackend.removableVolumes.map(volume => ({"id": volume.udi, "title": volume.name, "subtitle": volume.path || volume.filesystem, "mounted": volume.mounted, "trailingKind": "action", "actionText": volume.mounted ? qsTr("Unmount") : qsTr("Mount"), "enabled": !StorageBackend.busy}))
+            onRowActionTriggered: (index, row) => StorageBackend.setMounted(row.id, !row.mounted)
+        }
+
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Mounted volumes")

@@ -147,7 +147,13 @@ void DynamicColorBackend::applyCurrentKdeSeed()
     applySource(QStringLiteral("accent"));
 }
 
-void DynamicColorBackend::applySource(const QString &requestedSource, const QString &requestedManualColor)
+void DynamicColorBackend::applyThemeMode(const QString &mode)
+{
+    if (mode != "light" && mode != "dark") { setError(tr("Choose light or dark appearance.")); return; }
+    applySource(m_sourceMode, m_manualColor, mode);
+}
+
+void DynamicColorBackend::applySource(const QString &requestedSource, const QString &requestedManualColor, const QString &themeMode)
 {
     clearError();
     if (busy()) {
@@ -159,10 +165,15 @@ void DynamicColorBackend::applySource(const QString &requestedSource, const QStr
     }
 
     QString argumentError;
-    const QStringList arguments = applyArguments(requestedSource, requestedManualColor, &argumentError);
+    QStringList arguments = applyArguments(requestedSource, requestedManualColor, &argumentError);
     if (arguments.isEmpty()) {
         setError(argumentError);
         return;
+    }
+
+    if (!themeMode.isEmpty()) {
+        if (themeMode != "light" && themeMode != "dark") { setError(tr("Choose light or dark appearance.")); return; }
+        arguments << (themeMode == "dark" ? QStringLiteral("--dark") : QStringLiteral("--light"));
     }
 
     // Do not synthesize a palette in Settings. The native MeoKDE tool resolves

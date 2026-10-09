@@ -2,6 +2,10 @@
 
 #include <Solid/Device>
 #include <Solid/StorageDrive>
+#include <Solid/StorageVolume>
+#include <Solid/StorageAccess>
+#include <Solid/DeviceNotifier>
+#include <QTimer>
 
 #include <QtConcurrentRun>
 
@@ -49,9 +53,8 @@ bool isPseudoFilesystem(const QString &filesystem)
     return pseudoFilesystems.contains(normalized) || normalized.startsWith(QStringLiteral("fuse."));
 }
 
-SolidMountInfo solidInfoForMount(const QString &mountPoint)
+SolidMountInfo solidInfoForDevice(const Solid::Device &mountDevice)
 {
-    const Solid::Device mountDevice = Solid::Device::storageAccessFromPath(mountPoint);
     SolidMountInfo result;
     if (!mountDevice.isValid())
     {
@@ -76,6 +79,11 @@ SolidMountInfo solidInfoForMount(const QString &mountPoint)
         device = parent;
     }
     return result;
+}
+
+SolidMountInfo solidInfoForMount(const QString &mountPoint)
+{
+    return solidInfoForDevice(Solid::Device::storageAccessFromPath(mountPoint));
 }
 
 QString displayNameFor(const QStorageInfo &storage, const SolidMountInfo &solidInfo)
@@ -415,6 +423,8 @@ StorageBackend::StorageBackend(QObject *parent) : BackendBase(parent)
     m_usageScanWatcher = new QFutureWatcher<StorageUsageScanSnapshot>(this);
     connect(m_usageScanWatcher, &QFutureWatcher<StorageUsageScanSnapshot>::finished,
             this, &StorageBackend::finishUsageScan);
+    connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceAdded, this, &StorageBackend::refresh);
+    connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceRemoved, this, &StorageBackend::refresh);
     m_usageScanSummary = tr("Run a category scan to inspect selected personal folders.");
     refresh();
 }
@@ -712,4 +722,50 @@ void StorageBackend::finishUsageScan()
     }
     m_usageScanError = warnings.join(QLatin1Char(' '));
     Q_EMIT usageChanged();
+}
+
+QVariantList StorageBackend::removableVolumes() const
+{
+    QVariantList result;
+    for (const auto &device : Solid::Device::listFromType(Solid::DeviceInterface::StorageVolume)) {
+        const auto *volume = device.as<const Solid::StorageVolume>();
+        const auto *access = device.as<const Solid::StorageAccess>();
+        const auto drive = solidInfoForDevice(device);
+        if (!volume || !access || volume->isIgnored() || volume->usage() != Solid::StorageVolume::FileSystem
+            || (!drive.removable && !drive.hotpluggable)) continue;
+        result.append(QVariantMap{{"udi", device.udi()}, {"name", volume->label().isEmpty() ? device.displayName() : volume->label()},
+            {"mounted", access->isAccessible()}, {"path", access->filePath()}, {"filesystem", volume->fsType()}});
+    }
+    return result;
+}
+
+void StorageBackend::setMounted(const QString &udi, bool mounted)
+{
+    if (busy()) return;
+    bool discovered = false;
+    for (const auto &volume : removableVolumes()) if (volume.toMap().value("udi").toString() == udi) discovered = true;
+    Solid::Device device(udi);
+    auto *access = device.as<Solid::StorageAccess>();
+    if (!discovered || !access || (!mounted && (access->filePath() == "/" || access->filePath() == QDir::homePath()))) {
+        setError(tr("Select a removable filesystem volume.")); return;
+    }
+    if (access->isAccessible() == mounted) return;
+    setBusy(true); clearError();
+    auto *request = new QObject(this);
+    auto *timeout = new QTimer(request); timeout->setSingleShot(true); timeout->setInterval(120000);
+    const auto finish = [this, request, timeout, udi, device](Solid::ErrorType error, const QVariant &details, const QString &completedUdi) {
+        if (completedUdi != udi) return;
+        timeout->stop(); setBusy(false); refresh();
+        if (error != Solid::NoError) setError(details.toString().isEmpty() ? tr("The storage service rejected this operation.") : details.toString());
+        request->deleteLater();
+    };
+    if (mounted) connect(access, &Solid::StorageAccess::setupDone, request, finish);
+    else connect(access, &Solid::StorageAccess::teardownDone, request, finish);
+    connect(timeout, &QTimer::timeout, request, [this, request] {
+        setBusy(false); refresh(); setError(tr("The storage service has not confirmed completion. Refresh before retrying.")); request->deleteLater();
+    });
+    timeout->start();
+    if (!(mounted ? access->setup() : access->teardown())) {
+        timeout->stop(); request->deleteLater(); setBusy(false); setError(tr("The storage operation could not start."));
+    }
 }

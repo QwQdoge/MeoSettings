@@ -11,6 +11,11 @@
 class NetworkBackend final : public BackendBase
 {
     Q_OBJECT
+    Q_PROPERTY(bool hotspotSupported READ hotspotSupported NOTIFY changed)
+    Q_PROPERTY(bool hotspotActive READ hotspotActive NOTIFY changed)
+    Q_PROPERTY(bool networkingEnabled READ networkingEnabled NOTIFY changed)
+    Q_PROPERTY(QVariantList profiles READ profiles NOTIFY changed)
+    Q_PROPERTY(QVariantList devices READ devices NOTIFY changed)
     Q_PROPERTY(bool wifiAvailable READ wifiAvailable NOTIFY changed)
     Q_PROPERTY(bool wifiEnabled READ wifiEnabled WRITE setWifiEnabled NOTIFY changed)
     Q_PROPERTY(bool connected READ connected NOTIFY changed)
@@ -27,6 +32,17 @@ class NetworkBackend final : public BackendBase
 public:
     explicit NetworkBackend(QObject *parent = nullptr);
 
+    bool hotspotSupported() const;
+    bool hotspotActive() const;
+    bool networkingEnabled() const;
+    Q_INVOKABLE void setNetworkingEnabled(bool enabled);
+    Q_INVOKABLE void startHotspot(const QString &ssid, const QString &password);
+    Q_INVOKABLE void stopHotspot();
+    QVariantList profiles() const;
+    QVariantList devices() const;
+    Q_INVOKABLE void activateProfile(const QString &uuid);
+    Q_INVOKABLE void deactivateProfile(const QString &uuid);
+    Q_INVOKABLE void configureProfile(const QString &uuid, const QVariantMap &changes);
     bool wifiAvailable() const;
     bool wifiEnabled() const;
     bool connected() const;

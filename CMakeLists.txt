@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(GNUInstallDirs)
 include(CTest)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Concurrent Core DBus Gui Qml Quick QuickControls2 Test LinguistTools)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Concurrent Core DBus Gui Multimedia Qml Quick QuickControls2 Test LinguistTools)
 find_package(KF6CoreAddons REQUIRED)
 find_package(KF6Config REQUIRED)
 find_package(KF6NetworkManagerQt REQUIRED)
@@ -18,6 +18,7 @@ find_package(KF6BluezQt REQUIRED)
 find_package(KF6Solid REQUIRED)
 find_package(KF6PulseAudioQt REQUIRED)
 find_package(KF6Screen REQUIRED)
+find_package(KF6Service REQUIRED)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
@@ -79,6 +80,24 @@ qt_add_executable(meo-settings
     src/backends/applicationiconbackend.h
     src/backends/apppermissionsbackend.cpp
     src/backends/apppermissionsbackend.h
+    src/backends/proxybackend.cpp
+    src/backends/proxybackend.h
+    src/backends/accessibilitybackend.cpp
+    src/backends/accessibilitybackend.h
+    src/backends/portalpermissionsbackend.cpp
+    src/backends/portalpermissionsbackend.h
+    src/backends/appearancebackend.cpp
+    src/backends/appearancebackend.h
+    src/backends/wallpaperbackend.cpp
+    src/backends/wallpaperbackend.h
+    src/backends/powerpolicybackend.cpp
+    src/backends/powerpolicybackend.h
+    src/backends/fontsettingsbackend.cpp
+    src/backends/fontsettingsbackend.h
+    src/backends/defaultappsbackend.cpp
+    src/backends/defaultappsbackend.h
+    src/backends/regionalbackend.cpp
+    src/backends/regionalbackend.h
     src/backends/displaybackend.cpp
     src/backends/displaybackend.h
     src/backends/hardwarecapabilityregistry.cpp
@@ -135,12 +154,23 @@ qt_add_qml_module(meo-settings
         qml/pages/HomePage.qml
         qml/pages/CategoryPage.qml
         qml/pages/WifiPage.qml
+        qml/pages/NetworkConnectionsPage.qml
+        qml/pages/HotspotPage.qml
+        qml/pages/ProxyPage.qml
         qml/pages/BluetoothPage.qml
         qml/pages/SoundPage.qml
         qml/pages/DisplayPage.qml
+        qml/pages/InputDevicesPage.qml
+        qml/pages/KeyboardPage.qml
+        qml/pages/InputMethodsPage.qml
         qml/pages/PowerPage.qml
         qml/pages/PerformancePage.qml
         qml/pages/LanguageRegionPage.qml
+        qml/pages/AccessibilityPage.qml
+        qml/pages/WallpaperPage.qml
+        qml/pages/FontsPage.qml
+        qml/pages/DefaultAppsPage.qml
+        qml/pages/DateTimePage.qml
         qml/pages/AppearancePage.qml
         qml/pages/ControlCenterPage.qml
         qml/pages/ShellPage.qml
@@ -235,6 +265,9 @@ qt_add_lupdate(
         qml/pages/KcmPage.qml
         qml/pages/MeoLockScreenLayoutEditor.qml
         qml/pages/WifiPage.qml
+        qml/pages/NetworkConnectionsPage.qml
+        qml/pages/HotspotPage.qml
+        qml/pages/ProxyPage.qml
         qml/pages/SoundPage.qml
         qml/pages/NotificationsPage.qml
         qml/pages/PowerPage.qml
@@ -260,6 +293,7 @@ add_dependencies(meo-settings meo_settings_lrelease)
 target_link_libraries(meo-settings PRIVATE
     Qt6::Core
     Qt6::Concurrent
+    Qt6::Multimedia
     Qt6::DBus
     Qt6::Gui
     Qt6::Qml
@@ -272,6 +306,7 @@ target_link_libraries(meo-settings PRIVATE
     KF6::Solid
     KF6::PulseAudioQt
     KF6::Screen
+    KF6::Service
 )
 
 target_link_libraries(meo-welcome PRIVATE
@@ -676,3 +711,9 @@ if(BUILD_TESTING AND TEST meo-settings-qml-smoke)
     set_tests_properties(meo-settings-qml-smoke meo-settings-lockscreen-layout-editor-smoke
         PROPERTIES TIMEOUT 180)
 endif()
+
+add_executable(meo-settings-display-transaction src/helpers/displaytransaction.cpp)
+target_link_libraries(meo-settings-display-transaction PRIVATE Qt6::Core KF6::Screen)
+install(TARGETS meo-settings-display-transaction RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}/meo-settings")
+
+target_compile_definitions(meo-settings PRIVATE MEO_SETTINGS_LIBEXEC_DIR="${CMAKE_INSTALL_FULL_LIBEXECDIR}/meo-settings")

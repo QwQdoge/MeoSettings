@@ -34,8 +34,9 @@ public:
     /// Applies and remembers a single source only after an explicit UI
     /// confirmation. The native MeoKDE generator remains sole owner of HCT/MD3
     /// generation, persistence, KDE projection, and session notification.
-    Q_INVOKABLE void applySource(const QString &sourceMode, const QString &manualColor = {});
+    Q_INVOKABLE void applySource(const QString &sourceMode, const QString &manualColor = {}, const QString &themeMode = {});
     Q_INVOKABLE void applyCurrentKdeSeed();
+    Q_INVOKABLE void applyThemeMode(const QString &mode);
 
 Q_SIGNALS:
     void changed();

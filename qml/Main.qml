@@ -237,16 +237,29 @@ ApplicationWindow {
         if (route.startsWith("category:"))
             return Qt.resolvedUrl("pages/CategoryPage.qml")
         switch (route) {
+        case "mobile-hotspot": return Qt.resolvedUrl("pages/HotspotPage.qml")
+        case "proxy": return Qt.resolvedUrl("pages/ProxyPage.qml")
+        case "input-method": return Qt.resolvedUrl("pages/InputMethodsPage.qml")
         case "home": return Qt.resolvedUrl("pages/HomePage.qml")
+        case "network-advanced": return Qt.resolvedUrl("pages/NetworkConnectionsPage.qml")
         case "wifi": return Qt.resolvedUrl("pages/WifiPage.qml")
         case "bluetooth": return Qt.resolvedUrl("pages/BluetoothPage.qml")
         case "sound": return Qt.resolvedUrl("pages/SoundPage.qml")
+        case "keyboard": return Qt.resolvedUrl("pages/KeyboardPage.qml")
+        case "mouse":
+        case "touchpad": return Qt.resolvedUrl("pages/InputDevicesPage.qml")
         case "display": return Qt.resolvedUrl("pages/DisplayPage.qml")
         case "power": return Qt.resolvedUrl("pages/PowerPage.qml")
         case "performance": return Qt.resolvedUrl("pages/PerformancePage.qml")
+        case "date-time": return Qt.resolvedUrl("pages/DateTimePage.qml")
         case "language-region": return Qt.resolvedUrl("pages/LanguageRegionPage.qml")
+        case "accessibility": return Qt.resolvedUrl("pages/AccessibilityPage.qml")
+        case "wallpaper": return Qt.resolvedUrl("pages/WallpaperPage.qml")
+        case "fonts": return Qt.resolvedUrl("pages/FontsPage.qml")
         case "appearance": return Qt.resolvedUrl("pages/AppearancePage.qml")
         case "notifications": return Qt.resolvedUrl("pages/NotificationsPage.qml")
+        case "default-apps":
+        case "filetypes": return Qt.resolvedUrl("pages/DefaultAppsPage.qml")
         case "applications": return Qt.resolvedUrl("pages/ApplicationsPage.qml")
         case "accounts": return Qt.resolvedUrl("pages/AccountsPage.qml")
         case "session-entry": return Qt.resolvedUrl("pages/SessionEntryPage.qml")
@@ -271,7 +284,10 @@ ApplicationWindow {
             "navigateTo": root.navigate,
             "rootMetrics": rootMetrics
         }
-        if (route === "applications") {
+        if (route === "filetypes") common.fileTypesOnly = true
+        if (route === "mouse" || route === "touchpad") {
+            common.deviceFilter = route
+        } else if (route === "applications") {
             common.requestedAppId = requestedApplicationId
             common.requestedAppName = requestedApplicationName
             common.requestedSection = requestedApplicationSection

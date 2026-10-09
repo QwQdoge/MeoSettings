@@ -55,15 +55,15 @@ public:
 };
 
 /**
- * Exposes a factual, read-only view of mounted filesystems.
+ * Exposes mounted filesystems and owner-mediated removable-volume access.
  *
- * This backend intentionally has no operations for mounting, unmounting,
- * formatting, partitioning, encrypting, repairing, or otherwise changing a
- * disk.  Those actions require their own explicit owner and recovery model.
+ * Mount/unmount is delegated to Solid/UDisks for discovered removable volumes.
+ * Formatting, partitioning, encryption and repair require a separate trusted transaction owner.
  */
 class StorageBackend final : public BackendBase
 {
     Q_OBJECT
+    Q_PROPERTY(QVariantList removableVolumes READ removableVolumes NOTIFY changed)
     Q_PROPERTY(QVariantList volumes READ volumes NOTIFY changed)
     Q_PROPERTY(QString summary READ summary NOTIFY changed)
     Q_PROPERTY(int mountedVolumeCount READ mountedVolumeCount NOTIFY changed)
@@ -86,7 +86,10 @@ public:
     QString usageScanError() const;
     QString usageScanUpdatedAt() const;
 
-    /// Re-reads the operating system's current mount information only.
+    QVariantList removableVolumes() const;
+    Q_INVOKABLE void setMounted(const QString &udi, bool mounted);
+
+    /// Re-reads the operating system's current mount information.
     Q_INVOKABLE void refresh();
     /**
      * Starts an explicit, bounded read-only scan of selected standard folders.

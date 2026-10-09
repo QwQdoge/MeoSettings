@@ -6,6 +6,15 @@
 #include "backends/shellsettingsbackend.h"
 #include "backends/dynamiccolorbackend.h"
 #include "backends/displaybackend.h"
+#include "backends/regionalbackend.h"
+#include "backends/defaultappsbackend.h"
+#include "backends/fontsettingsbackend.h"
+#include "backends/powerpolicybackend.h"
+#include "backends/wallpaperbackend.h"
+#include "backends/appearancebackend.h"
+#include "backends/portalpermissionsbackend.h"
+#include "backends/accessibilitybackend.h"
+#include "backends/proxybackend.h"
 #include "backends/documentationprovider.h"
 #include "backends/fingerprintbackend.h"
 #include "backends/hardwarecapabilityregistry.h"
@@ -255,6 +264,15 @@ int main(int argc, char *argv[])
     ApplicationIconBackend applicationIconBackend;
     AppPermissionsBackend appPermissionsBackend;
     DisplayBackend displayBackend;
+    ProxyBackend proxyBackend;
+    AccessibilityBackend accessibilityBackend;
+    PortalPermissionsBackend portalPermissionsBackend;
+    WallpaperBackend wallpaperBackend;
+    AppearanceBackend appearanceBackend;
+    PowerPolicyBackend powerPolicyBackend;
+    FontSettingsBackend fontSettingsBackend;
+    DefaultAppsBackend defaultAppsBackend;
+    RegionalBackend regionalBackend;
     HardwareCapabilityRegistry hardwareCapabilityRegistry;
     LoginAuthBackend loginAuthBackend;
     LockScreenPresentationBackend lockScreenPresentationBackend;
@@ -264,6 +282,10 @@ int main(int argc, char *argv[])
     DocumentationProvider documentationProvider;
     SystemTransactionBackend systemTransactionBackend;
     DynamicColorBackend dynamicColorBackend;
+    QObject::connect(&wallpaperBackend, &WallpaperBackend::imageApplied, &dynamicColorBackend, [&dynamicColorBackend] {
+        if (dynamicColorBackend.available() && dynamicColorBackend.sourceMode() == QStringLiteral("wallpaper"))
+            QTimer::singleShot(400, &dynamicColorBackend, &DynamicColorBackend::applyCurrentKdeSeed);
+    });
     WeatherBackend weatherBackend;
     MeoAccountBackend meoAccountBackend;
     PowerBackend powerBackend;
@@ -305,6 +327,15 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("ApplicationIconBackend"), &applicationIconBackend);
     context->setContextProperty(QStringLiteral("AppPermissionsBackend"), &appPermissionsBackend);
     context->setContextProperty(QStringLiteral("DisplayBackend"), &displayBackend);
+    context->setContextProperty(QStringLiteral("ProxyBackend"), &proxyBackend);
+    context->setContextProperty(QStringLiteral("AccessibilityBackend"), &accessibilityBackend);
+    context->setContextProperty(QStringLiteral("PortalPermissionsBackend"), &portalPermissionsBackend);
+    context->setContextProperty(QStringLiteral("WallpaperBackend"), &wallpaperBackend);
+    context->setContextProperty(QStringLiteral("AppearanceBackend"), &appearanceBackend);
+    context->setContextProperty(QStringLiteral("PowerPolicyBackend"), &powerPolicyBackend);
+    context->setContextProperty(QStringLiteral("FontSettingsBackend"), &fontSettingsBackend);
+    context->setContextProperty(QStringLiteral("DefaultAppsBackend"), &defaultAppsBackend);
+    context->setContextProperty(QStringLiteral("RegionalBackend"), &regionalBackend);
     context->setContextProperty(QStringLiteral("HardwareCapabilities"), &hardwareCapabilityRegistry);
     context->setContextProperty(QStringLiteral("LoginAuthBackend"), &loginAuthBackend);
     context->setContextProperty(QStringLiteral("LockScreenPresentationBackend"),

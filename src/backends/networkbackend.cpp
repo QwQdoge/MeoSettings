@@ -8,12 +8,17 @@
 #include <NetworkManagerQt/Utils>
 #include <NetworkManagerQt/WirelessNetwork>
 #include <NetworkManagerQt/WirelessSetting>
+#include <NetworkManagerQt/Ipv4Setting>
 
 #include <QDBusPendingCallWatcher>
+#include <QDBusConnection>
+#include <QHostAddress>
+#include <QRegularExpression>
 #include <QDBusPendingReply>
 #include <QDateTime>
 #include <QDBusObjectPath>
 #include <QUuid>
+#include <QtEndian>
 
 #include <algorithm>
 
@@ -61,6 +66,18 @@ NetworkBackend::NetworkBackend(QObject *parent)
             [refresh](const QString &) { refresh(); });
     connect(notifier, &NetworkManager::Notifier::deviceRemoved, this,
             [refresh](const QString &) { refresh(); });
+
+    connect(notifier, &NetworkManager::Notifier::networkingEnabledChanged, this, &NetworkBackend::publishChanged);
+    connect(notifier, &NetworkManager::Notifier::activeConnectionsChanged, this, &NetworkBackend::publishChanged);
+    auto *settings = NetworkManager::settingsNotifier();
+    connect(settings, &NetworkManager::SettingsNotifier::connectionAdded, this, [this](const QString &path) {
+        if (const auto connection = NetworkManager::findConnection(path))
+            connect(connection.data(), &NetworkManager::Connection::updated, this, &NetworkBackend::publishChanged, Qt::UniqueConnection);
+        publishChanged();
+    });
+    connect(settings, &NetworkManager::SettingsNotifier::connectionRemoved, this, &NetworkBackend::publishChanged);
+    for (const auto &connection : NetworkManager::listConnections())
+        connect(connection.data(), &NetworkManager::Connection::updated, this, &NetworkBackend::publishChanged, Qt::UniqueConnection);
 
     refreshDevice();
     publishChanged();
@@ -495,4 +512,221 @@ QString NetworkBackend::securityLabel(const NetworkManager::WirelessSecurityType
     case NetworkManager::OWE: return tr("Enhanced open");
     default: return tr("Secured");
     }
+}
+
+QVariantList NetworkBackend::devices() const
+{
+    QVariantList result;
+    for (const auto &device : NetworkManager::networkInterfaces()) {
+        if (!device) continue;
+        const bool wired = device->type() == NetworkManager::Device::Ethernet;
+        const bool wireless = device->type() == NetworkManager::Device::Wifi;
+        if (!wired && !wireless) continue;
+        result.append(QVariantMap{{"name", device->interfaceName()}, {"wired", wired},
+            {"connected", device->state() == NetworkManager::Device::Activated}, {"managed", device->managed()}});
+    }
+    return result;
+}
+
+QVariantList NetworkBackend::profiles() const
+{
+    QVariantList result;
+    for (const auto &connection : NetworkManager::listConnections()) {
+        const auto settings = connection->settings()->toMap();
+        const auto identity = settings.value(QStringLiteral("connection"));
+        const QString uuid = identity.value(QStringLiteral("uuid")).toString();
+        if (uuid.isEmpty()) continue;
+        bool active = false, connecting = false;
+        for (const auto &candidate : NetworkManager::activeConnections()) if (candidate && candidate->uuid() == uuid) {
+            active = candidate->state() == NetworkManager::ActiveConnection::Activated;
+            connecting = candidate->state() == NetworkManager::ActiveConnection::Activating;
+        }
+        const auto ip = settings.value(QStringLiteral("ipv4"));
+        const auto ipv4 = connection->settings()->setting(NetworkManager::Setting::Ipv4).dynamicCast<NetworkManager::Ipv4Setting>();
+        QStringList dns; QString address, gateway; int prefix = 24;
+        if (ipv4) {
+            for (const auto &server : ipv4->dns()) dns.append(server.toString());
+            if (!ipv4->addresses().isEmpty()) {
+                const auto current = ipv4->addresses().first();
+                address = current.ip().toString(); prefix = current.prefixLength(); gateway = current.gateway().isNull() ? QString() : current.gateway().toString();
+            }
+        }
+        // Never publish the opaque VPN/security sections or connection secrets to QML.
+        result.append(QVariantMap{{"uuid", uuid}, {"name", connection->name()},
+            {"type", identity.value(QStringLiteral("type"))}, {"active", active}, {"connecting", connecting},
+            {"autoconnect", identity.value(QStringLiteral("autoconnect"), true)},
+            {"metered", identity.value(QStringLiteral("metered"), 0)}, {"ipv4Method", ip.value(QStringLiteral("method"))},
+            {"address", address}, {"prefix", prefix}, {"gateway", gateway}, {"dns", dns.join(QStringLiteral(", "))},
+            {"basicIpv4", ipv4 && ipv4->addresses().size() <= 1 && (ip.value("method") == "auto" || ip.value("method") == "manual")}});
+    }
+    return result;
+}
+
+void NetworkBackend::activateProfile(const QString &uuid)
+{
+    if (busy()) return;
+    const auto connection = NetworkManager::findConnectionByUuid(uuid);
+    if (!connection) { setError(tr("This connection no longer exists.")); return; }
+    setBusy(true); clearError();
+    // NetworkManager chooses a compatible device; its secret agent owns VPN/enterprise authentication.
+    auto *watcher = new QDBusPendingCallWatcher(NetworkManager::activateConnection(connection->path(), QStringLiteral("/"), QStringLiteral("/")), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
+        const QDBusPendingReply<QDBusObjectPath> result = *call;
+        if (result.isError()) setError(result.error().message());
+        call->deleteLater(); setBusy(false); publishChanged();
+    });
+}
+
+void NetworkBackend::deactivateProfile(const QString &uuid)
+{
+    if (busy()) return;
+    for (const auto &active : NetworkManager::activeConnections()) if (active && active->uuid() == uuid) {
+        setBusy(true); clearError();
+        auto *watcher = new QDBusPendingCallWatcher(NetworkManager::deactivateConnection(active->path()), this);
+        connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
+            const QDBusPendingReply<> result = *call;
+            if (result.isError()) setError(result.error().message());
+            call->deleteLater(); setBusy(false); publishChanged();
+        });
+        return;
+    }
+    setError(tr("This connection is not active."));
+}
+
+void NetworkBackend::configureProfile(const QString &uuid, const QVariantMap &changes)
+{
+    if (busy()) return;
+    const auto connection = NetworkManager::findConnectionByUuid(uuid);
+    const QStringList allowed{QStringLiteral("autoconnect"), QStringLiteral("metered"), QStringLiteral("ipv4Method"), QStringLiteral("address"), QStringLiteral("prefix"), QStringLiteral("gateway"), QStringLiteral("dns")};
+    if (!connection || changes.isEmpty()) { setError(tr("Select an existing connection.")); return; }
+    for (auto it = changes.begin(); it != changes.end(); ++it)
+        if (!allowed.contains(it.key())) { setError(tr("Unsupported network setting.")); return; }
+    QVariantMap identity, ip;
+    if (changes.contains("autoconnect")) {
+        if (changes.value("autoconnect").metaType().id() != QMetaType::Bool) { setError(tr("Invalid automatic connection setting.")); return; }
+        identity.insert("autoconnect", changes.value("autoconnect"));
+    }
+    if (changes.contains("metered")) {
+        bool valid = false; const int value = changes.value("metered").toInt(&valid);
+        if (!valid || value < 0 || value > 2) { setError(tr("Invalid metered connection setting.")); return; }
+        identity.insert("metered", value);
+    }
+    if (changes.contains("ipv4Method")) {
+        const auto current = connection->settings();
+        const auto ipv4 = current->setting(NetworkManager::Setting::Ipv4).dynamicCast<NetworkManager::Ipv4Setting>();
+        const auto type = current->toMap().value("connection").value("type").toString();
+        if (!ipv4 || (type != "802-3-ethernet" && type != "802-11-wireless") || ipv4->addresses().size() > 1
+            || (ipv4->method() != NetworkManager::Ipv4Setting::Automatic && ipv4->method() != NetworkManager::Ipv4Setting::Manual)) {
+            setError(tr("This connection uses an advanced address configuration.")); return;
+        }
+        const QString method = changes.value("ipv4Method").toString();
+        if (method != "auto" && method != "manual") { setError(tr("Choose automatic or manual IPv4 configuration.")); return; }
+        ip.insert("method", method);
+        if (method == "manual") {
+            const QHostAddress address(changes.value("address").toString());
+            const QHostAddress gateway(changes.value("gateway").toString());
+            bool valid = false; const int prefix = changes.value("prefix").toInt(&valid);
+            if (address.protocol() != QAbstractSocket::IPv4Protocol || !valid || prefix < 1 || prefix > 32
+                || (!changes.value("gateway").toString().isEmpty() && gateway.protocol() != QAbstractSocket::IPv4Protocol)) {
+                setError(tr("Enter a valid IPv4 address, prefix and optional gateway.")); return;
+            }
+            ip.insert("address-data", QVariant::fromValue(QList<QVariantMap>{{{"address", address.toString()}, {"prefix", uint(prefix)}}}));
+            ip.insert("gateway", gateway.isNull() ? QString() : gateway.toString());
+        }
+        QVariantList servers;
+        for (const auto &server : changes.value("dns").toString().split(QRegularExpression(QStringLiteral("[,;\\s]+")), Qt::SkipEmptyParts)) {
+            const QHostAddress address(server);
+            if (address.protocol() != QAbstractSocket::IPv4Protocol) { setError(tr("Enter valid IPv4 DNS servers.")); return; }
+            servers.append(uint(address.toIPv4Address()));
+        }
+        // Legacy IPv4 DNS integers use network byte order in the NetworkManager D-Bus contract.
+        QList<uint> encodedDns;
+        for (const auto &server : servers) encodedDns.append(qToBigEndian(server.toUInt()));
+        ip.insert("dns", QVariant::fromValue(encodedDns)); ip.insert("ignore-auto-dns", !servers.isEmpty());
+    } else if (changes.contains("address") || changes.contains("prefix") || changes.contains("gateway") || changes.contains("dns")) {
+        setError(tr("Choose an IPv4 method before changing addresses.")); return;
+    }
+    setBusy(true); clearError();
+    auto message = QDBusMessage::createMethodCall(QStringLiteral("org.freedesktop.NetworkManager"), connection->path(), QStringLiteral("org.freedesktop.NetworkManager.Settings.Connection"), QStringLiteral("GetSettings"));
+    auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(message, 5000), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, connection, identity, ip](QDBusPendingCallWatcher *call) {
+        const QDBusPendingReply<NMVariantMapMap> reply = *call; call->deleteLater();
+        if (reply.isError()) { setBusy(false); setError(reply.error().message()); return; }
+        auto settings = reply.value();
+        auto connectionValues = settings.value("connection");
+        for (auto it = identity.begin(); it != identity.end(); ++it) connectionValues.insert(it.key(), it.value());
+        settings.insert("connection", connectionValues);
+        if (!ip.isEmpty()) {
+            auto ipv4 = settings.value("ipv4"); ipv4.remove("addresses"); ipv4.remove("address-data"); ipv4.remove("gateway");
+            for (auto it = ip.begin(); it != ip.end(); ++it) ipv4.insert(it.key(), it.value());
+            settings.insert("ipv4", ipv4);
+        }
+        // GetSettings contains no secrets. Preserve that property: NetworkManager's
+        // update_auth_cb merges its stored and agent-owned secrets when the new
+        // settings contain no secrets. Do not fetch credentials into the UI or
+        // inject a partially populated secret group that would replace that cache.
+        auto *update = new QDBusPendingCallWatcher(connection->update(settings), this);
+        connect(update, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *finished) {
+            const QDBusPendingReply<> result = *finished;
+            if (result.isError()) setError(result.error().message());
+            finished->deleteLater(); setBusy(false); publishChanged();
+        });
+    });
+}
+
+bool NetworkBackend::hotspotSupported() const
+{
+    return m_wifiDevice && m_wifiDevice->wirelessCapabilities().testFlag(NetworkManager::WirelessDevice::ApCap)
+        && m_wifiDevice->wirelessCapabilities().testFlag(NetworkManager::WirelessDevice::Rsn);
+}
+
+bool NetworkBackend::hotspotActive() const
+{
+    if (!m_wifiDevice || !m_wifiDevice->activeConnection() || !m_wifiDevice->activeConnection()->connection()) return false;
+    return m_wifiDevice->activeConnection()->connection()->settings()->toMap().value(QStringLiteral("802-11-wireless")).value(QStringLiteral("mode")).toString() == "ap";
+}
+
+bool NetworkBackend::networkingEnabled() const { return NetworkManager::isNetworkingEnabled(); }
+
+void NetworkBackend::setNetworkingEnabled(bool enabled)
+{
+    if (busy()) return;
+    auto message = QDBusMessage::createMethodCall(QStringLiteral("org.freedesktop.NetworkManager"), QStringLiteral("/org/freedesktop/NetworkManager"), QStringLiteral("org.freedesktop.NetworkManager"), QStringLiteral("Enable"));
+    message << enabled; setBusy(true); clearError();
+    auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::systemBus().asyncCall(message, 30000), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
+        const QDBusPendingReply<> result = *call;
+        if (result.isError()) setError(result.error().message());
+        call->deleteLater(); setBusy(false); publishChanged();
+    });
+}
+
+void NetworkBackend::startHotspot(const QString &ssid, const QString &password)
+{
+    if (busy()) return;
+    if (!hotspotSupported() || !wifiEnabled() || !networkingEnabled() || ssid.toUtf8().isEmpty() || ssid.toUtf8().size() > 32
+        || password.size() < 8 || password.size() > 63 || !QRegularExpression(QStringLiteral("^[ -~]+$")).match(password).hasMatch()) {
+        setError(tr("Choose a network name up to 32 bytes and a password of 8–63 printable ASCII characters on an adapter supporting WPA2 hotspot mode.")); return;
+    }
+    if (hotspotActive()) { setError(tr("A hotspot is already active on this adapter.")); return; }
+    NMVariantMapMap settings{
+        {"connection", {{"id", ssid}, {"uuid", QUuid::createUuid().toString(QUuid::WithoutBraces)}, {"type", "802-11-wireless"}, {"autoconnect", false}}},
+        {"802-11-wireless", {{"ssid", ssid.toUtf8()}, {"mode", "ap"}, {"security", "802-11-wireless-security"}}},
+        {"802-11-wireless-security", {{"key-mgmt", "wpa-psk"}, {"psk", password}, {"proto", QStringList{"rsn"}}}},
+        {"ipv4", {{"method", "shared"}}}, {"ipv6", {{"method", "disabled"}}}
+    };
+    setBusy(true); clearError();
+    // The secret/profile exists only while active; stopping sharing removes the volatile profile.
+    auto *watcher = new QDBusPendingCallWatcher(NetworkManager::addAndActivateConnection2(settings, m_wifiDevice->uni(), QStringLiteral("/"), {{"persist", "volatile"}}), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
+        const QDBusMessage result = call->reply();
+        if (result.type() == QDBusMessage::ErrorMessage) setError(result.errorMessage());
+        call->deleteLater(); setBusy(false); publishChanged();
+    });
+}
+
+void NetworkBackend::stopHotspot()
+{
+    if (!hotspotActive()) { setError(tr("No hotspot is active on this adapter.")); return; }
+    deactivateProfile(m_wifiDevice->activeConnection()->uuid());
 }

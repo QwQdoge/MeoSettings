@@ -259,8 +259,8 @@ void SettingsRegistryTest::exposesCuratedCategoryEntries()
 void SettingsRegistryTest::resolvesKcmRoutes()
 {
     SettingsRegistry registry;
-    const auto fallback = registry.entry(QStringLiteral("kcm:kcm_componentchooser"));
-    QCOMPARE(fallback.value(QStringLiteral("id")).toString(), QStringLiteral("default-apps"));
+    const auto fallback = registry.entry(QStringLiteral("kcm:kcm_keys"));
+    QCOMPARE(fallback.value(QStringLiteral("id")).toString(), QStringLiteral("shortcuts"));
     QVERIFY(!fallback.value(QStringLiteral("direct")).toBool());
 }
 
@@ -273,8 +273,8 @@ void SettingsRegistryTest::exposesStorageAndSafetyMetadata()
 
     const auto storage = registry.entry(QStringLiteral("storage"));
     QCOMPARE(storage.value(QStringLiteral("route")).toString(), QStringLiteral("storage"));
-    QCOMPARE(storage.value(QStringLiteral("pageKind")).toString(), QStringLiteral("inspector"));
-    QCOMPARE(storage.value(QStringLiteral("risk")).toString(), QStringLiteral("read-only"));
+    QCOMPARE(storage.value(QStringLiteral("pageKind")).toString(), QStringLiteral("control"));
+    QCOMPARE(storage.value(QStringLiteral("risk")).toString(), QStringLiteral("reversible"));
     QCOMPARE(storage.value(QStringLiteral("depth")).toInt(), 2);
 
     const auto appUsageResults = registry.search(QStringLiteral("omnistore app usage"));

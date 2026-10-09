@@ -129,6 +129,31 @@ Item {
             }
         }
 
+        MeoBanner { width: parent.width; visible: PowerPolicyBackend.error !== ""; title: qsTr("Power schedule needs attention"); text: PowerPolicyBackend.error; tone: "error" }
+        Repeater {
+            model: PowerPolicyBackend.policies
+            delegate: Column {
+                required property var modelData
+                width: parent.width; spacing: MeoTheme.space12
+                readonly property var minutes: [0, 1, 2, 5, 10, 15, 30, 60, 120, 180]
+                readonly property var choices: minutes.map(value => value === 0 ? qsTr("Never") : qsTr("%1 minutes").arg(value))
+                MeoExposedDropdown {
+                    width: parent.width; label: qsTr("%1: turn off screen").arg(modelData.label)
+                    model: parent.choices
+                    text: modelData.screenMinutes < 0 ? qsTr("System default") : modelData.screenMinutes === 0 ? qsTr("Never") : qsTr("%1 minutes").arg(modelData.screenMinutes)
+                    enabled: PowerPolicyBackend.available && !PowerPolicyBackend.busy
+                    onSelected: (index, value) => PowerPolicyBackend.setTimeout(modelData.id, "screen", parent.minutes[index])
+                }
+                MeoExposedDropdown {
+                    width: parent.width; label: qsTr("%1: sleep when idle").arg(modelData.label)
+                    model: parent.choices
+                    text: modelData.sleepMinutes < 0 ? qsTr("System default or advanced policy") : modelData.sleepMinutes === 0 ? qsTr("Never") : qsTr("%1 minutes").arg(modelData.sleepMinutes)
+                    enabled: PowerPolicyBackend.available && PowerPolicyBackend.canSuspend && !PowerPolicyBackend.busy
+                    onSelected: (index, value) => PowerPolicyBackend.setTimeout(modelData.id, "sleep", parent.minutes[index])
+                }
+            }
+        }
+
         MeoCard {
             width: parent.width
             type: "outlined"

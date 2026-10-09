@@ -6,6 +6,7 @@ import MeoUI
 Item {
     id: root
 
+    Component.onDestruction: AudioBackend.stopTestSound()
     property var navigateTo: function(route) {}
     property var rootMetrics: null
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
@@ -231,6 +232,106 @@ Item {
                         leadingIcon: "mic"
                         selected: modelData.active
                         onClicked: AudioBackend.setDefaultInput(modelData.id)
+                    }
+                }
+            }
+        }
+
+        MeoButton {
+            text: AudioBackend.testingSound ? qsTr("Stop test sound") : qsTr("Test default output")
+            enabled: AudioBackend.available; type: "tonal"
+            onClicked: AudioBackend.testingSound ? AudioBackend.stopTestSound() : AudioBackend.testSound()
+        }
+        Column {
+            width: parent.width; spacing: MeoTheme.space8
+            visible: Object.keys(AudioBackend.notificationSound).length > 0
+            MeoText { text: qsTr("Notification and system sounds"); typeRole: "title"; typeSize: "small" }
+            MeoSlider {
+                width: parent.width; from: 0; to: 100; value: AudioBackend.notificationSound.volume || 0
+                enabled: AudioBackend.notificationSound.writable || false
+                Accessible.name: qsTr("Notification sound volume")
+                onMoved: value => AudioBackend.setNotificationSound(Math.round(value), AudioBackend.notificationSound.muted)
+            }
+            MeoSwitch {
+                checked: !(AudioBackend.notificationSound.muted || false)
+                enabled: AudioBackend.notificationSound.writable || false
+                Accessible.name: qsTr("Enable notification sounds")
+                onToggled: enabled => AudioBackend.setNotificationSound(AudioBackend.notificationSound.volume, !enabled)
+            }
+        }
+        MeoText { text: qsTr("Applications"); typeRole: "title"; typeSize: "small"; visible: AudioBackend.streams.length > 0 }
+        Repeater {
+            model: AudioBackend.streams
+            delegate: Column {
+                id: streamEntry
+                required property var modelData
+                width: parent.width
+                spacing: MeoTheme.space8
+                readonly property var devices: modelData.input ? AudioBackend.inputs : AudioBackend.outputs
+                readonly property string currentDevice: {
+                    for (const device of devices) if (device.index === modelData.deviceIndex) return device.name
+                    return qsTr("Unavailable")
+                }
+                MeoText { text: streamEntry.modelData.name + (streamEntry.modelData.input ? qsTr(" · Recording") : qsTr(" · Playback")); typeRole: "title"; typeSize: "small" }
+                RowLayout {
+                    width: parent.width
+                    MeoSlider {
+                        Layout.fillWidth: true; from: 0; to: 100
+                        value: streamEntry.modelData.volume
+                        enabled: streamEntry.modelData.hasVolume
+                        Accessible.name: qsTr("Application volume for %1").arg(streamEntry.modelData.name)
+                        onMoved: value => AudioBackend.setStreamVolume(streamEntry.modelData.id, Math.round(value))
+                    }
+                    MeoSwitch {
+                        checked: !streamEntry.modelData.muted
+                        Accessible.name: qsTr("Enable audio for %1").arg(streamEntry.modelData.name)
+                        onToggled: enabled => AudioBackend.setStreamMuted(streamEntry.modelData.id, !enabled)
+                    }
+                }
+                MeoExposedDropdown {
+                    width: parent.width; label: qsTr("Device"); text: streamEntry.currentDevice
+                    model: streamEntry.devices.map(device => device.name)
+                    onSelected: (index, value) => AudioBackend.setStreamDevice(streamEntry.modelData.id, streamEntry.devices[index].id)
+                }
+            }
+        }
+        MeoText { text: qsTr("Hardware profiles"); typeRole: "title"; typeSize: "small"; visible: AudioBackend.cards.length > 0 }
+        Repeater {
+            model: AudioBackend.cards
+            delegate: MeoExposedDropdown {
+                required property var modelData
+                width: parent.width; label: modelData.name
+                readonly property var profiles: modelData.profiles.filter(profile => profile.available || profile.index === modelData.activeProfile)
+                model: profiles.map(profile => profile.label)
+                text: modelData.profiles[modelData.activeProfile]?.label || qsTr("Unavailable")
+                onSelected: (index, value) => AudioBackend.setCardProfile(modelData.id, profiles[index].index)
+            }
+        }
+        Repeater {
+            model: AudioBackend.outputs.map(device => Object.assign({}, device, {input: false})).concat(AudioBackend.inputs.map(device => Object.assign({}, device, {input: true})))
+            delegate: Column {
+                id: hardwareEntry
+                required property var modelData
+                width: parent.width; spacing: MeoTheme.space8
+                readonly property var ports: modelData.ports.filter(port => port.available || port.active)
+                MeoExposedDropdown {
+                    width: parent.width; visible: hardwareEntry.ports.length > 0
+                    label: qsTr("%1 · Port").arg(hardwareEntry.modelData.name)
+                    model: hardwareEntry.ports.map(port => port.name)
+                    text: hardwareEntry.ports.find(port => port.active)?.name || qsTr("Unavailable")
+                    onSelected: (index, value) => AudioBackend.setDevicePort(hardwareEntry.modelData.id, hardwareEntry.modelData.input, hardwareEntry.ports[index].index)
+                }
+                Repeater {
+                    model: hardwareEntry.modelData.channels
+                    delegate: RowLayout {
+                        required property var modelData
+                        width: parent.width
+                        MeoText { text: hardwareEntry.modelData.name + " · " + modelData.name; Layout.maximumWidth: parent.width / 2; elide: Text.ElideRight }
+                        MeoSlider {
+                            Layout.fillWidth: true; from: 0; to: 100; value: parent.modelData.volume
+                            Accessible.name: qsTr("%1 channel volume").arg(parent.modelData.name)
+                            onMoved: value => AudioBackend.setChannelVolume(hardwareEntry.modelData.id, hardwareEntry.modelData.input, parent.modelData.index, Math.round(value))
+                        }
                     }
                 }
             }

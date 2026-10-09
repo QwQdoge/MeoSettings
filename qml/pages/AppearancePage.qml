@@ -187,12 +187,12 @@ Item {
     readonly property var kdeAppearanceRows: [
         root.moduleRow("kcm_lookandfeel", qsTr("Global theme"), qsTr("Apply a complete platform look-and-feel package"), "palette"),
         root.moduleRow("kcm_colors", qsTr("Color scheme & contrast"), qsTr("Inspect installed platform color schemes and compatibility colors"), "contrast"),
-        root.moduleRow("kcm_wallpaper", qsTr("Wallpaper"), qsTr("Desktop backgrounds, positioning, slideshows, and plugins"), "wallpaper"),
+        ({"title": qsTr("Wallpaper"), "subtitle": qsTr("Choose a desktop image and layout"), "icon": "wallpaper", "route": "wallpaper", "enabled": true, "trailingKind": "chevron"}),
         root.moduleRow("kcm_style", qsTr("Application style"), qsTr("Widget style, toolbar labels, and application behavior"), "web_asset"),
         root.moduleRow("kcm_desktoptheme", qsTr("Plasma style"), qsTr("Panel, widget, popup, and notification appearance"), "dashboard"),
         root.moduleRow("kcm_icons", qsTr("System icon theme"), qsTr("Installed platform icon themes for apps and the workspace"), "apps"),
         root.moduleRow("kcm_cursortheme", qsTr("Cursors"), qsTr("Pointer theme, size, and animation"), "mouse"),
-        root.moduleRow("kcm_fonts", qsTr("Fonts"), qsTr("Font families, rendering, hinting, and system-wide sizing"), "format_size"),
+        ({"title": qsTr("Fonts"), "subtitle": qsTr("Interface, fixed width, menus and window titles"), "icon": "format_size", "route": "fonts", "enabled": true, "trailingKind": "chevron"}),
         root.moduleRow("kcm_kwindecoration", qsTr("Window decorations"), qsTr("Title bars, borders, buttons, and decoration themes"), "select_window"),
         root.moduleRow("kcm_splashscreen", qsTr("Welcome screen"), qsTr("Plasma session startup animation"), "animation"),
         root.moduleRow("kcm_soundtheme", qsTr("Sound theme"), qsTr("Notification and desktop event sounds"), "music_note")
@@ -207,6 +207,26 @@ Item {
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : qsTr("Appearance")
         subtitle: qsTr("Choose a wallpaper, system accent, or color. Meo uses one consistent color scheme across its apps.")
+
+        MeoBanner { width: parent.width; visible: AppearanceBackend.error !== ""; title: qsTr("Appearance needs attention"); text: AppearanceBackend.error; tone: "error" }
+        MeoText { width: parent.width; visible: AppearanceBackend.status !== ""; text: AppearanceBackend.status; wrapMode: Text.WordWrap }
+        MeoButton {
+            text: AppearanceBackend.busy ? qsTr("Applying appearance…") : qsTr("Apply Meo desktop preset")
+            enabled: AppearanceBackend.available && !AppearanceBackend.busy
+            onClicked: AppearanceBackend.applyPreset()
+        }
+        MeoButton {
+            text: qsTr("Restore previous appearance"); type: "tonal"
+            visible: AppearanceBackend.recoveryAvailable; enabled: !AppearanceBackend.busy
+            onClicked: appearanceRestore.open()
+        }
+        MeoExposedDropdown {
+            width: parent.width; label: qsTr("Appearance mode")
+            model: [qsTr("Light"), qsTr("Dark")]
+            text: MeoTheme.isDarkMode ? model[1] : model[0]
+            enabled: AppearanceBackend.available && !AppearanceBackend.busy
+            onSelected: (index, value) => AppearanceBackend.applyMode(index === 1 ? "dark" : "light")
+        }
 
         MeoSettingsGroup {
             width: parent.width
@@ -303,6 +323,16 @@ Item {
                 }
             }
         }
+    }
+
+    MeoSettingsTaskSheet {
+        id: appearanceRestore
+        popupParent: Overlay.overlay
+        title: qsTr("Restore previous appearance?")
+        subtitle: qsTr("Restore the desktop configuration saved before the most recent Meo preset application. Later changes to those configuration files will be replaced. Sign out afterward to reload all components.")
+        acceptText: qsTr("Restore")
+        rejectText: qsTr("Cancel")
+        onAccepted: AppearanceBackend.restore()
     }
 
     MeoSettingsTaskSheet {

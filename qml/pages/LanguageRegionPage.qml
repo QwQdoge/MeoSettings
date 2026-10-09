@@ -49,12 +49,44 @@ Item {
         title: root.isCompact ? "" : qsTr("Language & region")
         subtitle: qsTr("Language, regional formats, input, time, and weather location")
 
-        MeoSettingsGroup {
+        MeoBanner {
             width: parent.width
-            title: qsTr("Regional settings")
-            subtitle: ""
-            model: root.regionRows
-            onRowActivated: (index, row) => root.navigateTo(row.route)
+            visible: RegionalBackend.error !== ""
+            title: qsTr("Regional setting needs attention")
+            text: RegionalBackend.error
+            tone: "error"
+        }
+        MeoBanner {
+            width: parent.width
+            visible: RegionalBackend.restartRequired
+            title: qsTr("Language preferences saved")
+            text: qsTr("Sign out and sign in to apply system language and formats to all applications.")
+        }
+        MeoExposedDropdown {
+            width: parent.width
+            label: qsTr("System language")
+            model: RegionalBackend.languages
+            textRole: "label"
+            valueRole: "id"
+            currentValue: RegionalBackend.preferences.language
+            onSelected: (index, value) => RegionalBackend.setLanguage(value)
+        }
+        MeoExposedDropdown {
+            width: parent.width
+            label: qsTr("Regional formats")
+            model: RegionalBackend.formats
+            textRole: "label"
+            valueRole: "id"
+            currentValue: RegionalBackend.preferences.format
+            onSelected: (index, value) => RegionalBackend.setFormats(value)
+        }
+        Flow {
+            width: parent.width
+            spacing: MeoTheme.space8
+            MeoButton { text: qsTr("Use system language default"); type: "text"; onClicked: RegionalBackend.setLanguage("") }
+            MeoButton { text: qsTr("Use system format default"); type: "text"; onClicked: RegionalBackend.setFormats("") }
+            MeoButton { text: qsTr("Date & time"); type: "tonal"; onClicked: root.navigateTo("date-time") }
+            MeoButton { text: qsTr("Advanced language settings"); type: "text"; onClicked: root.navigateTo("kcm:kcm_regionandlang") }
         }
 
         MeoCard {

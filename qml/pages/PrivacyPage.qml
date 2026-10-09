@@ -126,6 +126,22 @@ Item {
         title: root.isCompact ? "" : qsTr("Privacy & security")
         subtitle: qsTr("Review verifiable app sandbox access, then use maintained system tools for security-sensitive controls.")
 
+        MeoBanner { width: parent.width; visible: PortalPermissionsBackend.error !== ""; title: qsTr("Portal permission needs attention"); text: PortalPermissionsBackend.error; tone: "error" }
+        MeoText { width: parent.width; text: qsTr("Portal decisions apply to applications using that portal. They do not block direct device access by unsandboxed applications or end an existing capture session."); wrapMode: Text.WordWrap }
+        Repeater {
+            model: PortalPermissionsBackend.permissions
+            delegate: MeoExposedDropdown {
+                required property var modelData
+                width: parent.width
+                label: modelData.label + " · " + modelData.appId
+                model: modelData.choices.map(choice => choice === "yes" ? qsTr("Allow") : choice === "no" ? qsTr("Deny") : qsTr("Ask"))
+                text: modelData.decision === "yes" ? qsTr("Allow") : modelData.decision === "no" ? qsTr("Deny") : modelData.decision === "ask" ? qsTr("Ask") : modelData.decision
+                enabled: modelData.editable && !PortalPermissionsBackend.busy
+                onSelected: (index, value) => PortalPermissionsBackend.setPermission(modelData.resource, modelData.appId, modelData.choices[index])
+            }
+        }
+        MeoButton { text: qsTr("Refresh portal decisions"); type: "text"; enabled: !PortalPermissionsBackend.busy; onClicked: PortalPermissionsBackend.refresh() }
+
         MeoCard {
             width: parent.width
             type: "outlined"
