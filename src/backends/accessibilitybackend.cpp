@@ -89,7 +89,7 @@ void AccessibilityBackend::setOption(const QString &id, bool enabled)
     if (!effects.contains(id)) { setError(tr("Unsupported accessibility preference.")); return; }
     const QString effect = effects.value(id), key = effect + QStringLiteral("Enabled");
     auto group = KSharedConfig::openConfig(QStringLiteral("kwinrc"))->group(QStringLiteral("Plugins"));
-    const bool hadEntry = group.hasKey(key); const QVariant previous = group.readEntry(key, QVariant());
+    const bool hadEntry = group.hasKey(key); const QVariant previous = group.readEntry(key, QString());
     group.writeEntry(key, enabled, KConfig::Notify);
     if (!group.sync()) { setError(tr("The visual accessibility preference could not be saved.")); return; }
     setBusy(true); ++m_generation;

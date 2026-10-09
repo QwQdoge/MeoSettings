@@ -4,6 +4,7 @@
 #include <Solid/DeviceNotifier>
 
 #include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -127,6 +128,25 @@ QString PowerBackend::summary() const
     return tr("%1 · %2").arg(amount, stateLabel());
 }
 
+double PowerBackend::fullEnergy() const
+{
+    if (!m_primaryBattery || !m_primaryBattery->isPresent()) return -1;
+    const double value = m_primaryBattery->energyFull();
+    return std::isfinite(value) && value > 0 ? value : -1;
+}
+
+double PowerBackend::designEnergy() const
+{
+    if (!m_primaryBattery || !m_primaryBattery->isPresent()) return -1;
+    const double value = m_primaryBattery->energyFullDesign();
+    return std::isfinite(value) && value > 0 ? value : -1;
+}
+
+double PowerBackend::healthPercent() const
+{
+    return fullEnergy() > 0 && designEnergy() > 0 ? 100.0 * fullEnergy() / designEnergy() : -1;
+}
+
 void PowerBackend::refresh()
 {
     Solid::Device nextDevice;
@@ -161,6 +181,8 @@ void PowerBackend::bindPrimaryBattery()
 
     const auto publish = [this] { publishChanged(); };
     connect(m_primaryBattery, &Solid::Battery::chargePercentChanged, this, publish);
+    connect(m_primaryBattery, &Solid::Battery::energyFullChanged, this, publish);
+    connect(m_primaryBattery, &Solid::Battery::energyFullDesignChanged, this, publish);
     connect(m_primaryBattery, &Solid::Battery::chargeStateChanged, this, publish);
     connect(m_primaryBattery, &Solid::Battery::timeToEmptyChanged, this, publish);
     connect(m_primaryBattery, &Solid::Battery::timeToFullChanged, this, publish);

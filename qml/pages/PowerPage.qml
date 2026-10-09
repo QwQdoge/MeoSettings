@@ -10,6 +10,36 @@ Item {
     property var rootMetrics: null
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
 
+    readonly property var lidActions: [0].concat(PowerPolicyBackend.canSuspend ? [1] : []).concat(PowerPolicyBackend.canHibernate ? [2] : []).concat([32, 64, 8])
+    readonly property var batteryActions: [-1, 0].concat(PowerPolicyBackend.canSuspend ? [1] : []).concat(PowerPolicyBackend.canHibernate ? [2] : []).concat([8])
+    function actionTitle(action) {
+        switch (action) {
+        case -1: return qsTr("Keep current or system default")
+        case 0: return qsTr("Do nothing")
+        case 1: return qsTr("Sleep")
+        case 2: return qsTr("Hibernate")
+        case 8: return qsTr("Shut down")
+        case 32: return qsTr("Lock screen")
+        case 64: return qsTr("Turn off screen")
+        default: return qsTr("Advanced action (%1)").arg(action)
+        }
+    }
+    property var pendingPolicy: null
+    MeoSettingsTaskSheet {
+        id: confirmPolicy; popupParent: Overlay.overlay
+        title: qsTr("Apply automatic power behavior?")
+        subtitle: qsTr("The desktop will use this action when the lid closes or the battery reaches its critical level. Save work before choosing shutdown; doing nothing at critical battery may lose work when power runs out.")
+        acceptText: qsTr("Apply"); rejectText: qsTr("Cancel")
+        onAccepted: {
+            const request = root.pendingPolicy
+            if (!request) return
+            if (request.kind === "lid") PowerPolicyBackend.setLidPolicy(request.profile, request.action, request.inhibit)
+            else PowerPolicyBackend.setBatteryPolicy(request.low, request.critical, request.action)
+            root.pendingPolicy = null
+        }
+        onRejected: root.pendingPolicy = null
+    }
+
     function profileTitle(profile) {
         if (profile === "performance")
             return qsTr("Performance")
@@ -141,15 +171,77 @@ Item {
                     width: parent.width; label: qsTr("%1: turn off screen").arg(modelData.label)
                     model: parent.choices
                     text: modelData.screenMinutes < 0 ? qsTr("System default") : modelData.screenMinutes === 0 ? qsTr("Never") : qsTr("%1 minutes").arg(modelData.screenMinutes)
-                    enabled: PowerPolicyBackend.available && !PowerPolicyBackend.busy
+                    enabled: PowerPolicyBackend.available && modelData.screenWritable && !PowerPolicyBackend.busy
                     onSelected: (index, value) => PowerPolicyBackend.setTimeout(modelData.id, "screen", parent.minutes[index])
                 }
                 MeoExposedDropdown {
                     width: parent.width; label: qsTr("%1: sleep when idle").arg(modelData.label)
                     model: parent.choices
                     text: modelData.sleepMinutes < 0 ? qsTr("System default or advanced policy") : modelData.sleepMinutes === 0 ? qsTr("Never") : qsTr("%1 minutes").arg(modelData.sleepMinutes)
-                    enabled: PowerPolicyBackend.available && PowerPolicyBackend.canSuspend && !PowerPolicyBackend.busy
+                    enabled: PowerPolicyBackend.available && modelData.sleepWritable && PowerPolicyBackend.canSuspend && !PowerPolicyBackend.busy
                     onSelected: (index, value) => PowerPolicyBackend.setTimeout(modelData.id, "sleep", parent.minutes[index])
+                }
+                Column {
+                    id: lidPolicy
+                    width: parent.width; spacing: MeoTheme.space8
+                    visible: PowerPolicyBackend.lidPresent
+                    property int action: modelData.lidAction
+                    property bool inhibit: modelData.inhibitLidWithMonitor
+                    MeoExposedDropdown {
+                        width: parent.width; label: qsTr("%1: when closing the lid").arg(modelData.label)
+                        model: root.lidActions.map(value => root.actionTitle(value))
+                        text: lidPolicy.action < 0 ? qsTr("System default") : root.actionTitle(lidPolicy.action)
+                        enabled: modelData.lidWritable && !PowerPolicyBackend.busy
+                        onSelected: (index, value) => lidPolicy.action = root.lidActions[index]
+                    }
+                    MeoSettingsGroup {
+                        width: parent.width
+                        model: [{"title": qsTr("Keep running with an external monitor"), "trailingKind": "toggle", "checked": lidPolicy.inhibit, "enabled": modelData.lidWritable && !PowerPolicyBackend.busy}]
+                        onRowToggled: (index, checked, row) => lidPolicy.inhibit = checked
+                    }
+                    MeoButton {
+                        text: qsTr("Apply lid behavior"); type: "tonal"
+                        enabled: modelData.lidWritable && !PowerPolicyBackend.busy && root.lidActions.indexOf(lidPolicy.action) >= 0
+                        onClicked: {
+                            root.pendingPolicy = {"kind": "lid", "profile": modelData.id, "action": lidPolicy.action, "inhibit": lidPolicy.inhibit}
+                            confirmPolicy.open()
+                        }
+                    }
+                }
+            }
+        }
+
+        Column {
+            id: batteryPolicy
+            width: parent.width; spacing: MeoTheme.space12
+            visible: PowerBackend.available
+            property int action: PowerPolicyBackend.batteryPolicy.action
+            MeoText { width: parent.width; text: qsTr("Low and critical battery"); typeRole: "title"; typeSize: "medium" }
+            MeoTextField {
+                id: lowLevel; width: parent.width; label: qsTr("Low-battery warning (%)")
+                text: String(PowerPolicyBackend.batteryPolicy.lowPercent)
+                enabled: PowerPolicyBackend.batteryPolicy.writable && !PowerPolicyBackend.busy
+                validator: IntValidator { bottom: 2; top: 100 }
+            }
+            MeoTextField {
+                id: criticalLevel; width: parent.width; label: qsTr("Critical battery (%)")
+                text: String(PowerPolicyBackend.batteryPolicy.criticalPercent)
+                enabled: PowerPolicyBackend.batteryPolicy.writable && !PowerPolicyBackend.busy
+                validator: IntValidator { bottom: 1; top: 99 }
+            }
+            MeoExposedDropdown {
+                width: parent.width; label: qsTr("At critical battery")
+                model: root.batteryActions.map(value => root.actionTitle(value))
+                text: root.actionTitle(batteryPolicy.action)
+                enabled: PowerPolicyBackend.batteryPolicy.writable && !PowerPolicyBackend.busy
+                onSelected: (index, value) => batteryPolicy.action = root.batteryActions[index]
+            }
+            MeoButton {
+                text: qsTr("Apply battery behavior"); type: "tonal"
+                enabled: PowerPolicyBackend.available && PowerPolicyBackend.batteryPolicy.writable && !PowerPolicyBackend.busy && lowLevel.acceptableInput && criticalLevel.acceptableInput && Number(criticalLevel.text) < Number(lowLevel.text) && root.batteryActions.indexOf(batteryPolicy.action) >= 0
+                onClicked: {
+                    root.pendingPolicy = {"kind": "battery", "low": Number(lowLevel.text), "critical": Number(criticalLevel.text), "action": batteryPolicy.action}
+                    confirmPolicy.open()
                 }
             }
         }
@@ -181,7 +273,10 @@ Item {
             width: parent.width
             title: qsTr("Battery")
             subtitle: qsTr("Battery level and charging status from this device")
-            model: root.batteryRows
+            model: root.batteryRows.concat(PowerBackend.available ? [{
+                "title": qsTr("Battery health"), "subtitle": PowerBackend.healthPercent < 0 ? qsTr("The battery does not report full and design capacity") : qsTr("%1% of design capacity · %2 / %3 Wh").arg(PowerBackend.healthPercent.toFixed(1)).arg(PowerBackend.fullEnergy.toFixed(1)).arg(PowerBackend.designEnergy.toFixed(1)),
+                "icon": "battery_full", "interactive": false, "trailingKind": "status", "trailingText": PowerBackend.healthPercent < 0 ? qsTr("Unknown") : qsTr("Reported by device")
+            }] : [])
         }
 
         MeoSettingsGroup {
@@ -324,10 +419,10 @@ Item {
             width: parent.width
             visible: KcmBridge.isAvailable("kcm_powerdevilprofilesconfig")
             title: qsTr("Advanced power policy")
-            subtitle: qsTr("Use system power settings for schedules, charge limits, and other advanced options.")
+            subtitle: qsTr("Use system power settings for charge limits and other device-specific options.")
             model: [{
                 "title": qsTr("Advanced Power Management"),
-                "subtitle": qsTr("Schedules, critical battery actions, and device-specific power options"),
+                "subtitle": qsTr("Charge limits, sleep modes, and device-specific power options"),
                 "icon": "tune",
                 "tone": "neutral",
                 "route": "kcm:kcm_powerdevilprofilesconfig",

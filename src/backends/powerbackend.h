@@ -13,8 +13,8 @@ class Battery;
  * A factual view of the system's primary battery.
  *
  * This deliberately exposes no power-profile, suspend, charge-limit, or
- * other mutating controls. Those continue to belong to KDE's maintained
- * PowerDevil configuration module. The backend only consumes Solid's primary
+ * other mutating controls. PowerPolicyBackend and Meo.System consume the
+ * maintained power authorities separately. The backend only consumes Solid's primary
  * battery interface so the home surface never invents battery state.
  */
 class PowerBackend final : public BackendBase
@@ -28,6 +28,9 @@ class PowerBackend final : public BackendBase
     Q_PROPERTY(qint64 timeRemaining READ timeRemaining NOTIFY changed)
     Q_PROPERTY(bool timeRemainingKnown READ timeRemainingKnown NOTIFY changed)
     Q_PROPERTY(QString summary READ summary NOTIFY changed)
+    Q_PROPERTY(double fullEnergy READ fullEnergy NOTIFY changed)
+    Q_PROPERTY(double designEnergy READ designEnergy NOTIFY changed)
+    Q_PROPERTY(double healthPercent READ healthPercent NOTIFY changed)
 
 public:
     explicit PowerBackend(QObject *parent = nullptr);
@@ -46,6 +49,10 @@ public:
     qint64 timeRemaining() const;
     bool timeRemainingKnown() const;
     QString summary() const;
+    /// Wh and full/design ratio; -1 means the device did not provide usable data.
+    double fullEnergy() const;
+    double designEnergy() const;
+    double healthPercent() const;
 
     /// Re-discovers the primary battery. This performs no system mutation.
     Q_INVOKABLE void refresh();

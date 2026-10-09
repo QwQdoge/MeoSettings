@@ -373,6 +373,17 @@ add_executable(meo-settings-powerbackend-test
 target_link_libraries(meo-settings-powerbackend-test PRIVATE Qt6::Core Qt6::Test KF6::Solid)
 add_test(NAME meo-settings-powerbackend COMMAND meo-settings-powerbackend-test)
 
+find_program(MEO_SETTINGS_DBUS_RUN_SESSION dbus-run-session REQUIRED)
+add_executable(meo-settings-powerpolicybackend-test
+    tests/tst_powerpolicybackend.cpp
+    src/core/backendbase.cpp src/core/backendbase.h
+    src/backends/powerpolicybackend.cpp src/backends/powerpolicybackend.h
+)
+target_link_libraries(meo-settings-powerpolicybackend-test PRIVATE Qt6::Core Qt6::DBus Qt6::Test KF6::ConfigCore)
+add_test(NAME meo-settings-powerpolicybackend
+    COMMAND ${MEO_SETTINGS_DBUS_RUN_SESSION} -- ${CMAKE_COMMAND} -E env
+        MEO_POWER_POLICY_TEST_BUS=1 $<TARGET_FILE:meo-settings-powerpolicybackend-test>)
+
 add_executable(meo-settings-storagebackend-test
     tests/tst_storagebackend.cpp
     src/core/backendbase.cpp
