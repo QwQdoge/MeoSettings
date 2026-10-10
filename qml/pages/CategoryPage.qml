@@ -30,14 +30,23 @@ Item {
         }
     }
 
+    function activationRoute(entry) {
+        // Keep section-level entries distinct even when they share a native
+        // implementation with a broader page.
+        if (entry.id === "night-light" || entry.id === "app-permissions")
+            return entry.id
+        return entry.route
+    }
+
     readonly property var categoryRows: {
         const rows = []
         for (let index = 0; index < categoryEntries.length; ++index) {
             const entry = categoryEntries[index]
             if (!root.capabilityAvailable(entry.capability))
                 continue
+            const route = root.activationRoute(entry)
             const handoff = entry.presentation === "external"
-            const available = routeIsAvailable(entry.route)
+            const available = routeIsAvailable(route)
             rows.push({
                 "title": entry.title,
                 "subtitle": handoff && !available
@@ -45,7 +54,7 @@ Item {
                             : entry.description,
                 "icon": entry.icon,
                 "tone": entry.tone || "primary",
-                "route": entry.route,
+                "route": route,
                 "enabled": available,
                 "trailingKind": handoff ? "choice" : "navigation",
                 "trailingText": handoff ? qsTr("Advanced") : ""
