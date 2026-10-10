@@ -2,6 +2,10 @@
 
 #include "../core/backendbase.h"
 
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QPointer>
 #include <QString>
@@ -66,7 +70,64 @@ public:
     QString lastBackupAt() const;
     QString previewSummary() const;
     QString previewPath() const;
-    QVariantList previewPlan() const;
+    QVariantList previewPlan() const
+    {
+        if (!m_previewValid || m_previewPath.isEmpty())
+            return {};
+
+        const QFileInfo info(m_previewPath);
+        if (!info.exists() || !info.isFile() || info.isSymLink())
+            return {};
+
+        QFile file(info.canonicalFilePath());
+        if (!file.open(QIODevice::ReadOnly))
+            return {};
+
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+        if (parseError.error != QJsonParseError::NoError || !document.isObject())
+            return {};
+
+        QString contractError;
+        const QJsonObject manifest = document.object();
+        if (!BackupManifestContract::validate(manifest, &contractError))
+            return {};
+
+        const QJsonObject contents = manifest.value(QStringLiteral("contents")).toObject();
+        const QJsonObject settings = contents.value(QStringLiteral("settings")).toObject();
+        const QJsonObject controlCenter = settings.value(QStringLiteral("controlCenter")).toObject();
+        const QJsonObject shell = settings.value(QStringLiteral("shell")).toObject();
+        const QString applicationsState = contents.value(QStringLiteral("applicationsState")).toString();
+        const int applicationCount = contents.value(QStringLiteral("applications")).toArray().size();
+
+        const auto row = [](const QString &id, const QString &state, int count = -1) {
+            QVariantMap value{
+                {QStringLiteral("id"), id},
+                {QStringLiteral("state"), state},
+            };
+            if (count >= 0)
+                value.insert(QStringLiteral("count"), count);
+            return QVariant(value);
+        };
+
+        return QVariantList{
+            row(QStringLiteral("applications"), applicationsState, applicationCount),
+            row(QStringLiteral("control-center"),
+                controlCenter.contains(QStringLiteral("layout")) ? QStringLiteral("included") : QStringLiteral("not-included")),
+            row(QStringLiteral("top-bar"),
+                controlCenter.contains(QStringLiteral("topBar")) ? QStringLiteral("included") : QStringLiteral("not-included")),
+            row(QStringLiteral("shelf"),
+                shell.contains(QStringLiteral("shelf")) ? QStringLiteral("included") : QStringLiteral("not-included")),
+            row(QStringLiteral("notifications"),
+                shell.contains(QStringLiteral("notifications")) ? QStringLiteral("included") : QStringLiteral("not-included")),
+            row(QStringLiteral("time-center"),
+                shell.contains(QStringLiteral("timeCenter")) ? QStringLiteral("included") : QStringLiteral("not-included")),
+            row(QStringLiteral("top-tasks"),
+                shell.contains(QStringLiteral("topTasks")) ? QStringLiteral("included") : QStringLiteral("not-included")),
+            row(QStringLiteral("user-data"), QStringLiteral("not-included"), 0),
+            row(QStringLiteral("accounts-secrets"), QStringLiteral("not-included")),
+        };
+    }
     bool previewValid() const;
 
     void setPortableSettingsSources(QObject *controlCenterBackend,
@@ -91,7 +152,6 @@ Q_SIGNALS:
 
 private:
     QVariantMap portableSettingsSnapshot(QString *error = nullptr) const;
-    QVariantList restorePreviewPlan(const QJsonObject &manifest) const;
     bool createLocalManifestInternal(const QVariantMap &settings);
 
     OmniStoreAppsBackend *m_appsBackend = nullptr;
@@ -101,7 +161,6 @@ private:
     QString m_lastBackupAt;
     QString m_previewSummary;
     QString m_previewPath;
-    QVariantList m_previewPlan;
     bool m_lastApplicationInventoryIncluded = false;
     bool m_previewValid = false;
 };
