@@ -1,8 +1,6 @@
 #include "backupbackend.h"
 
-#include "controlcenterbackend.h"
 #include "omnistoreappsbackend.h"
-#include "shellsettingsbackend.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -15,6 +13,8 @@
 #include <QSet>
 #include <QStandardPaths>
 
+#include <cmath>
+
 namespace
 {
 constexpr qsizetype kMaximumManifestBytes = 2 * 1024 * 1024;
@@ -25,6 +25,37 @@ void setContractError(QString *error, const QString &message)
 {
     if (error)
         *error = message;
+}
+
+bool containsOnlyKeys(const QJsonObject &object, const QSet<QString> &allowed)
+{
+    for (auto iterator = object.begin(); iterator != object.end(); ++iterator) {
+        if (!allowed.contains(iterator.key()))
+            return false;
+    }
+    return true;
+}
+
+bool hasExactlyKeys(const QJsonObject &object, const QSet<QString> &keys)
+{
+    return object.size() == keys.size() && containsOnlyKeys(object, keys);
+}
+
+bool oneOf(const QString &value, std::initializer_list<const char *> allowed)
+{
+    for (const char *candidate : allowed) {
+        if (value == QLatin1String(candidate))
+            return true;
+    }
+    return false;
+}
+
+bool integerInRange(const QJsonValue &value, int minimum, int maximum)
+{
+    if (!value.isDouble())
+        return false;
+    const double number = value.toDouble();
+    return std::floor(number) == number && number >= minimum && number <= maximum;
 }
 
 bool safeAppId(const QString &value)
@@ -56,142 +87,245 @@ bool safeVersion(const QString &value)
     return true;
 }
 
-bool containsOnlyKeys(const QJsonObject &object, const QSet<QString> &allowed)
+bool validateControlCenterLayout(const QJsonObject &layout, QString *error)
 {
-    for (auto iterator = object.begin(); iterator != object.end(); ++iterator) {
-        if (!allowed.contains(iterator.key()))
+    const QSet<QString> layoutKeys{QStringLiteral("tiles"), QStringLiteral("density")};
+    if (!hasExactlyKeys(layout, layoutKeys)
+        || !layout.value(QStringLiteral("tiles")).isArray()
+        || !layout.value(QStringLiteral("density")).isString()
+        || !oneOf(layout.value(QStringLiteral("density")).toString(),
+                  {"compact", "comfortable", "spacious"})) {
+        setContractError(error, QStringLiteral("The Control Center layout backup is invalid."));
+        return false;
+    }
+
+    const QSet<QString> canonicalIds{
+        QStringLiteral("wifi"), QStringLiteral("bluetooth"), QStringLiteral("focus"),
+        QStringLiteral("nightLight"), QStringLiteral("keepAwake"), QStringLiteral("powerMode"),
+        QStringLiteral("microphone"), QStringLiteral("audioDevices"),
+        QStringLiteral("display"), QStringLiteral("screenshot")};
+    const QSet<QString> tileKeys{
+        QStringLiteral("id"), QStringLiteral("span"), QStringLiteral("visible")};
+    const QJsonArray tiles = layout.value(QStringLiteral("tiles")).toArray();
+    if (tiles.size() != canonicalIds.size()) {
+        setContractError(error, QStringLiteral("The Control Center layout must include every supported tile."));
+        return false;
+    }
+
+    QSet<QString> seen;
+    int visibleCount = 0;
+    for (const QJsonValue &value : tiles) {
+        if (!value.isObject()) {
+            setContractError(error, QStringLiteral("The Control Center tile backup is invalid."));
             return false;
+        }
+        const QJsonObject tile = value.toObject();
+        const QString id = tile.value(QStringLiteral("id")).toString();
+        if (!hasExactlyKeys(tile, tileKeys)
+            || !canonicalIds.contains(id) || seen.contains(id)
+            || !integerInRange(tile.value(QStringLiteral("span")), 1, 2)
+            || !tile.value(QStringLiteral("visible")).isBool()) {
+            setContractError(error, QStringLiteral("The Control Center tile backup contains unsupported fields or values."));
+            return false;
+        }
+        seen.insert(id);
+        if (tile.value(QStringLiteral("visible")).toBool())
+            ++visibleCount;
+    }
+    if (seen != canonicalIds || visibleCount == 0) {
+        setContractError(error, QStringLiteral("The Control Center layout is incomplete."));
+        return false;
     }
     return true;
 }
 
-bool validateSerializedMap(const QJsonObject &value,
-                           const std::function<QVariantMap(const QVariantMap &, QString *)> &serializer,
-                           QString *error)
+bool validateTopBar(const QJsonObject &topBar, QString *error)
 {
-    QString validationError;
-    const QVariantMap serialized = serializer(value.toVariantMap(), &validationError);
-    if (serialized.isEmpty() || QJsonObject::fromVariantMap(serialized) != value) {
-        setContractError(error, validationError.isEmpty()
-                                    ? QStringLiteral("A Meo setting contains unsupported fields or values.")
-                                    : validationError);
+    const QSet<QString> keys{
+        QStringLiteral("textScalePercent"), QStringLiteral("density"),
+        QStringLiteral("surfaceStyle"), QStringLiteral("surfaceOpacityPercent"),
+        QStringLiteral("motionProfile"), QStringLiteral("showUnreadBadge"),
+        QStringLiteral("showJobs"), QStringLiteral("showNetwork"),
+        QStringLiteral("showBluetooth"), QStringLiteral("showVolume"),
+        QStringLiteral("batteryDisplay"), QStringLiteral("showDate"),
+        QStringLiteral("showNotifications"), QStringLiteral("use24HourClock")};
+    if (!hasExactlyKeys(topBar, keys)
+        || !integerInRange(topBar.value(QStringLiteral("textScalePercent")), 75, 150)
+        || !integerInRange(topBar.value(QStringLiteral("surfaceOpacityPercent")), 70, 100)
+        || !integerInRange(topBar.value(QStringLiteral("batteryDisplay")), 0, 3)
+        || !oneOf(topBar.value(QStringLiteral("density")).toString(), {"compact", "comfortable"})
+        || !oneOf(topBar.value(QStringLiteral("surfaceStyle")).toString(),
+                  {"theme", "flat", "tonal", "translucent"})
+        || !oneOf(topBar.value(QStringLiteral("motionProfile")).toString(),
+                  {"calm", "pixel", "playful"})) {
+        setContractError(error, QStringLiteral("The top-bar backup settings are invalid."));
         return false;
+    }
+    const QStringList booleanKeys{
+        QStringLiteral("showUnreadBadge"), QStringLiteral("showJobs"),
+        QStringLiteral("showNetwork"), QStringLiteral("showBluetooth"),
+        QStringLiteral("showVolume"), QStringLiteral("showDate"),
+        QStringLiteral("showNotifications"), QStringLiteral("use24HourClock")};
+    for (const QString &key : booleanKeys) {
+        if (!topBar.value(key).isBool()) {
+            setContractError(error, QStringLiteral("The top-bar backup contains a non-boolean switch."));
+            return false;
+        }
+    }
+    return true;
+}
+
+bool validateShelf(const QJsonObject &shelf, QString *error)
+{
+    const QSet<QString> keys{
+        QStringLiteral("showLauncherButton"), QStringLiteral("filterTasksByVirtualDesktop"),
+        QStringLiteral("showRunningIndicators"), QStringLiteral("showTooltips"),
+        QStringLiteral("launcherDefaultPage"), QStringLiteral("launcherWidth"),
+        QStringLiteral("launcherShowFavorites"), QStringLiteral("launcherShowRecents")};
+    if (!hasExactlyKeys(shelf, keys)
+        || !oneOf(shelf.value(QStringLiteral("launcherDefaultPage")).toString(), {"home", "apps"})
+        || !oneOf(shelf.value(QStringLiteral("launcherWidth")).toString(),
+                  {"compact", "standard", "wide"})) {
+        setContractError(error, QStringLiteral("The Shelf backup settings are invalid."));
+        return false;
+    }
+    for (const QString &key : keys) {
+        if (key == QLatin1String("launcherDefaultPage") || key == QLatin1String("launcherWidth"))
+            continue;
+        if (!shelf.value(key).isBool()) {
+            setContractError(error, QStringLiteral("The Shelf backup contains a non-boolean switch."));
+            return false;
+        }
+    }
+    return true;
+}
+
+bool validateNotificationSurface(const QJsonObject &surface, bool exactKeys, QString *error)
+{
+    const QSet<QString> keys{
+        QStringLiteral("density"), QStringLiteral("surfaceStyle"),
+        QStringLiteral("surfaceOpacityPercent"), QStringLiteral("showUnreadBadge"),
+        QStringLiteral("showJobs"), QStringLiteral("showNotificationHistory"),
+        QStringLiteral("notificationView"), QStringLiteral("notificationPreview")};
+    if ((exactKeys ? !hasExactlyKeys(surface, keys) : !containsOnlyKeys(surface, keys))
+        || !integerInRange(surface.value(QStringLiteral("surfaceOpacityPercent")), 70, 100)
+        || !oneOf(surface.value(QStringLiteral("density")).toString(), {"compact", "comfortable"})
+        || !oneOf(surface.value(QStringLiteral("surfaceStyle")).toString(),
+                  {"theme", "flat", "tonal", "translucent"})
+        || !oneOf(surface.value(QStringLiteral("notificationView")).toString(), {"cards", "compact"})
+        || !oneOf(surface.value(QStringLiteral("notificationPreview")).toString(),
+                  {"full", "summary", "hidden"})
+        || !surface.value(QStringLiteral("showUnreadBadge")).isBool()
+        || !surface.value(QStringLiteral("showJobs")).isBool()
+        || !surface.value(QStringLiteral("showNotificationHistory")).isBool()) {
+        setContractError(error, QStringLiteral("The notification presentation backup settings are invalid."));
+        return false;
+    }
+    return true;
+}
+
+bool validateTimeCenter(const QJsonObject &timeCenter, QString *error)
+{
+    const QSet<QString> keys{
+        QStringLiteral("density"), QStringLiteral("surfaceStyle"),
+        QStringLiteral("surfaceOpacityPercent"), QStringLiteral("showUnreadBadge"),
+        QStringLiteral("showJobs"), QStringLiteral("showNotificationHistory"),
+        QStringLiteral("notificationView"), QStringLiteral("notificationPreview"),
+        QStringLiteral("textScalePercent"), QStringLiteral("clockFormat"),
+        QStringLiteral("showSeconds"), QStringLiteral("popupLayout"),
+        QStringLiteral("defaultPage"), QStringLiteral("showWeekNumbers"),
+        QStringLiteral("showSecondaryCalendar"), QStringLiteral("showDate"),
+        QStringLiteral("showNotifications"), QStringLiteral("use24HourClock")};
+    if (!hasExactlyKeys(timeCenter, keys)) {
+        setContractError(error, QStringLiteral("The Time Center backup settings are incomplete."));
+        return false;
+    }
+    QJsonObject notificationSubset;
+    for (const QString &key : {
+             QStringLiteral("density"), QStringLiteral("surfaceStyle"),
+             QStringLiteral("surfaceOpacityPercent"), QStringLiteral("showUnreadBadge"),
+             QStringLiteral("showJobs"), QStringLiteral("showNotificationHistory"),
+             QStringLiteral("notificationView"), QStringLiteral("notificationPreview")}) {
+        notificationSubset.insert(key, timeCenter.value(key));
+    }
+    if (!validateNotificationSurface(notificationSubset, true, error)
+        || !integerInRange(timeCenter.value(QStringLiteral("textScalePercent")), 75, 150)
+        || !oneOf(timeCenter.value(QStringLiteral("clockFormat")).toString(), {"system", "24h", "12h"})
+        || !oneOf(timeCenter.value(QStringLiteral("popupLayout")).toString(), {"standard", "wide"})
+        || !oneOf(timeCenter.value(QStringLiteral("defaultPage")).toString(), {"notifications", "calendar"})) {
+        if (error && error->isEmpty())
+            *error = QStringLiteral("The Time Center backup settings are invalid.");
+        return false;
+    }
+    const QStringList booleanKeys{
+        QStringLiteral("showSeconds"), QStringLiteral("showWeekNumbers"),
+        QStringLiteral("showSecondaryCalendar"), QStringLiteral("showDate"),
+        QStringLiteral("showNotifications"), QStringLiteral("use24HourClock")};
+    for (const QString &key : booleanKeys) {
+        if (!timeCenter.value(key).isBool()) {
+            setContractError(error, QStringLiteral("The Time Center backup contains a non-boolean switch."));
+            return false;
+        }
     }
     return true;
 }
 
 bool validateSettings(const QJsonObject &settings, QString *error)
 {
-    const QSet<QString> allowedSettingsKeys{
-        QStringLiteral("controlCenter"), QStringLiteral("shell")};
-    if (!containsOnlyKeys(settings, allowedSettingsKeys)) {
+    const QSet<QString> settingsKeys{QStringLiteral("controlCenter"), QStringLiteral("shell")};
+    if (!containsOnlyKeys(settings, settingsKeys)) {
         setContractError(error, QStringLiteral("The backup settings section contains unsupported products."));
         return false;
     }
 
     if (settings.contains(QStringLiteral("controlCenter"))) {
-        const QJsonValue controlCenterValue = settings.value(QStringLiteral("controlCenter"));
-        if (!controlCenterValue.isObject()) {
+        const QJsonValue value = settings.value(QStringLiteral("controlCenter"));
+        if (!value.isObject()) {
             setContractError(error, QStringLiteral("The Control Center backup settings are invalid."));
             return false;
         }
-        const QJsonObject controlCenter = controlCenterValue.toObject();
-        const QSet<QString> allowedControlCenterKeys{
-            QStringLiteral("layout"), QStringLiteral("topBar")};
-        if (!containsOnlyKeys(controlCenter, allowedControlCenterKeys)
-            || !controlCenter.contains(QStringLiteral("layout"))
-            || !controlCenter.contains(QStringLiteral("topBar"))) {
-            setContractError(error, QStringLiteral("The Control Center backup settings are incomplete."));
-            return false;
-        }
-
-        const QJsonValue layoutValue = controlCenter.value(QStringLiteral("layout"));
-        if (!layoutValue.isObject()) {
-            setContractError(error, QStringLiteral("The Control Center layout backup is invalid."));
-            return false;
-        }
-        const QJsonObject layout = layoutValue.toObject();
-        const QSet<QString> allowedLayoutKeys{
-            QStringLiteral("tiles"), QStringLiteral("density")};
-        if (!containsOnlyKeys(layout, allowedLayoutKeys)
-            || !layout.value(QStringLiteral("tiles")).isArray()
-            || !layout.value(QStringLiteral("density")).isString()) {
-            setContractError(error, QStringLiteral("The Control Center layout backup contains unsupported fields."));
-            return false;
-        }
-        const QJsonArray tileArray = layout.value(QStringLiteral("tiles")).toArray();
-        for (const QJsonValue &tileValue : tileArray) {
-            if (!tileValue.isObject()) {
-                setContractError(error, QStringLiteral("The Control Center tile backup is invalid."));
-                return false;
-            }
-            const QJsonObject tile = tileValue.toObject();
-            const QSet<QString> allowedTileKeys{
-                QStringLiteral("id"), QStringLiteral("span"), QStringLiteral("visible")};
-            if (!containsOnlyKeys(tile, allowedTileKeys)
-                || !tile.value(QStringLiteral("id")).isString()
-                || !tile.value(QStringLiteral("span")).isDouble()
-                || !tile.value(QStringLiteral("visible")).isBool()) {
-                setContractError(error, QStringLiteral("The Control Center tile backup contains unsupported fields."));
-                return false;
-            }
-        }
-        QString layoutError;
-        const QVariantMap serializedLayout = ControlCenterBackend::serializeLayout(
-            tileArray.toVariantList(), layout.value(QStringLiteral("density")).toString(), &layoutError);
-        if (serializedLayout.isEmpty()
-            || QJsonArray::fromVariantList(serializedLayout.value(QStringLiteral("tiles")).toList()) != tileArray
-            || serializedLayout.value(QStringLiteral("density")).toString()
-                   != layout.value(QStringLiteral("density")).toString()) {
-            setContractError(error, layoutError.isEmpty()
-                                        ? QStringLiteral("The Control Center layout backup is not canonical.")
-                                        : layoutError);
-            return false;
-        }
-
-        const QJsonValue topBarValue = controlCenter.value(QStringLiteral("topBar"));
-        if (!topBarValue.isObject()
-            || !validateSerializedMap(topBarValue.toObject(), ControlCenterBackend::serializeTopBar, error)) {
-            if (error && error->isEmpty())
-                *error = QStringLiteral("The top-bar backup settings are invalid.");
+        const QJsonObject controlCenter = value.toObject();
+        const QSet<QString> keys{QStringLiteral("layout"), QStringLiteral("topBar")};
+        if (!hasExactlyKeys(controlCenter, keys)
+            || !controlCenter.value(QStringLiteral("layout")).isObject()
+            || !controlCenter.value(QStringLiteral("topBar")).isObject()
+            || !validateControlCenterLayout(controlCenter.value(QStringLiteral("layout")).toObject(), error)
+            || !validateTopBar(controlCenter.value(QStringLiteral("topBar")).toObject(), error)) {
             return false;
         }
     }
 
     if (settings.contains(QStringLiteral("shell"))) {
-        const QJsonValue shellValue = settings.value(QStringLiteral("shell"));
-        if (!shellValue.isObject()) {
+        const QJsonValue value = settings.value(QStringLiteral("shell"));
+        if (!value.isObject()) {
             setContractError(error, QStringLiteral("The Meo Shell backup settings are invalid."));
             return false;
         }
-        const QJsonObject shell = shellValue.toObject();
-        const QSet<QString> allowedShellKeys{
+        const QJsonObject shell = value.toObject();
+        const QSet<QString> keys{
             QStringLiteral("shelf"), QStringLiteral("notifications"),
             QStringLiteral("timeCenter"), QStringLiteral("topTasks")};
-        if (!containsOnlyKeys(shell, allowedShellKeys)
-            || shell.size() != allowedShellKeys.size()) {
+        if (!hasExactlyKeys(shell, keys)
+            || !shell.value(QStringLiteral("shelf")).isObject()
+            || !shell.value(QStringLiteral("notifications")).isObject()
+            || !shell.value(QStringLiteral("timeCenter")).isObject()
+            || !shell.value(QStringLiteral("topTasks")).isObject()) {
             setContractError(error, QStringLiteral("The Meo Shell backup settings are incomplete."));
             return false;
         }
-
-        const auto validateSurface = [&shell, error](
-                                         const QString &key,
-                                         const std::function<QVariantMap(const QVariantMap &, QString *)> &serializer) {
-            const QJsonValue value = shell.value(key);
-            if (!value.isObject()) {
-                setContractError(error, QStringLiteral("A Meo Shell backup surface is invalid."));
-                return false;
-            }
-            return validateSerializedMap(value.toObject(), serializer, error);
-        };
-        if (!validateSurface(QStringLiteral("shelf"), ShellSettingsBackend::serializeShelf)
-            || !validateSurface(QStringLiteral("notifications"), ShellSettingsBackend::serializeNotifications)
-            || !validateSurface(QStringLiteral("timeCenter"), ShellSettingsBackend::serializeTimeCenter)
-            || !validateSurface(QStringLiteral("topTasks"), ShellSettingsBackend::serializeTopTasks)) {
+        if (!validateShelf(shell.value(QStringLiteral("shelf")).toObject(), error)
+            || !validateNotificationSurface(shell.value(QStringLiteral("notifications")).toObject(), true, error)
+            || !validateTimeCenter(shell.value(QStringLiteral("timeCenter")).toObject(), error)) {
+            return false;
+        }
+        const QJsonObject topTasks = shell.value(QStringLiteral("topTasks")).toObject();
+        const QSet<QString> topTaskKeys{QStringLiteral("taskLimit")};
+        if (!hasExactlyKeys(topTasks, topTaskKeys)
+            || !integerInRange(topTasks.value(QStringLiteral("taskLimit")), 1, 12)) {
+            setContractError(error, QStringLiteral("The Top Tasks backup settings are invalid."));
             return false;
         }
     }
-
     return true;
 }
 }
@@ -262,45 +396,40 @@ QJsonObject BackupManifestContract::build(const QVariantList &applications,
 
 bool BackupManifestContract::validate(const QJsonObject &manifest, QString *error)
 {
-    const QSet<QString> allowedManifestKeys{
-        QStringLiteral("schema"),
-        QStringLiteral("createdAt"),
-        QStringLiteral("contents"),
-        QStringLiteral("secretsIncluded"),
-    };
-    if (!containsOnlyKeys(manifest, allowedManifestKeys)) {
-        setContractError(error, QStringLiteral("The backup manifest contains unsupported top-level fields."));
+    const QSet<QString> manifestKeys{
+        QStringLiteral("schema"), QStringLiteral("createdAt"),
+        QStringLiteral("contents"), QStringLiteral("secretsIncluded")};
+    if (!hasExactlyKeys(manifest, manifestKeys)) {
+        setContractError(error, QStringLiteral("The backup manifest contains unsupported or missing top-level fields."));
         return false;
     }
     if (manifest.value(QStringLiteral("schema")).toString() != kSchema) {
         setContractError(error, QStringLiteral("Unsupported backup manifest format."));
         return false;
     }
-    if (manifest.value(QStringLiteral("secretsIncluded")).toBool(true)) {
+    if (!manifest.value(QStringLiteral("secretsIncluded")).isBool()
+        || manifest.value(QStringLiteral("secretsIncluded")).toBool()) {
         setContractError(error, QStringLiteral("Backup manifests containing secrets are not accepted."));
         return false;
     }
-    const QDateTime created = QDateTime::fromString(
-        manifest.value(QStringLiteral("createdAt")).toString(), Qt::ISODate);
-    if (!created.isValid()) {
+    if (!QDateTime::fromString(manifest.value(QStringLiteral("createdAt")).toString(), Qt::ISODate).isValid()) {
         setContractError(error, QStringLiteral("The backup timestamp is invalid."));
         return false;
     }
+
     const QJsonValue contentsValue = manifest.value(QStringLiteral("contents"));
     if (!contentsValue.isObject()) {
         setContractError(error, QStringLiteral("The backup contents section is missing."));
         return false;
     }
     const QJsonObject contents = contentsValue.toObject();
-    const QSet<QString> allowedContentKeys{
-        QStringLiteral("applications"),
-        QStringLiteral("settings"),
-        QStringLiteral("userData"),
-    };
-    if (!containsOnlyKeys(contents, allowedContentKeys)) {
-        setContractError(error, QStringLiteral("The backup contents section contains unsupported fields."));
+    const QSet<QString> contentKeys{
+        QStringLiteral("applications"), QStringLiteral("settings"), QStringLiteral("userData")};
+    if (!hasExactlyKeys(contents, contentKeys)) {
+        setContractError(error, QStringLiteral("The backup contents section contains unsupported or missing fields."));
         return false;
     }
+
     const QJsonValue applicationsValue = contents.value(QStringLiteral("applications"));
     if (!applicationsValue.isArray()) {
         setContractError(error, QStringLiteral("The backup application list is missing."));
@@ -317,16 +446,18 @@ bool BackupManifestContract::validate(const QJsonObject &manifest, QString *erro
             return false;
         }
         const QJsonObject row = value.toObject();
-        if (!safeAppId(row.value(QStringLiteral("id")).toString())
-            || !safeSourceId(row.value(QStringLiteral("sourceId")).toString())
-            || !safeVersion(row.value(QStringLiteral("version")).toString())) {
-            setContractError(error, QStringLiteral("The backup application list contains unsafe metadata."));
-            return false;
-        }
+        const QSet<QString> requiredKeys{QStringLiteral("id"), QStringLiteral("sourceId")};
         const QSet<QString> allowedKeys{
             QStringLiteral("id"), QStringLiteral("sourceId"), QStringLiteral("version")};
-        if (!containsOnlyKeys(row, allowedKeys)) {
-            setContractError(error, QStringLiteral("The backup application list contains unsupported fields."));
+        if (!containsOnlyKeys(row, allowedKeys)
+            || !row.contains(QStringLiteral("id")) || !row.contains(QStringLiteral("sourceId"))
+            || !safeAppId(row.value(QStringLiteral("id")).toString())
+            || !safeSourceId(row.value(QStringLiteral("sourceId")).toString())
+            || (row.contains(QStringLiteral("version"))
+                && (!row.value(QStringLiteral("version")).isString()
+                    || !safeVersion(row.value(QStringLiteral("version")).toString())))) {
+            Q_UNUSED(requiredKeys);
+            setContractError(error, QStringLiteral("The backup application list contains unsafe metadata."));
             return false;
         }
     }
@@ -359,30 +490,11 @@ QString BackupBackend::summary() const
     return tr("Last local backup manifest: %1").arg(m_lastBackupAt);
 }
 
-QString BackupBackend::lastBackupPath() const
-{
-    return m_lastBackupPath;
-}
-
-QString BackupBackend::lastBackupAt() const
-{
-    return m_lastBackupAt;
-}
-
-QString BackupBackend::previewSummary() const
-{
-    return m_previewSummary;
-}
-
-QString BackupBackend::previewPath() const
-{
-    return m_previewPath;
-}
-
-bool BackupBackend::previewValid() const
-{
-    return m_previewValid;
-}
+QString BackupBackend::lastBackupPath() const { return m_lastBackupPath; }
+QString BackupBackend::lastBackupAt() const { return m_lastBackupAt; }
+QString BackupBackend::previewSummary() const { return m_previewSummary; }
+QString BackupBackend::previewPath() const { return m_previewPath; }
+bool BackupBackend::previewValid() const { return m_previewValid; }
 
 bool BackupBackend::createLocalManifest()
 {
@@ -445,8 +557,7 @@ bool BackupBackend::createLocalManifestInternal(const QVariantMap &settings)
         return false;
     }
     const QByteArray payload = QJsonDocument(manifest).toJson(QJsonDocument::Indented);
-    if (payload.size() > kMaximumManifestBytes || file.write(payload) != payload.size()
-        || !file.commit()) {
+    if (payload.size() > kMaximumManifestBytes || file.write(payload) != payload.size() || !file.commit()) {
         setBusy(false);
         setError(tr("The backup manifest could not be saved safely."));
         return false;
