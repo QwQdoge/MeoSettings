@@ -17,6 +17,11 @@ class BackupManifestContract final
 {
 public:
     static QJsonObject build(const QVariantList &applications,
+                             bool applicationInventoryIncluded,
+                             const QVariantMap &settings,
+                             const QString &createdAt,
+                             QString *error = nullptr);
+    static QJsonObject build(const QVariantList &applications,
                              const QVariantMap &settings,
                              const QString &createdAt,
                              QString *error = nullptr);
@@ -30,10 +35,11 @@ public:
  * Creates and inspects a deliberately non-secret Meo backup manifest.
  *
  * The manifest is a portable product backup, not a filesystem snapshot. It
- * projects OmniStore's validated application inventory and a tightly
- * whitelisted set of Meo-owned presentation settings. It never copies KWallet,
- * Account sessions, provider keys, device credentials, filesystem paths,
- * arbitrary application data, or privileged system configuration.
+ * projects OmniStore's validated application inventory when one is available
+ * and a tightly whitelisted set of Meo-owned presentation settings. An absent
+ * application snapshot is recorded as unavailable rather than as zero apps.
+ * It never copies KWallet, Account sessions, provider keys, device credentials,
+ * filesystem paths, arbitrary application data, or privileged system config.
  *
  * The live settings sources are generic QObjects on purpose: the backup format
  * remains independently testable and does not gain a runtime dependency on
@@ -92,5 +98,6 @@ private:
     QString m_lastBackupAt;
     QString m_previewSummary;
     QString m_previewPath;
+    bool m_lastApplicationInventoryIncluded = false;
     bool m_previewValid = false;
 };
