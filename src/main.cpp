@@ -301,6 +301,7 @@ int main(int argc, char *argv[])
     UpdatesBackend updatesBackend;
     ControlCenterBackend controlCenterBackend;
     ShellSettingsBackend shellSettingsBackend;
+    backupBackend.setPortableSettingsSources(&controlCenterBackend, &shellSettingsBackend);
     KcmBridge kcmBridge;
     WelcomeBackend welcomeBackend;
     CapabilityManager capabilities(&networkBackend, &bluetoothBackend, &audioBackend, &displayBackend, &powerBackend);
