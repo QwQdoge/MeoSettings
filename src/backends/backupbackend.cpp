@@ -87,6 +87,29 @@ bool safeVersion(const QString &value)
     return true;
 }
 
+QVariantMap projectMap(const QVariantMap &source, const QStringList &keys)
+{
+    QVariantMap projected;
+    for (const QString &key : keys)
+        projected.insert(key, source.value(key));
+    return projected;
+}
+
+QVariantList projectTiles(const QVariantList &source)
+{
+    QVariantList projected;
+    projected.reserve(source.size());
+    for (const QVariant &value : source) {
+        const QVariantMap tile = value.toMap();
+        projected.push_back(QVariantMap{
+            {QStringLiteral("id"), tile.value(QStringLiteral("id"))},
+            {QStringLiteral("span"), tile.value(QStringLiteral("span"))},
+            {QStringLiteral("visible"), tile.value(QStringLiteral("visible"))},
+        });
+    }
+    return projected;
+}
+
 bool validateControlCenterLayout(const QJsonObject &layout, QString *error)
 {
     const QSet<QString> layoutKeys{QStringLiteral("tiles"), QStringLiteral("density")};
@@ -446,7 +469,6 @@ bool BackupManifestContract::validate(const QJsonObject &manifest, QString *erro
             return false;
         }
         const QJsonObject row = value.toObject();
-        const QSet<QString> requiredKeys{QStringLiteral("id"), QStringLiteral("sourceId")};
         const QSet<QString> allowedKeys{
             QStringLiteral("id"), QStringLiteral("sourceId"), QStringLiteral("version")};
         if (!containsOnlyKeys(row, allowedKeys)
@@ -456,7 +478,6 @@ bool BackupManifestContract::validate(const QJsonObject &manifest, QString *erro
             || (row.contains(QStringLiteral("version"))
                 && (!row.value(QStringLiteral("version")).isString()
                     || !safeVersion(row.value(QStringLiteral("version")).toString())))) {
-            Q_UNUSED(requiredKeys);
             setContractError(error, QStringLiteral("The backup application list contains unsafe metadata."));
             return false;
         }
@@ -496,9 +517,98 @@ QString BackupBackend::previewSummary() const { return m_previewSummary; }
 QString BackupBackend::previewPath() const { return m_previewPath; }
 bool BackupBackend::previewValid() const { return m_previewValid; }
 
+void BackupBackend::setPortableSettingsSources(QObject *controlCenterBackend,
+                                               QObject *shellSettingsBackend)
+{
+    m_controlCenterBackend = controlCenterBackend;
+    m_shellSettingsBackend = shellSettingsBackend;
+}
+
+QVariantMap BackupBackend::portableSettingsSnapshot(QString *error) const
+{
+    QVariantMap settings;
+
+    if (m_controlCenterBackend
+        && m_controlCenterBackend->property("available").toBool()) {
+        const QVariantList tiles = projectTiles(
+            m_controlCenterBackend->property("tiles").toList());
+        const QString density = m_controlCenterBackend->property("density").toString();
+        const QVariantMap topBarSource = m_controlCenterBackend->property("topBar").toMap();
+        const QVariantMap topBar = projectMap(topBarSource, {
+            QStringLiteral("textScalePercent"), QStringLiteral("density"),
+            QStringLiteral("surfaceStyle"), QStringLiteral("surfaceOpacityPercent"),
+            QStringLiteral("motionProfile"), QStringLiteral("showUnreadBadge"),
+            QStringLiteral("showJobs"), QStringLiteral("showNetwork"),
+            QStringLiteral("showBluetooth"), QStringLiteral("showVolume"),
+            QStringLiteral("batteryDisplay"), QStringLiteral("showDate"),
+            QStringLiteral("showNotifications"), QStringLiteral("use24HourClock")});
+
+        settings.insert(QStringLiteral("controlCenter"), QVariantMap{
+            {QStringLiteral("layout"), QVariantMap{
+                 {QStringLiteral("tiles"), tiles},
+                 {QStringLiteral("density"), density},
+             }},
+            {QStringLiteral("topBar"), topBar},
+        });
+    }
+
+    if (m_shellSettingsBackend
+        && m_shellSettingsBackend->property("available").toBool()) {
+        const QVariantMap shelfSource = m_shellSettingsBackend->property("shelf").toMap();
+        const QVariantMap notificationsSource = m_shellSettingsBackend->property("notifications").toMap();
+        const QVariantMap timeCenterSource = m_shellSettingsBackend->property("timeCenter").toMap();
+        const QVariantMap topTasksSource = m_shellSettingsBackend->property("topTasks").toMap();
+
+        const QVariantMap shelf = projectMap(shelfSource, {
+            QStringLiteral("showLauncherButton"), QStringLiteral("filterTasksByVirtualDesktop"),
+            QStringLiteral("showRunningIndicators"), QStringLiteral("showTooltips"),
+            QStringLiteral("launcherDefaultPage"), QStringLiteral("launcherWidth"),
+            QStringLiteral("launcherShowFavorites"), QStringLiteral("launcherShowRecents")});
+        const QVariantMap notifications = projectMap(notificationsSource, {
+            QStringLiteral("density"), QStringLiteral("surfaceStyle"),
+            QStringLiteral("surfaceOpacityPercent"), QStringLiteral("showUnreadBadge"),
+            QStringLiteral("showJobs"), QStringLiteral("showNotificationHistory"),
+            QStringLiteral("notificationView"), QStringLiteral("notificationPreview")});
+        const QVariantMap timeCenter = projectMap(timeCenterSource, {
+            QStringLiteral("density"), QStringLiteral("surfaceStyle"),
+            QStringLiteral("surfaceOpacityPercent"), QStringLiteral("showUnreadBadge"),
+            QStringLiteral("showJobs"), QStringLiteral("showNotificationHistory"),
+            QStringLiteral("notificationView"), QStringLiteral("notificationPreview"),
+            QStringLiteral("textScalePercent"), QStringLiteral("clockFormat"),
+            QStringLiteral("showSeconds"), QStringLiteral("popupLayout"),
+            QStringLiteral("defaultPage"), QStringLiteral("showWeekNumbers"),
+            QStringLiteral("showSecondaryCalendar"), QStringLiteral("showDate"),
+            QStringLiteral("showNotifications"), QStringLiteral("use24HourClock")});
+        const QVariantMap topTasks = projectMap(topTasksSource, {
+            QStringLiteral("taskLimit")});
+
+        settings.insert(QStringLiteral("shell"), QVariantMap{
+            {QStringLiteral("shelf"), shelf},
+            {QStringLiteral("notifications"), notifications},
+            {QStringLiteral("timeCenter"), timeCenter},
+            {QStringLiteral("topTasks"), topTasks},
+        });
+    }
+
+    QString validationError;
+    const QJsonObject settingsObject = QJsonObject::fromVariantMap(settings);
+    if (!validateSettings(settingsObject, &validationError)) {
+        setContractError(error, validationError);
+        return {};
+    }
+    return settings;
+}
+
 bool BackupBackend::createLocalManifest()
 {
-    return createLocalManifestInternal({});
+    clearError();
+    QString snapshotError;
+    const QVariantMap settings = portableSettingsSnapshot(&snapshotError);
+    if (!snapshotError.isEmpty()) {
+        setError(tr("Portable Meo settings could not be prepared: %1").arg(snapshotError));
+        return false;
+    }
+    return createLocalManifestInternal(settings);
 }
 
 bool BackupBackend::createLocalManifestWithSettings(const QVariantMap &settings)
