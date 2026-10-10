@@ -80,6 +80,8 @@ qt_add_executable(meo-settings
     src/backends/applicationiconbackend.h
     src/backends/apppermissionsbackend.cpp
     src/backends/apppermissionsbackend.h
+    src/backends/backupbackend.cpp
+    src/backends/backupbackend.h
     src/backends/proxybackend.cpp
     src/backends/proxybackend.h
     src/backends/accessibilitybackend.cpp
@@ -421,6 +423,18 @@ add_executable(meo-settings-omnistoreappsbackend-test
 )
 target_link_libraries(meo-settings-omnistoreappsbackend-test PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME meo-settings-omnistoreappsbackend COMMAND meo-settings-omnistoreappsbackend-test)
+
+add_executable(meo-settings-backupbackend-test
+    tests/tst_backupbackend.cpp
+    src/core/backendbase.cpp
+    src/core/backendbase.h
+    src/backends/backupbackend.cpp
+    src/backends/backupbackend.h
+    src/backends/omnistoreappsbackend.cpp
+    src/backends/omnistoreappsbackend.h
+)
+target_link_libraries(meo-settings-backupbackend-test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME meo-settings-backupbackend COMMAND meo-settings-backupbackend-test)
 
 add_executable(meo-settings-packageinventorybackend-test
     tests/tst_packageinventorybackend.cpp
