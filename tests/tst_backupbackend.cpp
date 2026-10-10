@@ -97,6 +97,7 @@ class BackupBackendTest final : public QObject
 private Q_SLOTS:
     void buildsOnlyWhitelistedApplicationMetadata();
     void buildsPortableMeoSettings();
+    void representsUnavailableApplicationInventory();
     void rejectsSecretsAndUnexpectedFields();
     void rejectsNonCanonicalSettings();
     void rejectsUnsafeApplicationMetadata();
@@ -124,6 +125,8 @@ void BackupBackendTest::buildsOnlyWhitelistedApplicationMetadata()
     QCOMPARE(manifest.value(QStringLiteral("secretsIncluded")).toBool(), false);
 
     const auto contents = manifest.value(QStringLiteral("contents")).toObject();
+    QCOMPARE(contents.value(QStringLiteral("applicationsState")).toString(),
+             QStringLiteral("included"));
     const auto applications = contents.value(QStringLiteral("applications")).toArray();
     QCOMPARE(applications.size(), 1);
     const auto app = applications.first().toObject();
@@ -150,6 +153,40 @@ void BackupBackendTest::buildsPortableMeoSettings()
     QVERIFY(!QJsonDocument(settings).toJson(QJsonDocument::Compact).contains("token"));
     QVERIFY(!QJsonDocument(settings).toJson(QJsonDocument::Compact).contains("/home/"));
     QVERIFY(BackupManifestContract::validate(manifest, &error));
+}
+
+void BackupBackendTest::representsUnavailableApplicationInventory()
+{
+    QString error;
+    const auto manifest = BackupManifestContract::build(
+        {}, false, portableSettings(), QStringLiteral("2026-10-10T02:00:00Z"), &error);
+    QVERIFY2(!manifest.isEmpty(), qPrintable(error));
+    const auto contents = manifest.value(QStringLiteral("contents")).toObject();
+    QCOMPARE(contents.value(QStringLiteral("applicationsState")).toString(),
+             QStringLiteral("unavailable"));
+    QVERIFY(contents.value(QStringLiteral("applications")).toArray().isEmpty());
+    QVERIFY(BackupManifestContract::validate(manifest, &error));
+
+    const QVariantList impossibleApps{
+        QVariantMap{
+            {QStringLiteral("id"), QStringLiteral("org.example.App")},
+            {QStringLiteral("sourceId"), QStringLiteral("flatpak")},
+        },
+    };
+    const auto impossibleManifest = BackupManifestContract::build(
+        impossibleApps, false, portableSettings(), QStringLiteral("2026-10-10T02:00:00Z"), &error);
+    QVERIFY(impossibleManifest.isEmpty());
+
+    QJsonObject tampered = manifest;
+    QJsonObject tamperedContents = tampered.value(QStringLiteral("contents")).toObject();
+    tamperedContents.insert(QStringLiteral("applications"), QJsonArray{
+        QJsonObject{
+            {QStringLiteral("id"), QStringLiteral("org.example.App")},
+            {QStringLiteral("sourceId"), QStringLiteral("flatpak")},
+        },
+    });
+    tampered.insert(QStringLiteral("contents"), tamperedContents);
+    QVERIFY(!BackupManifestContract::validate(tampered, &error));
 }
 
 void BackupBackendTest::rejectsSecretsAndUnexpectedFields()
