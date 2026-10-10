@@ -48,7 +48,6 @@ class BackupBackend final : public BackendBase
     Q_PROPERTY(QString lastBackupAt READ lastBackupAt NOTIFY changed)
     Q_PROPERTY(QString previewSummary READ previewSummary NOTIFY changed)
     Q_PROPERTY(QString previewPath READ previewPath NOTIFY changed)
-    Q_PROPERTY(QVariantList previewGroups READ previewGroups NOTIFY changed)
     Q_PROPERTY(bool previewValid READ previewValid NOTIFY changed)
 
 public:
@@ -60,7 +59,6 @@ public:
     QString lastBackupAt() const;
     QString previewSummary() const;
     QString previewPath() const;
-    QVariantList previewGroups() const;
     bool previewValid() const;
 
     void setPortableSettingsSources(QObject *controlCenterBackend,
@@ -69,7 +67,15 @@ public:
     Q_INVOKABLE bool createLocalManifest();
     Q_INVOKABLE bool createLocalManifestWithSettings(const QVariantMap &settings);
     Q_INVOKABLE bool previewLocalManifest(const QString &path);
-    Q_INVOKABLE bool previewManifestUrl(const QUrl &url);
+    Q_INVOKABLE bool previewManifestUrl(const QUrl &url)
+    {
+        clearError();
+        if (!url.isValid() || !url.isLocalFile()) {
+            setError(tr("Choose a local Meo backup manifest."));
+            return false;
+        }
+        return previewLocalManifest(url.toLocalFile());
+    }
     Q_INVOKABLE void clearPreview();
 
 Q_SIGNALS:
@@ -86,6 +92,5 @@ private:
     QString m_lastBackupAt;
     QString m_previewSummary;
     QString m_previewPath;
-    QVariantList m_previewGroups;
     bool m_previewValid = false;
 };
