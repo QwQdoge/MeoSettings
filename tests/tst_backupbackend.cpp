@@ -65,8 +65,16 @@ void BackupBackendTest::rejectsSecretsAndUnexpectedFields()
     QVERIFY(!BackupManifestContract::validate(manifest, &error));
 
     manifest.insert(QStringLiteral("secretsIncluded"), false);
-    manifest[QStringLiteral("contents")].toObject();
+    manifest.insert(QStringLiteral("token"), QStringLiteral("must-not-be-accepted"));
+    QVERIFY(!BackupManifestContract::validate(manifest, &error));
+    manifest.remove(QStringLiteral("token"));
+
     QJsonObject contents = manifest.value(QStringLiteral("contents")).toObject();
+    contents.insert(QStringLiteral("path"), QStringLiteral("/home/user"));
+    manifest.insert(QStringLiteral("contents"), contents);
+    QVERIFY(!BackupManifestContract::validate(manifest, &error));
+    contents.remove(QStringLiteral("path"));
+
     contents.insert(QStringLiteral("applications"), QJsonArray{
         QJsonObject{
             {QStringLiteral("id"), QStringLiteral("org.example.App")},
