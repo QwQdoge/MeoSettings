@@ -320,10 +320,99 @@ Item {
         compactWidth: 680 * MeoTheme.globalScale
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
-        title: root.isCompact ? "" : qsTr("Storage & applications")
-        subtitle: qsTr("See mounted storage separately from the personal folders you choose to scan, so each total stays clear.")
+        title: root.isCompact ? "" : qsTr("Storage & backup")
+        subtitle: qsTr("Inspect storage, create a safe local backup manifest, and keep system recovery as a separate verified workflow.")
 
         MeoBanner { width: parent.width; visible: StorageBackend.error !== ""; title: qsTr("Storage operation needs attention"); text: StorageBackend.error; tone: "error" }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("Backup & restore")
+            subtitle: qsTr("Local manifests are saved to Documents/Meo Backups. This first version records only the verified OmniStore application reinstall list; settings and user-data restore remain disabled until their backends are verified.")
+            model: [
+                {
+                    "id": "local-manifest",
+                    "title": qsTr("Local backup manifest"),
+                    "subtitle": OmniStoreAppsBackend.available
+                                ? BackupBackend.summary
+                                : qsTr("Refresh the OmniStore application inventory before creating a backup."),
+                    "icon": "backup",
+                    "tone": "tertiary",
+                    "trailingKind": "action",
+                    "actionText": BackupBackend.busy ? qsTr("Backing up…") : qsTr("Back up now"),
+                    "enabled": BackupBackend.available && OmniStoreAppsBackend.available && !BackupBackend.busy
+                },
+                {
+                    "id": "system-recovery",
+                    "title": qsTr("System recovery"),
+                    "subtitle": qsTr("Snapshots, fallback kernel, repair, and OS rollback stay in Recovery."),
+                    "icon": "restore",
+                    "tone": "neutral",
+                    "route": "recovery",
+                    "trailingKind": "navigation"
+                }
+            ]
+            onRowActionTriggered: (index, row) => {
+                if (row.id === "local-manifest")
+                    BackupBackend.createLocalManifest()
+            }
+            onRowActivated: (index, row) => {
+                if (row.route)
+                    root.navigateTo(row.route)
+            }
+        }
+
+        MeoBanner {
+            width: parent.width
+            visible: BackupBackend.error !== ""
+            title: qsTr("Backup needs attention")
+            text: BackupBackend.error
+            tone: "error"
+        }
+
+        MeoCard {
+            width: parent.width
+            type: "outlined"
+            Row {
+                width: parent.width
+                spacing: 12 * MeoTheme.globalScale
+                MeoIcon {
+                    icon: "shield"
+                    size: 24
+                    color: MeoTheme.primary
+                }
+                Column {
+                    width: parent.width - 36 * MeoTheme.globalScale
+                    spacing: 4 * MeoTheme.globalScale
+                    MeoText {
+                        width: parent.width
+                        text: qsTr("Secrets stay out of ordinary backups")
+                        typeRole: "title"
+                        typeSize: "small"
+                        emphasized: true
+                        color: MeoTheme.contentOnSurface
+                    }
+                    MeoText {
+                        width: parent.width
+                        text: qsTr("Passwords, KWallet contents, Meo Account sessions, OAuth tokens, device credentials, and AI provider API keys are never written to this manifest. Secret-backed services must reconnect after a future restore.")
+                        typeRole: "body"
+                        typeSize: "medium"
+                        color: MeoTheme.contentOnSurfaceVariant
+                        wrapMode: Text.WordWrap
+                    }
+                    MeoText {
+                        width: parent.width
+                        visible: BackupBackend.lastBackupPath !== ""
+                        text: qsTr("Saved to: %1").arg(BackupBackend.lastBackupPath)
+                        typeRole: "label"
+                        typeSize: "small"
+                        color: MeoTheme.contentOnSurfaceVariant
+                        wrapMode: Text.WrapAnywhere
+                    }
+                }
+            }
+        }
+
         MeoSettingsGroup {
             width: parent.width; title: qsTr("Removable storage")
             visible: StorageBackend.removableVolumes.length > 0
@@ -484,7 +573,7 @@ Item {
 
                     MeoText {
                         width: parent.width
-                    text: qsTr("%1 is used on the system volume. It includes system files, apps, settings, logs, and anything outside the personal folders listed above.")
+                        text: qsTr("%1 is used on the system volume. It includes system files, apps, settings, logs, and anything outside the personal folders listed above.")
                               .arg(root.formatBytes(root.systemVolume.usedBytes))
                         typeRole: "body"
                         typeSize: "medium"
@@ -818,21 +907,6 @@ Item {
                 if (row.id === "partition-manager")
                     KcmBridge.openPartitionManager()
             }
-        }
-
-        MeoSettingsGroup {
-            width: parent.width
-            title: qsTr("Backup & recovery")
-            subtitle: qsTr("Long-running recovery work is not a transient drawer and must have a verified backend before it becomes a Meo Settings control.")
-            model: [{
-                "title": qsTr("Backup provider"),
-                "subtitle": qsTr("No verified backup or restore backend is available in this build."),
-                "icon": "backup",
-                "tone": "neutral",
-                "trailingKind": "status",
-                "trailingText": qsTr("Not configured"),
-                "interactive": false
-            }]
         }
 
         Column {
