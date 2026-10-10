@@ -72,7 +72,7 @@ Application names, filesystem locations, cache/data paths, package-manager priva
 
 `BackupBackend` is the only coordinator that projects live Control Center and Shell state into this portable schema. QML asks for a backup but does not construct or duplicate the schema. Runtime-only fields exposed by the source backends are stripped before validation.
 
-The portable schema stores semantic values, not paths to Plasma/KConfig files. It can therefore be validated without a running Plasma session. A future restore apply step must still submit these values through the owning Control Center / Shell backends so their current runtime validation remains authoritative.
+The portable schema stores semantic values, not paths to Plasma/KConfig files. Restore therefore submits these values back through the owning Control Center / Shell capabilities rather than copying or editing Plasma configuration files directly.
 
 `contents.userData` is currently required to be an empty array. Arbitrary home-directory or application-data copying is not part of manifest v1 yet.
 
@@ -80,21 +80,40 @@ The portable schema stores semantic values, not paths to Plasma/KConfig files. I
 
 Restore is never an implicit side effect of sign-in or sync. The user must be able to see what will change before applying it.
 
-A restore implementation must:
+The current portable-settings restore coordinator follows these rules:
 
-1. validate backup format and version before reading payload data;
-2. reject unknown or unsafe paths rather than interpreting them as filesystem targets;
-3. show the affected settings/data categories;
-4. keep secret-backed connections disconnected until separately authorized;
-5. require explicit confirmation before replacing current state;
-6. report partial failures without claiming the whole restore succeeded;
-7. preserve a recovery path when the underlying subsystem supports one.
+1. preview validates the complete manifest before presenting any restore plan;
+2. Apply reopens and revalidates the selected file instead of trusting stale preview state;
+3. only whitelisted portable Meo presentation settings are queued;
+4. settings are applied serially in the order Control Center, Top Bar, Shelf, Notifications, Time Center, Top Tasks;
+5. a step advances only after the owning backend emits its explicit saved signal;
+6. backend errors or a 30-second confirmation timeout stop the restore immediately;
+7. partial completion is reported explicitly; later groups are not attempted after a failure;
+8. applications, user data, accounts, credentials, KWallet contents, and other secrets are never changed by this coordinator.
+
+The coordinator deliberately does not implement a pretend rollback across independent Plasma surfaces. If an early group has already been confirmed and a later group fails, the confirmed earlier changes remain applied and the result is reported as a partial failure. A future rollback design must use real per-surface snapshots or another verified recovery mechanism before it can claim transactional rollback.
 
 System rollback is not a substitute for user-data restore and stays under Recovery.
 
+## Restore plan model
+
+After validation, `BackupBackend.previewPlan` exposes a structure-only plan to QML. QML does not parse the manifest itself. The current plan contains:
+
+- Applications: `included` or `unavailable`, with reinstall-record count when available;
+- Control Center;
+- Top Bar;
+- Shelf & Launcher;
+- Notifications;
+- Time Center;
+- Top Tasks;
+- User data: currently `not-included`;
+- Accounts & secrets: always `not-included` for manifest v1.
+
+The six portable settings groups are the only categories currently eligible for Apply. The application reinstall list remains preview metadata until OmniStore has an explicit reinstall transaction with its own validation and failure reporting.
+
 ## Current implementation status
 
-Implemented:
+Implemented and validated in automated tests:
 
 - Meo Settings owns the visible `Storage & backup` surface;
 - a real local `Back up now` action writes a bounded v1 manifest;
@@ -103,25 +122,33 @@ Implemented:
 - an unavailable OmniStore inventory is represented explicitly and does not block a settings backup;
 - the portable Control Center / Shell settings schema is covered by a dedicated fast contract CI in addition to the full Arch build/test workflow;
 - ordinary manifests reject secret flags, unexpected fields, unsafe application identifiers, inconsistent application-inventory state, unsupported setting values, symlink restore inputs, and oversized files;
-- the Storage & backup page exposes a local-file restore picker and read-only restore preview;
+- the Storage & backup page exposes a local-file restore picker and structured category-level restore preview;
 - restore preview accepts only local file URLs and validates the complete manifest before presenting it;
-- no Apply Restore action exists yet, so preview cannot modify settings, applications, or data;
+- Apply reopens and revalidates the manifest, so a file changed after preview is rejected;
+- the portable-settings coordinator serializes the six Meo-owned setting groups and advances only on explicit saved signals;
+- coordinator tests verify the exact success order and verify that a Notifications failure prevents Time Center and Top Tasks from running;
+- a manifest with no portable settings is rejected by Apply rather than treating application metadata as a supported restore operation;
+- previous restore outcome state is cleared when the user selects a different manifest through the normal file-picker path;
 - the previous Meo Account `Library` / backup UI and Account search destination have been retired.
 
-Not yet implemented:
+Still requiring product/UI or live-runtime validation:
 
-- category-by-category restore plan details beyond the current validated summary;
-- an Apply Restore transaction;
+- the final explicit Apply confirmation surface in `Storage & backup`;
+- live Plasma validation that each real Control Center / Shell saved signal and error path behaves as expected during a restore;
+- application reinstall execution through OmniStore;
 - user-data payloads or encrypted user-data archives;
 - scheduled backups;
 - cloud backup destinations.
+
+The automated coordinator tests use fake QObject capability surfaces. Passing those tests proves sequencing, validation, timeout/error-state logic, and partial-failure behavior at code level; it does not by itself prove a live Plasma restore.
 
 Existing historical server-side backup data is intentionally not deleted during the UI move. It can be migrated or retired only after Meo Settings has an explicit compatibility path.
 
 ## Next implementation gates
 
-1. Expand restore preview into a category-level restore plan: applications included/unavailable, Control Center, Shell, user-data state, and required reconnects.
-2. Apply portable settings only through their owning backends, with explicit confirmation and per-group failure reporting.
-3. Add user-selected data only after a bounded path/category contract and local encrypted archive design exist.
-4. Add scheduled local backups only after the local manifest and restore transaction are stable.
-5. Add an optional Meo Account cloud destination only after local format and restore behavior are stable.
+1. Finish the explicit confirmation sheet and outcome presentation in `Storage & backup` without exposing application reinstall as supported Apply behavior.
+2. Run a live Plasma restore using a disposable settings backup and verify all six real saved signals plus at least one forced failure path.
+3. Add application reinstall only through an OmniStore-owned reinstall transaction with source availability checks, preview, confirmation, and per-app failure reporting.
+4. Add user-selected data only after a bounded path/category contract and local encrypted archive design exist.
+5. Add scheduled local backups only after the local manifest and restore transaction are stable.
+6. Add an optional Meo Account cloud destination only after local format and restore behavior are stable.
