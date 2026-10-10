@@ -3,6 +3,7 @@
 #include "../core/backendbase.h"
 
 #include <QJsonObject>
+#include <QPointer>
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
@@ -32,6 +33,11 @@ public:
  * whitelisted set of Meo-owned presentation settings. It never copies KWallet,
  * Account sessions, provider keys, device credentials, filesystem paths,
  * arbitrary application data, or privileged system configuration.
+ *
+ * The live settings sources are generic QObjects on purpose: the backup format
+ * remains independently testable and does not gain a runtime dependency on
+ * Plasma/DBus backend implementation classes. BackupBackend projects only the
+ * public properties that belong to the portable schema.
  */
 class BackupBackend final : public BackendBase
 {
@@ -54,6 +60,9 @@ public:
     QString previewPath() const;
     bool previewValid() const;
 
+    void setPortableSettingsSources(QObject *controlCenterBackend,
+                                    QObject *shellSettingsBackend);
+
     Q_INVOKABLE bool createLocalManifest();
     Q_INVOKABLE bool createLocalManifestWithSettings(const QVariantMap &settings);
     Q_INVOKABLE bool previewLocalManifest(const QString &path);
@@ -63,9 +72,12 @@ Q_SIGNALS:
     void changed();
 
 private:
+    QVariantMap portableSettingsSnapshot(QString *error = nullptr) const;
     bool createLocalManifestInternal(const QVariantMap &settings);
 
     OmniStoreAppsBackend *m_appsBackend = nullptr;
+    QPointer<QObject> m_controlCenterBackend;
+    QPointer<QObject> m_shellSettingsBackend;
     QString m_lastBackupPath;
     QString m_lastBackupAt;
     QString m_previewSummary;
