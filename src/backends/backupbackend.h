@@ -7,6 +7,8 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include <initializer_list>
+
 class OmniStoreAppsBackend;
 
 class BackupManifestContract final
