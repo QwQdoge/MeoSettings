@@ -70,7 +70,6 @@ QJsonObject BackupManifestContract::build(const QVariantList &applications,
     }
 
     QJsonArray reinstallList;
-    reinstallList.reserve(applications.size());
     for (const QVariant &item : applications) {
         const QVariantMap application = item.toMap();
         const QString id = application.value(QStringLiteral("id")).toString();
