@@ -10,12 +10,26 @@
 
 DefaultAppsBackend::DefaultAppsBackend(QObject *parent) : BackendBase(parent)
 {
-    for (const auto &type : QMimeDatabase().allMimeTypes()) m_mimeTypes.append(type.name());
+    // Enumerating every MIME type and resolving preferred applications through
+    // KSycoca is useful only on the Default apps / File associations routes.
+    // Keep process startup cheap and let those pages request the inventory
+    // after their visual shell has painted.
+    connect(KSycoca::self(), &KSycoca::databaseChanged, this, [this] {
+        if (!m_mimeTypes.isEmpty())
+            refresh();
+    });
+}
+
+void DefaultAppsBackend::ensureMimeTypes()
+{
+    if (!m_mimeTypes.isEmpty())
+        return;
+    for (const auto &type : QMimeDatabase().allMimeTypes())
+        m_mimeTypes.append(type.name());
     for (const auto &scheme : {"x-scheme-handler/http", "x-scheme-handler/https", "x-scheme-handler/mailto"})
-        if (!m_mimeTypes.contains(QString::fromLatin1(scheme))) m_mimeTypes.append(QString::fromLatin1(scheme));
+        if (!m_mimeTypes.contains(QString::fromLatin1(scheme)))
+            m_mimeTypes.append(QString::fromLatin1(scheme));
     m_mimeTypes.sort();
-    connect(KSycoca::self(), &KSycoca::databaseChanged, this, &DefaultAppsBackend::refresh);
-    refresh();
 }
 
 bool DefaultAppsBackend::supportedMime(const QString &mime) const { return m_mimeTypes.contains(mime); }
@@ -40,6 +54,9 @@ QString DefaultAppsBackend::preferredApplication(const QString &mime) const
 
 void DefaultAppsBackend::refresh()
 {
+    setBusy(true);
+    clearError();
+    ensureMimeTypes();
     m_roles.clear();
     const QList<QPair<QString, QString>> roles{
         {tr("Web browser"), QStringLiteral("x-scheme-handler/http")},
@@ -54,7 +71,9 @@ void DefaultAppsBackend::refresh()
     };
     for (const auto &[label, mime] : roles)
         m_roles.append(QVariantMap{{"label", label}, {"mime", mime}, {"applications", applicationsFor(mime)}, {"preferred", preferredApplication(mime)}});
-    setAvailable(true); Q_EMIT changed();
+    setAvailable(true);
+    setBusy(false);
+    Q_EMIT changed();
 }
 
 void DefaultAppsBackend::setPreferredApplication(const QString &mime, const QString &storageId)
