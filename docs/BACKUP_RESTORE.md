@@ -46,11 +46,18 @@ The current local format is `org.meo.backup/v1`. Meo Settings writes it with `QS
 
 The format is deliberately fail-closed. Unknown top-level fields, unknown content groups, unknown application fields, unknown setting products, incomplete setting groups, unsafe values, or a manifest claiming `secretsIncluded: true` are rejected.
 
-`contents.applications` is a reinstall list projected from OmniStore's already validated snapshot. An entry contains only:
+`contents.applications` is a reinstall list projected from OmniStore's already validated snapshot when that snapshot is available. An entry contains only:
 
 - `id`;
 - `sourceId`;
 - optional `version`.
+
+`contents.applicationsState` records whether the application inventory was actually captured. Its only accepted values are:
+
+- `included`: the list was built from a verified OmniStore snapshot;
+- `unavailable`: OmniStore inventory was unavailable or busy, so the application list is intentionally empty.
+
+An unavailable application inventory does not block a Meo settings backup and must never be interpreted as proof that the device has zero applications. A manifest claiming `applicationsState: unavailable` while carrying application rows is rejected.
 
 Application names, filesystem locations, cache/data paths, package-manager private metadata, and application settings are not copied into the reinstall list.
 
@@ -62,6 +69,8 @@ Application names, filesystem locations, cache/data paths, package-manager priva
 - Meo notification-surface presentation options;
 - Time Center presentation options;
 - Top Tasks limit.
+
+`BackupBackend` is the only coordinator that projects live Control Center and Shell state into this portable schema. QML asks for a backup but does not construct or duplicate the schema. Runtime-only fields exposed by the source backends are stripped before validation.
 
 The portable schema stores semantic values, not paths to Plasma/KConfig files. It can therefore be validated without a running Plasma session. A future restore apply step must still submit these values through the owning Control Center / Shell backends so their current runtime validation remains authoritative.
 
@@ -89,16 +98,19 @@ Implemented:
 
 - Meo Settings owns the visible `Storage & backup` surface;
 - a real local `Back up now` action writes a bounded v1 manifest;
-- OmniStore application identifiers are projected into a reinstall list;
-- the portable Control Center / Shell settings schema is implemented and covered by contract tests;
-- ordinary manifests reject secret flags, unexpected fields, unsafe application identifiers, unsupported setting values, symlink restore inputs, and oversized files;
-- local manifest parsing and restore preview validation exist;
+- `BackupBackend` projects the current available Control Center and Shell presentation state into the portable settings object;
+- OmniStore application identifiers are projected into a reinstall list when the verified inventory is available;
+- an unavailable OmniStore inventory is represented explicitly and does not block a settings backup;
+- the portable Control Center / Shell settings schema is covered by a dedicated fast contract CI in addition to the full Arch build/test workflow;
+- ordinary manifests reject secret flags, unexpected fields, unsafe application identifiers, inconsistent application-inventory state, unsupported setting values, symlink restore inputs, and oversized files;
+- the Storage & backup page exposes a local-file restore picker and read-only restore preview;
+- restore preview accepts only local file URLs and validates the complete manifest before presenting it;
+- no Apply Restore action exists yet, so preview cannot modify settings, applications, or data;
 - the previous Meo Account `Library` / backup UI and Account search destination have been retired.
 
 Not yet implemented:
 
-- wiring the current Control Center / Shell live snapshot into the visible `Back up now` action (the schema is ready; the current UI action still creates the application-list subset until this coordinator connection lands);
-- a file-picker restore surface and detailed restore preview UI;
+- category-by-category restore plan details beyond the current validated summary;
 - an Apply Restore transaction;
 - user-data payloads or encrypted user-data archives;
 - scheduled backups;
@@ -108,8 +120,8 @@ Existing historical server-side backup data is intentionally not deleted during 
 
 ## Next implementation gates
 
-1. Make `BackupBackend` the coordinator that projects live Control Center and Shell state into the portable v1 settings object. QML must not duplicate the schema.
-2. Expose a restore file picker and category-level preview while keeping Apply disabled.
-3. Apply portable settings only through their owning backends, with explicit confirmation and per-group failure reporting.
-4. Add user-selected data only after a bounded path/category contract and local encrypted archive design exist.
+1. Expand restore preview into a category-level restore plan: applications included/unavailable, Control Center, Shell, user-data state, and required reconnects.
+2. Apply portable settings only through their owning backends, with explicit confirmation and per-group failure reporting.
+3. Add user-selected data only after a bounded path/category contract and local encrypted archive design exist.
+4. Add scheduled local backups only after the local manifest and restore transaction are stable.
 5. Add an optional Meo Account cloud destination only after local format and restore behavior are stable.
