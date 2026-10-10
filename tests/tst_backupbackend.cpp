@@ -100,6 +100,91 @@ bool writeManifest(const QString &path, const QJsonObject &manifest)
 }
 }
 
+class FakeControlSettingsSource final : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(bool available READ available CONSTANT)
+    Q_PROPERTY(bool busy READ busy CONSTANT)
+    Q_PROPERTY(QString error READ error NOTIFY errorChanged)
+
+public:
+    explicit FakeControlSettingsSource(QStringList *calls, QObject *parent = nullptr)
+        : QObject(parent), m_calls(calls) {}
+
+    bool available() const { return true; }
+    bool busy() const { return false; }
+    QString error() const { return m_error; }
+
+    Q_INVOKABLE void saveLayout(const QVariantList &, const QString &)
+    {
+        m_calls->push_back(QStringLiteral("control-center"));
+        Q_EMIT layoutSaved();
+    }
+
+    Q_INVOKABLE void saveTopBar(const QVariantMap &)
+    {
+        m_calls->push_back(QStringLiteral("top-bar"));
+        Q_EMIT topBarSaved();
+    }
+
+Q_SIGNALS:
+    void errorChanged();
+    void layoutSaved();
+    void topBarSaved();
+
+private:
+    QStringList *m_calls = nullptr;
+    QString m_error;
+};
+
+class FakeShellSettingsSource final : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(bool available READ available CONSTANT)
+    Q_PROPERTY(bool busy READ busy CONSTANT)
+    Q_PROPERTY(QString error READ error NOTIFY errorChanged)
+
+public:
+    explicit FakeShellSettingsSource(QStringList *calls,
+                                     const QString &failStep = {},
+                                     QObject *parent = nullptr)
+        : QObject(parent), m_calls(calls), m_failStep(failStep) {}
+
+    bool available() const { return true; }
+    bool busy() const { return false; }
+    QString error() const { return m_error; }
+
+    Q_INVOKABLE void saveShelf(const QVariantMap &) { complete(QStringLiteral("shelf"), &FakeShellSettingsSource::shelfSaved); }
+    Q_INVOKABLE void saveNotifications(const QVariantMap &) { complete(QStringLiteral("notifications"), &FakeShellSettingsSource::notificationsSaved); }
+    Q_INVOKABLE void saveTimeCenter(const QVariantMap &) { complete(QStringLiteral("time-center"), &FakeShellSettingsSource::timeCenterSaved); }
+    Q_INVOKABLE void saveTopTasks(const QVariantMap &) { complete(QStringLiteral("top-tasks"), &FakeShellSettingsSource::topTasksSaved); }
+
+Q_SIGNALS:
+    void errorChanged();
+    void shelfSaved();
+    void notificationsSaved();
+    void timeCenterSaved();
+    void topTasksSaved();
+
+private:
+    using SavedSignal = void (FakeShellSettingsSource::*)();
+
+    void complete(const QString &step, SavedSignal signal)
+    {
+        m_calls->push_back(step);
+        if (m_failStep == step) {
+            m_error = QStringLiteral("Fake %1 failure").arg(step);
+            Q_EMIT errorChanged();
+            return;
+        }
+        Q_EMIT (this->*signal)();
+    }
+
+    QStringList *m_calls = nullptr;
+    QString m_failStep;
+    QString m_error;
+};
+
 class BackupBackendTest final : public QObject
 {
     Q_OBJECT
@@ -111,6 +196,8 @@ private Q_SLOTS:
     void buildsStructuredRestorePreviewPlan();
     void applyRejectsChangedPreviewManifest();
     void applyRejectsManifestWithoutPortableSettings();
+    void appliesPortableSettingsInSerializedOrder();
+    void stopsSerializedRestoreAfterFailure();
     void rejectsSecretsAndUnexpectedFields();
     void rejectsNonCanonicalSettings();
     void rejectsUnsafeApplicationMetadata();
@@ -133,13 +220,11 @@ void BackupBackendTest::buildsOnlyWhitelistedApplicationMetadata()
     const auto manifest = BackupManifestContract::build(
         apps, QStringLiteral("2026-10-10T02:00:00Z"), &error);
     QVERIFY2(!manifest.isEmpty(), qPrintable(error));
-    QCOMPARE(manifest.value(QStringLiteral("schema")).toString(),
-             QStringLiteral("org.meo.backup/v1"));
+    QCOMPARE(manifest.value(QStringLiteral("schema")).toString(), QStringLiteral("org.meo.backup/v1"));
     QCOMPARE(manifest.value(QStringLiteral("secretsIncluded")).toBool(), false);
 
     const auto contents = manifest.value(QStringLiteral("contents")).toObject();
-    QCOMPARE(contents.value(QStringLiteral("applicationsState")).toString(),
-             QStringLiteral("included"));
+    QCOMPARE(contents.value(QStringLiteral("applicationsState")).toString(), QStringLiteral("included"));
     const auto applications = contents.value(QStringLiteral("applications")).toArray();
     QCOMPARE(applications.size(), 1);
     const auto app = applications.first().toObject();
@@ -159,8 +244,7 @@ void BackupBackendTest::buildsPortableMeoSettings()
     const auto manifest = BackupManifestContract::build(
         {}, portableSettings(), QStringLiteral("2026-10-10T02:00:00Z"), &error);
     QVERIFY2(!manifest.isEmpty(), qPrintable(error));
-    const auto settings = manifest.value(QStringLiteral("contents"))
-                              .toObject().value(QStringLiteral("settings")).toObject();
+    const auto settings = manifest.value(QStringLiteral("contents")).toObject().value(QStringLiteral("settings")).toObject();
     QVERIFY(settings.contains(QStringLiteral("controlCenter")));
     QVERIFY(settings.contains(QStringLiteral("shell")));
     QVERIFY(!QJsonDocument(settings).toJson(QJsonDocument::Compact).contains("token"));
@@ -175,16 +259,13 @@ void BackupBackendTest::representsUnavailableApplicationInventory()
         {}, false, portableSettings(), QStringLiteral("2026-10-10T02:00:00Z"), &error);
     QVERIFY2(!manifest.isEmpty(), qPrintable(error));
     const auto contents = manifest.value(QStringLiteral("contents")).toObject();
-    QCOMPARE(contents.value(QStringLiteral("applicationsState")).toString(),
-             QStringLiteral("unavailable"));
+    QCOMPARE(contents.value(QStringLiteral("applicationsState")).toString(), QStringLiteral("unavailable"));
     QVERIFY(contents.value(QStringLiteral("applications")).toArray().isEmpty());
     QVERIFY(BackupManifestContract::validate(manifest, &error));
 
     const QVariantList impossibleApps{
-        QVariantMap{
-            {QStringLiteral("id"), QStringLiteral("org.example.App")},
-            {QStringLiteral("sourceId"), QStringLiteral("flatpak")},
-        },
+        QVariantMap{{QStringLiteral("id"), QStringLiteral("org.example.App")},
+                    {QStringLiteral("sourceId"), QStringLiteral("flatpak")}},
     };
     const auto impossibleManifest = BackupManifestContract::build(
         impossibleApps, false, portableSettings(), QStringLiteral("2026-10-10T02:00:00Z"), &error);
@@ -193,10 +274,8 @@ void BackupBackendTest::representsUnavailableApplicationInventory()
     QJsonObject tampered = manifest;
     QJsonObject tamperedContents = tampered.value(QStringLiteral("contents")).toObject();
     tamperedContents.insert(QStringLiteral("applications"), QJsonArray{
-        QJsonObject{
-            {QStringLiteral("id"), QStringLiteral("org.example.App")},
-            {QStringLiteral("sourceId"), QStringLiteral("flatpak")},
-        },
+        QJsonObject{{QStringLiteral("id"), QStringLiteral("org.example.App")},
+                    {QStringLiteral("sourceId"), QStringLiteral("flatpak")}},
     });
     tampered.insert(QStringLiteral("contents"), tamperedContents);
     QVERIFY(!BackupManifestContract::validate(tampered, &error));
@@ -206,10 +285,8 @@ void BackupBackendTest::buildsStructuredRestorePreviewPlan()
 {
     QString error;
     const QVariantList apps{
-        QVariantMap{
-            {QStringLiteral("id"), QStringLiteral("org.example.App")},
-            {QStringLiteral("sourceId"), QStringLiteral("flatpak")},
-        },
+        QVariantMap{{QStringLiteral("id"), QStringLiteral("org.example.App")},
+                    {QStringLiteral("sourceId"), QStringLiteral("flatpak")}},
     };
     const auto manifest = BackupManifestContract::build(
         apps, portableSettings(), QStringLiteral("2026-10-10T02:00:00Z"), &error);
@@ -235,25 +312,16 @@ void BackupBackendTest::buildsStructuredRestorePreviewPlan()
         return QVariantMap{};
     };
 
-    QCOMPARE(rowFor(QStringLiteral("applications")).value(QStringLiteral("state")).toString(),
-             QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("applications")).value(QStringLiteral("state")).toString(), QStringLiteral("included"));
     QCOMPARE(rowFor(QStringLiteral("applications")).value(QStringLiteral("count")).toInt(), 1);
-    QCOMPARE(rowFor(QStringLiteral("control-center")).value(QStringLiteral("state")).toString(),
-             QStringLiteral("included"));
-    QCOMPARE(rowFor(QStringLiteral("top-bar")).value(QStringLiteral("state")).toString(),
-             QStringLiteral("included"));
-    QCOMPARE(rowFor(QStringLiteral("shelf")).value(QStringLiteral("state")).toString(),
-             QStringLiteral("included"));
-    QCOMPARE(rowFor(QStringLiteral("notifications")).value(QStringLiteral("state")).toString(),
-             QStringLiteral("included"));
-    QCOMPARE(rowFor(QStringLiteral("time-center")).value(QStringLiteral("state")).toString(),
-             QStringLiteral("included"));
-    QCOMPARE(rowFor(QStringLiteral("top-tasks")).value(QStringLiteral("state")).toString(),
-             QStringLiteral("included"));
-    QCOMPARE(rowFor(QStringLiteral("user-data")).value(QStringLiteral("state")).toString(),
-             QStringLiteral("not-included"));
-    QCOMPARE(rowFor(QStringLiteral("accounts-secrets")).value(QStringLiteral("state")).toString(),
-             QStringLiteral("not-included"));
+    QCOMPARE(rowFor(QStringLiteral("control-center")).value(QStringLiteral("state")).toString(), QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("top-bar")).value(QStringLiteral("state")).toString(), QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("shelf")).value(QStringLiteral("state")).toString(), QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("notifications")).value(QStringLiteral("state")).toString(), QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("time-center")).value(QStringLiteral("state")).toString(), QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("top-tasks")).value(QStringLiteral("state")).toString(), QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("user-data")).value(QStringLiteral("state")).toString(), QStringLiteral("not-included"));
+    QCOMPARE(rowFor(QStringLiteral("accounts-secrets")).value(QStringLiteral("state")).toString(), QStringLiteral("not-included"));
 }
 
 void BackupBackendTest::applyRejectsChangedPreviewManifest()
@@ -278,7 +346,6 @@ void BackupBackendTest::applyRejectsChangedPreviewManifest()
     QVERIFY(writeManifest(path, tampered));
 
     QVERIFY(!backend.applyPreviewSettings());
-    QVERIFY(!backend.error().isEmpty());
     QVERIFY(backend.error().contains(QStringLiteral("changed"), Qt::CaseInsensitive));
     QCOMPARE(backend.restoreState(), QStringLiteral("idle"));
 }
@@ -301,6 +368,65 @@ void BackupBackendTest::applyRejectsManifestWithoutPortableSettings()
     QVERIFY(!backend.applyPreviewSettings());
     QVERIFY(backend.error().contains(QStringLiteral("portable Meo settings")));
     QCOMPARE(backend.restoreState(), QStringLiteral("idle"));
+}
+
+void BackupBackendTest::appliesPortableSettingsInSerializedOrder()
+{
+    QString error;
+    const auto manifest = BackupManifestContract::build(
+        {}, portableSettings(), QStringLiteral("2026-10-10T02:00:00Z"), &error);
+    QVERIFY2(!manifest.isEmpty(), qPrintable(error));
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("backup.json"));
+    QVERIFY(writeManifest(path, manifest));
+
+    QStringList calls;
+    FakeControlSettingsSource control(&calls);
+    FakeShellSettingsSource shell(&calls);
+    BackupBackend backend(nullptr);
+    backend.setPortableSettingsSources(&control, &shell);
+    QVERIFY(backend.previewLocalManifest(path));
+    QVERIFY(backend.applyPreviewSettings());
+
+    QCOMPARE(backend.restoreState(), QStringLiteral("succeeded"));
+    QCOMPARE(calls, QStringList({
+        QStringLiteral("control-center"), QStringLiteral("top-bar"),
+        QStringLiteral("shelf"), QStringLiteral("notifications"),
+        QStringLiteral("time-center"), QStringLiteral("top-tasks") }));
+    QCOMPARE(backend.restoreResults().size(), 6);
+    for (const QVariant &value : backend.restoreResults())
+        QCOMPARE(value.toMap().value(QStringLiteral("state")).toString(), QStringLiteral("applied"));
+}
+
+void BackupBackendTest::stopsSerializedRestoreAfterFailure()
+{
+    QString error;
+    const auto manifest = BackupManifestContract::build(
+        {}, portableSettings(), QStringLiteral("2026-10-10T02:00:00Z"), &error);
+    QVERIFY2(!manifest.isEmpty(), qPrintable(error));
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("backup.json"));
+    QVERIFY(writeManifest(path, manifest));
+
+    QStringList calls;
+    FakeControlSettingsSource control(&calls);
+    FakeShellSettingsSource shell(&calls, QStringLiteral("notifications"));
+    BackupBackend backend(nullptr);
+    backend.setPortableSettingsSources(&control, &shell);
+    QVERIFY(backend.previewLocalManifest(path));
+    QVERIFY(backend.applyPreviewSettings());
+
+    QCOMPARE(backend.restoreState(), QStringLiteral("partial-failure"));
+    QCOMPARE(calls, QStringList({
+        QStringLiteral("control-center"), QStringLiteral("top-bar"),
+        QStringLiteral("shelf"), QStringLiteral("notifications") }));
+    QCOMPARE(backend.restoreResults().size(), 4);
+    QCOMPARE(backend.restoreResults().last().toMap().value(QStringLiteral("state")).toString(), QStringLiteral("failed"));
+    QVERIFY(backend.restoreSummary().contains(QStringLiteral("3")));
 }
 
 void BackupBackendTest::rejectsSecretsAndUnexpectedFields()
@@ -363,10 +489,8 @@ void BackupBackendTest::rejectsNonCanonicalSettings()
 void BackupBackendTest::rejectsUnsafeApplicationMetadata()
 {
     const QVariantList apps{
-        QVariantMap{
-            {QStringLiteral("id"), QStringLiteral("../etc/passwd")},
-            {QStringLiteral("sourceId"), QStringLiteral("flatpak")},
-        },
+        QVariantMap{{QStringLiteral("id"), QStringLiteral("../etc/passwd")},
+                    {QStringLiteral("sourceId"), QStringLiteral("flatpak")}},
     };
     QString error;
     const auto manifest = BackupManifestContract::build(
