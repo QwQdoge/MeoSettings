@@ -1,0 +1,74 @@
+name: Backup contract
+
+on:
+  pull_request:
+    paths:
+      - 'src/backends/backupbackend.*'
+      - 'src/backends/omnistoreappsbackend.*'
+      - 'src/core/backendbase.*'
+      - 'tests/tst_backupbackend.cpp'
+      - '.github/workflows/backup-contract.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/backends/backupbackend.*'
+      - 'src/backends/omnistoreappsbackend.*'
+      - 'src/core/backendbase.*'
+      - 'tests/tst_backupbackend.cpp'
+      - '.github/workflows/backup-contract.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-contract-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Backup manifest contract
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Install minimal Qt build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --needed --noconfirm base-devel cmake ninja git qt6-base
+
+      - name: Check out MeoSettings
+        uses: actions/checkout@v6
+
+      - name: Configure isolated contract test
+        run: |
+          mkdir -p /tmp/meo-backup-contract
+          cat > /tmp/meo-backup-contract/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.21)
+          project(MeoBackupContract LANGUAGES CXX)
+          set(CMAKE_AUTOMOC ON)
+          set(CMAKE_CXX_STANDARD 20)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          set(CMAKE_CXX_EXTENSIONS OFF)
+          find_package(Qt6 6.8 REQUIRED COMPONENTS Core Test)
+          add_executable(meo-backup-contract-test
+              "$ENV{GITHUB_WORKSPACE}/tests/tst_backupbackend.cpp"
+              "$ENV{GITHUB_WORKSPACE}/src/core/backendbase.cpp"
+              "$ENV{GITHUB_WORKSPACE}/src/core/backendbase.h"
+              "$ENV{GITHUB_WORKSPACE}/src/backends/backupbackend.cpp"
+              "$ENV{GITHUB_WORKSPACE}/src/backends/backupbackend.h"
+              "$ENV{GITHUB_WORKSPACE}/src/backends/omnistoreappsbackend.cpp"
+              "$ENV{GITHUB_WORKSPACE}/src/backends/omnistoreappsbackend.h"
+          )
+          target_link_libraries(meo-backup-contract-test PRIVATE Qt6::Core Qt6::Test)
+          EOF
+          cmake -S /tmp/meo-backup-contract -B /tmp/meo-backup-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+      - name: Build contract test
+        run: cmake --build /tmp/meo-backup-build --parallel 2
+
+      - name: Run contract test
+        run: /tmp/meo-backup-build/meo-backup-contract-test
