@@ -22,7 +22,7 @@ Item {
     }
 
     // Read the same persisted Plasma preference that the dedicated
-    // Notifications page edits.  Home never writes this object; it only makes
+    // Notifications page edits. Home never writes this object; it only makes
     // a frequent daily state discoverable at a glance.
     NotificationManager.Settings {
         id: notificationSettings
@@ -66,6 +66,12 @@ Item {
             "route": category.route || "home",
             "trailingKind": "navigation"
         }
+    }
+
+    function activationRoute(entry) {
+        if (entry && (entry.id === "night-light" || entry.id === "app-permissions"))
+            return entry.id
+        return entry ? (entry.route || entry.id || "") : ""
     }
 
     function powerSummary() {
@@ -243,7 +249,7 @@ Item {
                 "subtitle": entry.category + " · " + entry.description,
                 "icon": entry.icon,
                 "tone": entry.tone || "primary",
-                "route": entry.route,
+                "route": root.activationRoute(entry),
                 "trailingKind": entry.authority === "kde" ? "choice" : "navigation",
                 "trailingText": entry.authority === "kde" ? qsTr("Advanced") : ""
             })
@@ -286,10 +292,10 @@ Item {
             Accessible.name: qsTr("Search settings")
         }
 
-        // The broker is the only identity authority here.  Once it reports a
+        // The broker is the only identity authority here. Once it reports a
         // signed-in Meo Account, every Settings identity surface uses its
         // scoped cloud name/avatar rather than silently mixing it with the
-        // local Unix profile.  A denied profile ID remains absent by design.
+        // local Unix profile. A denied profile ID remains absent by design.
         MeoSettingsAccountCard {
             width: parent.width
             visible: !root.searching
