@@ -90,6 +90,14 @@ QVariantMap portableSettings()
          }},
     };
 }
+
+bool writeManifest(const QString &path, const QJsonObject &manifest)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return false;
+    return file.write(QJsonDocument(manifest).toJson(QJsonDocument::Compact)) > 0;
+}
 }
 
 class BackupBackendTest final : public QObject
@@ -101,6 +109,8 @@ private Q_SLOTS:
     void buildsPortableMeoSettings();
     void representsUnavailableApplicationInventory();
     void buildsStructuredRestorePreviewPlan();
+    void applyRejectsChangedPreviewManifest();
+    void applyRejectsManifestWithoutPortableSettings();
     void rejectsSecretsAndUnexpectedFields();
     void rejectsNonCanonicalSettings();
     void rejectsUnsafeApplicationMetadata();
@@ -208,10 +218,7 @@ void BackupBackendTest::buildsStructuredRestorePreviewPlan()
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString path = directory.filePath(QStringLiteral("backup.json"));
-    QFile file(path);
-    QVERIFY(file.open(QIODevice::WriteOnly));
-    QCOMPARE(file.write(QJsonDocument(manifest).toJson(QJsonDocument::Compact)) > 0, true);
-    file.close();
+    QVERIFY(writeManifest(path, manifest));
 
     BackupBackend backend(nullptr);
     QVERIFY(backend.previewLocalManifest(path));
@@ -247,6 +254,53 @@ void BackupBackendTest::buildsStructuredRestorePreviewPlan()
              QStringLiteral("not-included"));
     QCOMPARE(rowFor(QStringLiteral("accounts-secrets")).value(QStringLiteral("state")).toString(),
              QStringLiteral("not-included"));
+}
+
+void BackupBackendTest::applyRejectsChangedPreviewManifest()
+{
+    QString error;
+    const auto manifest = BackupManifestContract::build(
+        {}, portableSettings(), QStringLiteral("2026-10-10T02:00:00Z"), &error);
+    QVERIFY2(!manifest.isEmpty(), qPrintable(error));
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("backup.json"));
+    QVERIFY(writeManifest(path, manifest));
+
+    BackupBackend backend(nullptr);
+    QVERIFY(backend.previewLocalManifest(path));
+    QVERIFY(backend.previewValid());
+    QVERIFY(backend.canApplyRestore());
+
+    QJsonObject tampered = manifest;
+    tampered.insert(QStringLiteral("unexpected"), QStringLiteral("changed-after-preview"));
+    QVERIFY(writeManifest(path, tampered));
+
+    QVERIFY(!backend.applyPreviewSettings());
+    QVERIFY(!backend.error().isEmpty());
+    QVERIFY(backend.error().contains(QStringLiteral("changed"), Qt::CaseInsensitive));
+    QCOMPARE(backend.restoreState(), QStringLiteral("idle"));
+}
+
+void BackupBackendTest::applyRejectsManifestWithoutPortableSettings()
+{
+    QString error;
+    const auto manifest = BackupManifestContract::build(
+        {}, QStringLiteral("2026-10-10T02:00:00Z"), &error);
+    QVERIFY2(!manifest.isEmpty(), qPrintable(error));
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("backup.json"));
+    QVERIFY(writeManifest(path, manifest));
+
+    BackupBackend backend(nullptr);
+    QVERIFY(backend.previewLocalManifest(path));
+    QVERIFY(backend.previewValid());
+    QVERIFY(!backend.applyPreviewSettings());
+    QVERIFY(backend.error().contains(QStringLiteral("portable Meo settings")));
+    QCOMPARE(backend.restoreState(), QStringLiteral("idle"));
 }
 
 void BackupBackendTest::rejectsSecretsAndUnexpectedFields()
