@@ -5,12 +5,17 @@
 #include <QJsonObject>
 #include <QString>
 #include <QVariantList>
+#include <QVariantMap>
 
 class OmniStoreAppsBackend;
 
 class BackupManifestContract final
 {
 public:
+    static QJsonObject build(const QVariantList &applications,
+                             const QVariantMap &settings,
+                             const QString &createdAt,
+                             QString *error = nullptr);
     static QJsonObject build(const QVariantList &applications,
                              const QString &createdAt,
                              QString *error = nullptr);
@@ -20,11 +25,11 @@ public:
 /**
  * Creates and inspects a deliberately non-secret Meo backup manifest.
  *
- * The first implementation is intentionally conservative: it records only a
- * schema version, creation timestamp, and a reinstall list projected from
- * OmniStore's already validated application snapshot. It never copies KWallet,
- * Account sessions, provider keys, device credentials, filesystem paths, or
- * arbitrary application data.
+ * The manifest is a portable product backup, not a filesystem snapshot. It
+ * projects OmniStore's validated application inventory and a tightly
+ * whitelisted set of Meo-owned presentation settings. It never copies KWallet,
+ * Account sessions, provider keys, device credentials, filesystem paths,
+ * arbitrary application data, or privileged system configuration.
  */
 class BackupBackend final : public BackendBase
 {
@@ -48,6 +53,7 @@ public:
     bool previewValid() const;
 
     Q_INVOKABLE bool createLocalManifest();
+    Q_INVOKABLE bool createLocalManifestWithSettings(const QVariantMap &settings);
     Q_INVOKABLE bool previewLocalManifest(const QString &path);
     Q_INVOKABLE void clearPreview();
 
@@ -55,6 +61,8 @@ Q_SIGNALS:
     void changed();
 
 private:
+    bool createLocalManifestInternal(const QVariantMap &settings);
+
     OmniStoreAppsBackend *m_appsBackend = nullptr;
     QString m_lastBackupPath;
     QString m_lastBackupAt;
