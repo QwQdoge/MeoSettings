@@ -1,6 +1,7 @@
 #include "backends/audiobackend.h"
 #include "backends/applicationiconbackend.h"
 #include "backends/apppermissionsbackend.h"
+#include "backends/backupbackend.h"
 #include "backends/bluetoothbackend.h"
 #include "backends/controlcenterbackend.h"
 #include "backends/shellsettingsbackend.h"
@@ -295,6 +296,7 @@ int main(int argc, char *argv[])
     SystemInfoBackend systemInfoBackend;
     StorageBackend storageBackend;
     OmniStoreAppsBackend omniStoreAppsBackend;
+    BackupBackend backupBackend(&omniStoreAppsBackend);
     PackageInventoryBackend packageInventoryBackend;
     UpdatesBackend updatesBackend;
     ControlCenterBackend controlCenterBackend;
@@ -356,6 +358,7 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("SystemInfoBackend"), &systemInfoBackend);
     context->setContextProperty(QStringLiteral("StorageBackend"), &storageBackend);
     context->setContextProperty(QStringLiteral("OmniStoreAppsBackend"), &omniStoreAppsBackend);
+    context->setContextProperty(QStringLiteral("BackupBackend"), &backupBackend);
     context->setContextProperty(QStringLiteral("PackageInventoryBackend"), &packageInventoryBackend);
     context->setContextProperty(QStringLiteral("UpdatesBackend"), &updatesBackend);
     context->setContextProperty(QStringLiteral("ControlCenterBackend"), &controlCenterBackend);
