@@ -13,6 +13,10 @@ Item {
     property string requestedAppName: ""
     property string requestedSection: ""
     property bool requestHandled: false
+    property bool dataViewReady: false
+    property int visibleLimit: 60
+    property int pageStep: 60
+    property bool hasMoreApplications: false
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
     readonly property var selectedCapabilities: selectedApp.capabilities || ({})
     readonly property var selectedSettings: selectedApp.settings || ({})
@@ -78,15 +82,23 @@ Item {
         const packageBytes = Number(app.packageSizeBytes) || 0
         if (packageBytes > 0 || managedBytes > 0)
             text += qsTr(" · %1 used").arg(formatBytes(packageBytes + managedBytes))
-        if (app.settings && app.settings.available)
-            text += qsTr(" · configurable")
         return text
     }
 
+    // Build only a bounded window of rows. The old page materialised the whole
+    // application list during construction, which amplified a large OmniStore
+    // export into a multi-second QML freeze. Search still walks the source list,
+    // but expensive row delegates are limited to visibleLimit.
     readonly property var filteredApplications: {
+        if (!dataViewReady) {
+            root.hasMoreApplications = false
+            return []
+        }
+
         const query = searchBar.text.trim().toLowerCase()
         const apps = OmniStoreAppsBackend.applications || []
         const rows = []
+        let more = false
         for (let index = 0; index < apps.length; ++index) {
             const app = apps[index]
             const haystack = (String(app.name || "") + " "
@@ -94,6 +106,10 @@ Item {
                               + String(app.sourceName || "")).toLowerCase()
             if (query !== "" && haystack.indexOf(query) < 0)
                 continue
+            if (rows.length >= root.visibleLimit) {
+                more = true
+                break
+            }
             rows.push({
                 "title": app.name || app.id,
                 "subtitle": root.appSubtitle(app),
@@ -103,6 +119,7 @@ Item {
                 "app": app
             })
         }
+        root.hasMoreApplications = more
         return rows
     }
 
@@ -153,9 +170,7 @@ Item {
             const paths = item.paths || []
             rows.push({
                 "title": qsTr("Verified configuration"),
-                "subtitle": paths.length > 0
-                            ? paths.join(" · ")
-                            : qsTr("Application configuration location"),
+                "subtitle": paths.length > 0 ? paths.join(" · ") : qsTr("Application configuration location"),
                 "icon": "folder",
                 "tone": "primary",
                 "trailingKind": "status",
@@ -166,7 +181,7 @@ Item {
         if (rows.length === 0) {
             rows.push({
                 "title": qsTr("No verified .config location"),
-                "subtitle": qsTr("Meo does not guess configuration paths. Add a trusted OmniStore manifest for native apps; Flatpak config is discovered from its sandbox."),
+                "subtitle": qsTr("Meo does not guess configuration paths. Trusted OmniStore metadata is required."),
                 "icon": "folder_off",
                 "tone": "neutral",
                 "trailingKind": "none",
@@ -186,9 +201,7 @@ Item {
             const paths = item.paths || []
             rows.push({
                 "title": root.categoryTitle(item.id),
-                "subtitle": paths.length > 0
-                            ? paths.join(" · ")
-                            : qsTr("App-scoped location"),
+                "subtitle": paths.length > 0 ? paths.join(" · ") : qsTr("App-scoped location"),
                 "icon": root.categoryIcon(item.id),
                 "tone": item.id === "cache" ? "secondary" : "neutral",
                 "trailingKind": "status",
@@ -209,20 +222,6 @@ Item {
         return rows
     }
 
-    readonly property var configurationRows: [{
-        "title": selectedSettings.available
-                 ? (selectedSettings.label || qsTr("Application configuration"))
-                 : qsTr("Graphical configuration"),
-        "subtitle": selectedSettings.available
-                    ? qsTr("Provided by %1").arg(selectedSettings.provider || qsTr("OmniStore"))
-                    : qsTr("No trusted configuration provider is installed for this application."),
-        "icon": selectedSettings.available ? "settings" : "settings_suggest",
-        "tone": selectedSettings.available ? "primary" : "neutral",
-        "trailingKind": selectedSettings.available && selectedSettings.route ? "navigation" : "none",
-        "route": selectedSettings.route || "",
-        "interactive": selectedSettings.available && !!selectedSettings.route
-    }]
-
     function openApp(app) {
         selectedApp = app
         appDetails.open()
@@ -239,7 +238,8 @@ Item {
     }
 
     function handleRequestedApp() {
-        if (requestHandled || (requestedAppId.trim() === "" && requestedAppName.trim() === ""))
+        if (!dataViewReady || requestHandled
+                || (requestedAppId.trim() === "" && requestedAppName.trim() === ""))
             return
         const apps = OmniStoreAppsBackend.applications || []
         for (let index = 0; index < apps.length; ++index) {
@@ -247,20 +247,10 @@ Item {
             if (!appMatchesRequest(app))
                 continue
             requestHandled = true
-            // The top-bar application-name menu always lands on the verified
-            // config view. App-provided File/Edit/View/etc remain owned by the
-            // KDE Global Menu and never get synthesized here.
             openApp(app)
             return
         }
-
-        // AppId and package id are not identical for every native package.
-        // Falling back to the user-visible application name keeps the target
-        // discoverable without guessing a package or filesystem path.
-        if (requestedAppName.trim() !== "")
-            searchBar.text = requestedAppName
-        else if (requestedAppId.trim() !== "")
-            searchBar.text = requestedAppId
+        searchBar.text = requestedAppName.trim() !== "" ? requestedAppName : requestedAppId
     }
 
     function requestAction(action) {
@@ -280,16 +270,11 @@ Item {
 
     function actionDescription(action) {
         switch (action) {
-        case "clear-cache":
-            return qsTr("Temporary files registered for %1 will be removed. Personal settings and app data are kept.").arg(selectedApp.name || "")
-        case "reset-settings":
-            return qsTr("Verified configuration files for %1 will be removed so the application can recreate defaults.").arg(selectedApp.name || "")
-        case "clear-data":
-            return qsTr("Configuration, cache, state, and app data registered for %1 will be removed. This can sign you out and permanently delete local app data.").arg(selectedApp.name || "")
-        case "uninstall":
-            return qsTr("%1 will be removed through OmniStore. App data is kept unless you delete it separately.").arg(selectedApp.name || "")
-        default:
-            return ""
+        case "clear-cache": return qsTr("Temporary files registered for %1 will be removed.").arg(selectedApp.name || "")
+        case "reset-settings": return qsTr("Verified configuration for %1 will be reset.").arg(selectedApp.name || "")
+        case "clear-data": return qsTr("Registered local app data for %1 will be removed. This can sign you out.").arg(selectedApp.name || "")
+        case "uninstall": return qsTr("%1 will be removed through OmniStore. App data is kept unless removed separately.").arg(selectedApp.name || "")
+        default: return ""
         }
     }
 
@@ -297,18 +282,10 @@ Item {
         const id = String(selectedApp.id || "")
         const source = String(selectedApp.sourceId || "")
         switch (pendingAction) {
-        case "clear-cache":
-            OmniStoreAppsBackend.clearCache(id, source)
-            break
-        case "reset-settings":
-            OmniStoreAppsBackend.resetSettings(id, source)
-            break
-        case "clear-data":
-            OmniStoreAppsBackend.clearData(id, source)
-            break
-        case "uninstall":
-            OmniStoreAppsBackend.uninstall(id, source)
-            break
+        case "clear-cache": OmniStoreAppsBackend.clearCache(id, source); break
+        case "reset-settings": OmniStoreAppsBackend.resetSettings(id, source); break
+        case "clear-data": OmniStoreAppsBackend.clearData(id, source); break
+        case "uninstall": OmniStoreAppsBackend.uninstall(id, source); break
         }
     }
 
@@ -317,12 +294,19 @@ Item {
             return
         const apps = OmniStoreAppsBackend.applications || []
         for (let index = 0; index < apps.length; ++index) {
-            if (apps[index].id === selectedApp.id
-                    && apps[index].sourceId === selectedApp.sourceId) {
+            if (apps[index].id === selectedApp.id && apps[index].sourceId === selectedApp.sourceId) {
                 selectedApp = apps[index]
                 return
             }
         }
+    }
+
+    function maybeExtendWindow() {
+        if (!dataViewReady || !hasMoreApplications)
+            return
+        const remaining = page.contentHeight - (page.contentY + page.height)
+        if (remaining < Math.max(700 * MeoTheme.globalScale, page.height * 0.9))
+            visibleLimit += pageStep
     }
 
     Connections {
@@ -339,9 +323,24 @@ Item {
         }
     }
 
-    Component.onCompleted: root.handleRequestedApp()
+    // Let the shell/title/status card paint before application projection and
+    // any exporter refresh work are requested. A slow backend now means a
+    // loading card inside a responsive page rather than an unresponsive route.
+    Timer {
+        interval: 1
+        repeat: false
+        running: true
+        onTriggered: {
+            root.dataViewReady = true
+            if (!OmniStoreAppsBackend.busy && (OmniStoreAppsBackend.applications || []).length === 0
+                    && OmniStoreAppsBackend.exporterAvailable)
+                OmniStoreAppsBackend.refresh()
+            root.handleRequestedApp()
+        }
+    }
 
     MeoPageLayout {
+        id: page
         anchors.fill: parent
         metricsOverride: root.rootMetrics
         compactWidth: 680 * MeoTheme.globalScale
@@ -349,6 +348,8 @@ Item {
         expandedWidth: MeoTheme.settingsContentMaxWidth
         title: root.isCompact ? "" : qsTr("Applications")
         subtitle: qsTr("Installed apps, configuration, storage, cache, and removal are managed through OmniStore.")
+        onContentYChanged: root.maybeExtendWindow()
+        onHeightChanged: root.maybeExtendWindow()
 
         MeoCard {
             width: parent.width
@@ -373,7 +374,7 @@ Item {
                             width: parent.width
                             text: OmniStoreAppsBackend.managerAvailable
                                   ? qsTr("Managed by OmniStore")
-                                  : qsTr("Read-only compatibility mode")
+                                  : qsTr("Application overview")
                             typeRole: "title"
                             typeSize: "small"
                             emphasized: true
@@ -381,9 +382,9 @@ Item {
                         }
                         MeoText {
                             width: parent.width
-                            text: OmniStoreAppsBackend.managerAvailable
-                                  ? qsTr("%1. Destructive actions only use app-scoped paths verified by OmniStore.").arg(OmniStoreAppsBackend.summary)
-                                  : qsTr("%1. Update OmniStore to manage cache, settings, data, and uninstall from this page.").arg(OmniStoreAppsBackend.summary)
+                            text: OmniStoreAppsBackend.busy
+                                  ? qsTr("Loading installed applications in the background…")
+                                  : OmniStoreAppsBackend.summary
                             typeRole: "body"
                             typeSize: "medium"
                             color: MeoTheme.contentOnSurfaceVariant
@@ -435,24 +436,53 @@ Item {
             trailingIcon: ""
             visualStyle: "settings"
             Accessible.name: qsTr("Search installed apps")
+            onTextChanged: root.visibleLimit = root.pageStep
         }
 
         MeoSettingsGroup {
             width: parent.width
-            visible: root.filteredApplications.length > 0
+            visible: root.dataViewReady && root.filteredApplications.length > 0
             title: qsTr("Installed applications")
-            subtitle: qsTr("%n application(s)", "", root.filteredApplications.length)
+            subtitle: root.hasMoreApplications
+                      ? qsTr("Showing the first %1 matches. Scroll to load more.").arg(root.filteredApplications.length)
+                      : qsTr("%n application(s) shown", "", root.filteredApplications.length)
             model: root.filteredApplications
             onRowActivated: (index, row) => root.openApp(row.app)
+        }
+
+        MeoCard {
+            width: parent.width
+            type: "outlined"
+            visible: root.hasMoreApplications
+            implicitHeight: moreColumn.implicitHeight + 24 * MeoTheme.globalScale
+            Column {
+                id: moreColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.margins: 12 * MeoTheme.globalScale
+                spacing: 8 * MeoTheme.globalScale
+                MeoText {
+                    width: parent.width
+                    text: qsTr("More applications are available")
+                    typeRole: "body"
+                    typeSize: "medium"
+                    color: MeoTheme.contentOnSurfaceVariant
+                }
+                MeoButton {
+                    text: qsTr("Load more")
+                    type: "text"
+                    onClicked: root.visibleLimit += root.pageStep
+                }
+            }
         }
 
         MeoEmptyState {
             width: parent.width
             height: 230 * MeoTheme.globalScale
-            visible: !OmniStoreAppsBackend.busy && root.filteredApplications.length === 0
+            visible: root.dataViewReady && !OmniStoreAppsBackend.busy && root.filteredApplications.length === 0
             icon: searchBar.text.trim() === "" ? "apps" : "search_off"
-            title: searchBar.text.trim() === "" ? qsTr("No applications reported")
-                                                : qsTr("No matching applications")
+            title: searchBar.text.trim() === "" ? qsTr("No applications reported") : qsTr("No matching applications")
             description: searchBar.text.trim() === ""
                          ? qsTr("Install or update OmniStore, then refresh this page.")
                          : qsTr("Try the application name, package ID, or source.")
@@ -463,9 +493,7 @@ Item {
         id: appDetails
         popupParent: Overlay.overlay
         title: root.selectedApp.name || qsTr("Application")
-        subtitle: root.selectedApp.sourceName
-                  ? qsTr("%1 · managed by OmniStore").arg(root.selectedApp.sourceName)
-                  : qsTr("Managed by OmniStore")
+        subtitle: root.selectedApp.sourceName || qsTr("Managed application")
         rejectText: qsTr("Close")
         content: Component {
             Column {
@@ -474,16 +502,14 @@ Item {
 
                 MeoSettingsGroup {
                     width: parent.width
-                    visible: root.requestedSection === "info"
                     title: qsTr("App info")
-                    subtitle: qsTr("About this installed application")
                     model: root.appInfoRows
                 }
 
                 MeoSettingsGroup {
                     width: parent.width
                     title: qsTr("Configuration (.config)")
-                    subtitle: qsTr("The application-name menu opens here. Only paths verified by OmniStore are exposed.")
+                    subtitle: qsTr("Only paths verified by OmniStore are exposed.")
                     model: root.configurationPathRows
                 }
 
@@ -491,8 +517,14 @@ Item {
                     width: parent.width
                     visible: root.selectedSettings.available === true
                     title: qsTr("App-provided settings")
-                    subtitle: qsTr("Optional graphical settings supplied through a trusted provider.")
-                    model: root.configurationRows
+                    model: [{
+                        "title": root.selectedSettings.label || qsTr("Application configuration"),
+                        "subtitle": qsTr("Provided by %1").arg(root.selectedSettings.provider || qsTr("OmniStore")),
+                        "icon": "settings",
+                        "tone": "primary",
+                        "trailingKind": root.selectedSettings.route ? "navigation" : "none",
+                        "route": root.selectedSettings.route || ""
+                    }]
                     onRowActivated: (index, row) => {
                         if (row.route) {
                             appDetails.close()
@@ -503,24 +535,16 @@ Item {
 
                 MeoSettingsGroup {
                     width: parent.width
-                    visible: root.requestedSection !== "info"
-                    title: qsTr("App info")
-                    model: root.appInfoRows
-                }
-
-                MeoSettingsGroup {
-                    width: parent.width
                     title: qsTr("Storage & data")
                     subtitle: selectedApp.storageComplete === false
-                              ? qsTr("Some directory scans were bounded, so shown sizes can be partial.")
-                              : qsTr("Only application-scoped locations verified by OmniStore are shown.")
+                              ? qsTr("Some bounded scans may be partial.")
+                              : qsTr("Only verified app-scoped locations are shown.")
                     model: root.storageRows
                 }
 
                 Flow {
                     width: parent.width
                     spacing: 8 * MeoTheme.globalScale
-
                     MeoButton {
                         text: qsTr("Clear cache")
                         type: "tonal"
@@ -560,8 +584,7 @@ Item {
         title: root.actionTitle(root.pendingAction)
         subtitle: root.actionDescription(root.pendingAction)
         acceptText: root.pendingAction === "clear-data" || root.pendingAction === "uninstall"
-                    ? qsTr("Continue")
-                    : qsTr("Confirm")
+                    ? qsTr("Continue") : qsTr("Confirm")
         rejectText: qsTr("Cancel")
         onAccepted: root.executePendingAction()
     }
