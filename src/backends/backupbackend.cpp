@@ -354,12 +354,17 @@ bool validateSettings(const QJsonObject &settings, QString *error)
 }
 
 QJsonObject BackupManifestContract::build(const QVariantList &applications,
+                                          bool applicationInventoryIncluded,
                                           const QVariantMap &settings,
                                           const QString &createdAt,
                                           QString *error)
 {
     if (applications.size() > kMaximumApplications) {
         setContractError(error, QStringLiteral("Too many applications for one backup manifest."));
+        return {};
+    }
+    if (!applicationInventoryIncluded && !applications.isEmpty()) {
+        setContractError(error, QStringLiteral("An unavailable application inventory must not contain application entries."));
         return {};
     }
     const QDateTime created = QDateTime::fromString(createdAt, Qt::ISODate);
@@ -397,6 +402,8 @@ QJsonObject BackupManifestContract::build(const QVariantList &applications,
         {QStringLiteral("createdAt"), created.toUTC().toString(Qt::ISODateWithMs)},
         {QStringLiteral("contents"), QJsonObject{
              {QStringLiteral("applications"), reinstallList},
+             {QStringLiteral("applicationsState"),
+              applicationInventoryIncluded ? QStringLiteral("included") : QStringLiteral("unavailable")},
              {QStringLiteral("settings"), settingsObject},
              {QStringLiteral("userData"), QJsonArray{}},
          }},
@@ -411,10 +418,18 @@ QJsonObject BackupManifestContract::build(const QVariantList &applications,
 }
 
 QJsonObject BackupManifestContract::build(const QVariantList &applications,
+                                          const QVariantMap &settings,
                                           const QString &createdAt,
                                           QString *error)
 {
-    return build(applications, {}, createdAt, error);
+    return build(applications, true, settings, createdAt, error);
+}
+
+QJsonObject BackupManifestContract::build(const QVariantList &applications,
+                                          const QString &createdAt,
+                                          QString *error)
+{
+    return build(applications, true, {}, createdAt, error);
 }
 
 bool BackupManifestContract::validate(const QJsonObject &manifest, QString *error)
@@ -447,11 +462,20 @@ bool BackupManifestContract::validate(const QJsonObject &manifest, QString *erro
     }
     const QJsonObject contents = contentsValue.toObject();
     const QSet<QString> contentKeys{
-        QStringLiteral("applications"), QStringLiteral("settings"), QStringLiteral("userData")};
+        QStringLiteral("applications"), QStringLiteral("applicationsState"),
+        QStringLiteral("settings"), QStringLiteral("userData")};
     if (!hasExactlyKeys(contents, contentKeys)) {
         setContractError(error, QStringLiteral("The backup contents section contains unsupported or missing fields."));
         return false;
     }
+
+    const QJsonValue applicationsStateValue = contents.value(QStringLiteral("applicationsState"));
+    if (!applicationsStateValue.isString()
+        || !oneOf(applicationsStateValue.toString(), {"included", "unavailable"})) {
+        setContractError(error, QStringLiteral("The backup application inventory state is invalid."));
+        return false;
+    }
+    const QString applicationsState = applicationsStateValue.toString();
 
     const QJsonValue applicationsValue = contents.value(QStringLiteral("applications"));
     if (!applicationsValue.isArray()) {
@@ -461,6 +485,10 @@ bool BackupManifestContract::validate(const QJsonObject &manifest, QString *erro
     const QJsonArray applications = applicationsValue.toArray();
     if (applications.size() > kMaximumApplications) {
         setContractError(error, QStringLiteral("The backup application list is too large."));
+        return false;
+    }
+    if (applicationsState == QLatin1String("unavailable") && !applications.isEmpty()) {
+        setContractError(error, QStringLiteral("An unavailable application inventory must be empty."));
         return false;
     }
     for (const QJsonValue &value : applications) {
@@ -499,7 +527,7 @@ BackupBackend::BackupBackend(OmniStoreAppsBackend *appsBackend, QObject *parent)
     : BackendBase(parent)
     , m_appsBackend(appsBackend)
 {
-    setAvailable(m_appsBackend != nullptr);
+    setAvailable(true);
 }
 
 QString BackupBackend::summary() const
@@ -508,7 +536,9 @@ QString BackupBackend::summary() const
         return tr("Backup support is unavailable in this build.");
     if (m_lastBackupPath.isEmpty())
         return tr("No local Meo backup manifest has been created yet.");
-    return tr("Last local backup manifest: %1").arg(m_lastBackupAt);
+    if (m_lastApplicationInventoryIncluded)
+        return tr("Last local backup: %1 · application inventory included").arg(m_lastBackupAt);
+    return tr("Last local backup: %1 · application inventory unavailable").arg(m_lastBackupAt);
 }
 
 QString BackupBackend::lastBackupPath() const { return m_lastBackupPath; }
@@ -619,24 +649,17 @@ bool BackupBackend::createLocalManifestWithSettings(const QVariantMap &settings)
 bool BackupBackend::createLocalManifestInternal(const QVariantMap &settings)
 {
     clearError();
-    if (!m_appsBackend) {
-        setError(tr("The application inventory backend is unavailable."));
-        return false;
-    }
-    if (m_appsBackend->busy()) {
-        setError(tr("Wait for the application inventory to finish refreshing."));
-        return false;
-    }
-    if (!m_appsBackend->available()) {
-        setError(tr("Refresh the OmniStore application inventory before creating a backup."));
-        return false;
-    }
+
+    const bool applicationsIncluded = m_appsBackend
+        && m_appsBackend->available() && !m_appsBackend->busy();
+    const QVariantList applications = applicationsIncluded
+        ? m_appsBackend->applications() : QVariantList{};
 
     setBusy(true);
     const QString createdAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
     QString contractError;
     const QJsonObject manifest = BackupManifestContract::build(
-        m_appsBackend->applications(), settings, createdAt, &contractError);
+        applications, applicationsIncluded, settings, createdAt, &contractError);
     if (manifest.isEmpty()) {
         setBusy(false);
         setError(contractError);
@@ -675,6 +698,7 @@ bool BackupBackend::createLocalManifestInternal(const QVariantMap &settings)
 
     m_lastBackupPath = path;
     m_lastBackupAt = createdAt;
+    m_lastApplicationInventoryIncluded = applicationsIncluded;
     setBusy(false);
     Q_EMIT changed();
     return true;
@@ -711,6 +735,7 @@ bool BackupBackend::previewLocalManifest(const QString &path)
     }
     const QJsonObject contents = manifest.value(QStringLiteral("contents")).toObject();
     const QJsonArray applications = contents.value(QStringLiteral("applications")).toArray();
+    const QString applicationsState = contents.value(QStringLiteral("applicationsState")).toString();
     const QJsonObject settings = contents.value(QStringLiteral("settings")).toObject();
     int settingsGroups = 0;
     if (settings.contains(QStringLiteral("controlCenter")))
@@ -718,9 +743,12 @@ bool BackupBackend::previewLocalManifest(const QString &path)
     if (settings.contains(QStringLiteral("shell")))
         settingsGroups += 4;
 
+    const QString applicationSummary = applicationsState == QLatin1String("included")
+        ? tr("%n application(s)", "", applications.size())
+        : tr("application inventory unavailable");
     m_previewPath = info.canonicalFilePath();
     m_previewValid = true;
-    m_previewSummary = tr("Valid Meo backup manifest · %n application(s)", "", applications.size())
+    m_previewSummary = tr("Valid Meo backup manifest · %1").arg(applicationSummary)
                            + tr(" · %n portable setting group(s)", "", settingsGroups)
                            + tr(" · created %1").arg(manifest.value(QStringLiteral("createdAt")).toString());
     Q_EMIT changed();
