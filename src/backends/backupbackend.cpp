@@ -1,6 +1,8 @@
 #include "backupbackend.h"
 
+#include "controlcenterbackend.h"
 #include "omnistoreappsbackend.h"
+#include "shellsettingsbackend.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -62,9 +64,140 @@ bool containsOnlyKeys(const QJsonObject &object, const QSet<QString> &allowed)
     }
     return true;
 }
+
+bool validateSerializedMap(const QJsonObject &value,
+                           const std::function<QVariantMap(const QVariantMap &, QString *)> &serializer,
+                           QString *error)
+{
+    QString validationError;
+    const QVariantMap serialized = serializer(value.toVariantMap(), &validationError);
+    if (serialized.isEmpty() || QJsonObject::fromVariantMap(serialized) != value) {
+        setContractError(error, validationError.isEmpty()
+                                    ? QStringLiteral("A Meo setting contains unsupported fields or values.")
+                                    : validationError);
+        return false;
+    }
+    return true;
+}
+
+bool validateSettings(const QJsonObject &settings, QString *error)
+{
+    const QSet<QString> allowedSettingsKeys{
+        QStringLiteral("controlCenter"), QStringLiteral("shell")};
+    if (!containsOnlyKeys(settings, allowedSettingsKeys)) {
+        setContractError(error, QStringLiteral("The backup settings section contains unsupported products."));
+        return false;
+    }
+
+    if (settings.contains(QStringLiteral("controlCenter"))) {
+        const QJsonValue controlCenterValue = settings.value(QStringLiteral("controlCenter"));
+        if (!controlCenterValue.isObject()) {
+            setContractError(error, QStringLiteral("The Control Center backup settings are invalid."));
+            return false;
+        }
+        const QJsonObject controlCenter = controlCenterValue.toObject();
+        const QSet<QString> allowedControlCenterKeys{
+            QStringLiteral("layout"), QStringLiteral("topBar")};
+        if (!containsOnlyKeys(controlCenter, allowedControlCenterKeys)
+            || !controlCenter.contains(QStringLiteral("layout"))
+            || !controlCenter.contains(QStringLiteral("topBar"))) {
+            setContractError(error, QStringLiteral("The Control Center backup settings are incomplete."));
+            return false;
+        }
+
+        const QJsonValue layoutValue = controlCenter.value(QStringLiteral("layout"));
+        if (!layoutValue.isObject()) {
+            setContractError(error, QStringLiteral("The Control Center layout backup is invalid."));
+            return false;
+        }
+        const QJsonObject layout = layoutValue.toObject();
+        const QSet<QString> allowedLayoutKeys{
+            QStringLiteral("tiles"), QStringLiteral("density")};
+        if (!containsOnlyKeys(layout, allowedLayoutKeys)
+            || !layout.value(QStringLiteral("tiles")).isArray()
+            || !layout.value(QStringLiteral("density")).isString()) {
+            setContractError(error, QStringLiteral("The Control Center layout backup contains unsupported fields."));
+            return false;
+        }
+        const QJsonArray tileArray = layout.value(QStringLiteral("tiles")).toArray();
+        for (const QJsonValue &tileValue : tileArray) {
+            if (!tileValue.isObject()) {
+                setContractError(error, QStringLiteral("The Control Center tile backup is invalid."));
+                return false;
+            }
+            const QJsonObject tile = tileValue.toObject();
+            const QSet<QString> allowedTileKeys{
+                QStringLiteral("id"), QStringLiteral("span"), QStringLiteral("visible")};
+            if (!containsOnlyKeys(tile, allowedTileKeys)
+                || !tile.value(QStringLiteral("id")).isString()
+                || !tile.value(QStringLiteral("span")).isDouble()
+                || !tile.value(QStringLiteral("visible")).isBool()) {
+                setContractError(error, QStringLiteral("The Control Center tile backup contains unsupported fields."));
+                return false;
+            }
+        }
+        QString layoutError;
+        const QVariantMap serializedLayout = ControlCenterBackend::serializeLayout(
+            tileArray.toVariantList(), layout.value(QStringLiteral("density")).toString(), &layoutError);
+        if (serializedLayout.isEmpty()
+            || QJsonArray::fromVariantList(serializedLayout.value(QStringLiteral("tiles")).toList()) != tileArray
+            || serializedLayout.value(QStringLiteral("density")).toString()
+                   != layout.value(QStringLiteral("density")).toString()) {
+            setContractError(error, layoutError.isEmpty()
+                                        ? QStringLiteral("The Control Center layout backup is not canonical.")
+                                        : layoutError);
+            return false;
+        }
+
+        const QJsonValue topBarValue = controlCenter.value(QStringLiteral("topBar"));
+        if (!topBarValue.isObject()
+            || !validateSerializedMap(topBarValue.toObject(), ControlCenterBackend::serializeTopBar, error)) {
+            if (error && error->isEmpty())
+                *error = QStringLiteral("The top-bar backup settings are invalid.");
+            return false;
+        }
+    }
+
+    if (settings.contains(QStringLiteral("shell"))) {
+        const QJsonValue shellValue = settings.value(QStringLiteral("shell"));
+        if (!shellValue.isObject()) {
+            setContractError(error, QStringLiteral("The Meo Shell backup settings are invalid."));
+            return false;
+        }
+        const QJsonObject shell = shellValue.toObject();
+        const QSet<QString> allowedShellKeys{
+            QStringLiteral("shelf"), QStringLiteral("notifications"),
+            QStringLiteral("timeCenter"), QStringLiteral("topTasks")};
+        if (!containsOnlyKeys(shell, allowedShellKeys)
+            || shell.size() != allowedShellKeys.size()) {
+            setContractError(error, QStringLiteral("The Meo Shell backup settings are incomplete."));
+            return false;
+        }
+
+        const auto validateSurface = [&shell, error](
+                                         const QString &key,
+                                         const std::function<QVariantMap(const QVariantMap &, QString *)> &serializer) {
+            const QJsonValue value = shell.value(key);
+            if (!value.isObject()) {
+                setContractError(error, QStringLiteral("A Meo Shell backup surface is invalid."));
+                return false;
+            }
+            return validateSerializedMap(value.toObject(), serializer, error);
+        };
+        if (!validateSurface(QStringLiteral("shelf"), ShellSettingsBackend::serializeShelf)
+            || !validateSurface(QStringLiteral("notifications"), ShellSettingsBackend::serializeNotifications)
+            || !validateSurface(QStringLiteral("timeCenter"), ShellSettingsBackend::serializeTimeCenter)
+            || !validateSurface(QStringLiteral("topTasks"), ShellSettingsBackend::serializeTopTasks)) {
+            return false;
+        }
+    }
+
+    return true;
+}
 }
 
 QJsonObject BackupManifestContract::build(const QVariantList &applications,
+                                          const QVariantMap &settings,
                                           const QString &createdAt,
                                           QString *error)
 {
@@ -98,16 +231,33 @@ QJsonObject BackupManifestContract::build(const QVariantList &applications,
         reinstallList.push_back(row);
     }
 
-    return {
+    const QJsonObject settingsObject = QJsonObject::fromVariantMap(settings);
+    if (!validateSettings(settingsObject, error))
+        return {};
+
+    const QJsonObject manifest{
         {QStringLiteral("schema"), kSchema},
         {QStringLiteral("createdAt"), created.toUTC().toString(Qt::ISODateWithMs)},
         {QStringLiteral("contents"), QJsonObject{
              {QStringLiteral("applications"), reinstallList},
-             {QStringLiteral("settings"), QJsonArray{}},
+             {QStringLiteral("settings"), settingsObject},
              {QStringLiteral("userData"), QJsonArray{}},
          }},
         {QStringLiteral("secretsIncluded"), false},
     };
+    QString validationError;
+    if (!validate(manifest, &validationError)) {
+        setContractError(error, validationError);
+        return {};
+    }
+    return manifest;
+}
+
+QJsonObject BackupManifestContract::build(const QVariantList &applications,
+                                          const QString &createdAt,
+                                          QString *error)
+{
+    return build(applications, {}, createdAt, error);
 }
 
 bool BackupManifestContract::validate(const QJsonObject &manifest, QString *error)
@@ -182,10 +332,12 @@ bool BackupManifestContract::validate(const QJsonObject &manifest, QString *erro
     }
 
     const QJsonValue settingsValue = contents.value(QStringLiteral("settings"));
+    if (!settingsValue.isObject() || !validateSettings(settingsValue.toObject(), error))
+        return false;
+
     const QJsonValue userDataValue = contents.value(QStringLiteral("userData"));
-    if (!settingsValue.isArray() || !settingsValue.toArray().isEmpty()
-        || !userDataValue.isArray() || !userDataValue.toArray().isEmpty()) {
-        setContractError(error, QStringLiteral("This build only accepts application-list backup manifests."));
+    if (!userDataValue.isArray() || !userDataValue.toArray().isEmpty()) {
+        setContractError(error, QStringLiteral("This build does not accept user-data payloads in backup manifests."));
         return false;
     }
     return true;
@@ -234,6 +386,16 @@ bool BackupBackend::previewValid() const
 
 bool BackupBackend::createLocalManifest()
 {
+    return createLocalManifestInternal({});
+}
+
+bool BackupBackend::createLocalManifestWithSettings(const QVariantMap &settings)
+{
+    return createLocalManifestInternal(settings);
+}
+
+bool BackupBackend::createLocalManifestInternal(const QVariantMap &settings)
+{
     clearError();
     if (!m_appsBackend) {
         setError(tr("The application inventory backend is unavailable."));
@@ -252,7 +414,7 @@ bool BackupBackend::createLocalManifest()
     const QString createdAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
     QString contractError;
     const QJsonObject manifest = BackupManifestContract::build(
-        m_appsBackend->applications(), createdAt, &contractError);
+        m_appsBackend->applications(), settings, createdAt, &contractError);
     if (manifest.isEmpty()) {
         setBusy(false);
         setError(contractError);
@@ -326,14 +488,20 @@ bool BackupBackend::previewLocalManifest(const QString &path)
         setError(contractError);
         return false;
     }
-    const QJsonArray applications = manifest.value(QStringLiteral("contents"))
-                                        .toObject()
-                                        .value(QStringLiteral("applications"))
-                                        .toArray();
+    const QJsonObject contents = manifest.value(QStringLiteral("contents")).toObject();
+    const QJsonArray applications = contents.value(QStringLiteral("applications")).toArray();
+    const QJsonObject settings = contents.value(QStringLiteral("settings")).toObject();
+    int settingsGroups = 0;
+    if (settings.contains(QStringLiteral("controlCenter")))
+        settingsGroups += 2;
+    if (settings.contains(QStringLiteral("shell")))
+        settingsGroups += 4;
+
     m_previewPath = info.canonicalFilePath();
     m_previewValid = true;
-    m_previewSummary = tr("Valid Meo backup manifest · %n application(s) · created %1", "", applications.size())
-                           .arg(manifest.value(QStringLiteral("createdAt")).toString());
+    m_previewSummary = tr("Valid Meo backup manifest · %n application(s)", "", applications.size())
+                           + tr(" · %n portable setting group(s)", "", settingsGroups)
+                           + tr(" · created %1").arg(manifest.value(QStringLiteral("createdAt")).toString());
     Q_EMIT changed();
     return true;
 }
