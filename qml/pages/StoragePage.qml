@@ -150,6 +150,20 @@ Item {
         return rows
     }
 
+    readonly property bool hasPortableRestoreSettings: {
+        const plan = BackupBackend.previewPlan || []
+        for (let index = 0; index < plan.length; ++index) {
+            const item = plan[index]
+            if (item.state !== "included")
+                continue
+            if (item.id === "control-center" || item.id === "top-bar"
+                    || item.id === "shelf" || item.id === "notifications"
+                    || item.id === "time-center" || item.id === "top-tasks")
+                return true
+        }
+        return false
+    }
+
     function categoryIcon(categoryId) {
         switch (categoryId) {
         case "images": return "image"
@@ -419,7 +433,7 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Backup & restore")
-            subtitle: qsTr("Local manifests are saved to Documents/Meo Backups. Portable Meo settings are always backed up; the verified application reinstall list is included when OmniStore inventory is available and otherwise marked unavailable. User-data payloads and Apply Restore remain disabled.")
+            subtitle: qsTr("Local manifests are saved to Documents/Meo Backups. After validation, only included portable Meo presentation settings can be applied here. Application reinstall, user-data payloads, accounts, and secrets remain unchanged.")
             model: [
                 {
                     "id": "local-manifest",
@@ -428,7 +442,7 @@ Item {
                     "icon": "backup",
                     "tone": "tertiary",
                     "trailingKind": "action",
-                    "actionText": BackupBackend.busy ? qsTr("Backing up…") : qsTr("Back up now"),
+                    "actionText": BackupBackend.busy ? qsTr("Working…") : qsTr("Back up now"),
                     "enabled": BackupBackend.available && !BackupBackend.busy
                 },
                 {
@@ -446,6 +460,26 @@ Item {
                     "enabled": !BackupBackend.busy
                 },
                 {
+                    "id": "apply-portable-settings",
+                    "title": BackupBackend.restoreState === "applying"
+                             ? qsTr("Applying portable settings")
+                             : qsTr("Apply portable settings"),
+                    "subtitle": !BackupBackend.previewValid
+                                ? qsTr("Preview a valid backup first.")
+                                : (!root.hasPortableRestoreSettings
+                                   ? qsTr("This backup does not contain portable Meo presentation settings to apply.")
+                                   : (BackupBackend.restoreSummary !== ""
+                                      ? BackupBackend.restoreSummary
+                                      : qsTr("Review and apply only the included Control Center and Meo Shell presentation settings."))),
+                    "icon": "restore",
+                    "tone": "primary",
+                    "trailingKind": "action",
+                    "actionText": BackupBackend.restoreState === "applying"
+                                  ? qsTr("Applying…")
+                                  : qsTr("Review & apply"),
+                    "enabled": root.hasPortableRestoreSettings && BackupBackend.canApplyRestore
+                },
+                {
                     "id": "system-recovery",
                     "title": qsTr("System recovery"),
                     "subtitle": qsTr("Snapshots, fallback kernel, repair, and OS rollback stay in Recovery."),
@@ -460,6 +494,8 @@ Item {
                     BackupBackend.createLocalManifest()
                 else if (row.id === "restore-preview")
                     restoreManifestDialog.open()
+                else if (row.id === "apply-portable-settings")
+                    restoreApplySheet.open()
             }
             onRowActivated: (index, row) => {
                 if (row.route)
@@ -470,7 +506,7 @@ Item {
         MeoBanner {
             width: parent.width
             visible: BackupBackend.error !== ""
-            title: qsTr("Backup or restore preview needs attention")
+            title: qsTr("Backup or restore needs attention")
             text: BackupBackend.error
             tone: "error"
         }
@@ -479,8 +515,65 @@ Item {
             width: parent.width
             visible: BackupBackend.previewValid && root.restorePlanRows.length > 0
             title: qsTr("Restore plan")
-            subtitle: qsTr("Preview only. These categories describe what the selected backup could restore. Nothing has been applied to this system.")
+            subtitle: BackupBackend.restoreState === "idle"
+                      ? qsTr("Preview only. These categories describe what the selected backup could restore. Nothing has been applied to this system.")
+                      : BackupBackend.restoreSummary
             model: root.restorePlanRows
+        }
+
+        MeoCard {
+            width: parent.width
+            type: "outlined"
+            visible: BackupBackend.restoreState !== "idle"
+
+            Row {
+                width: parent.width
+                spacing: 12 * MeoTheme.globalScale
+
+                MeoIcon {
+                    icon: BackupBackend.restoreState === "applying"
+                          ? "sync"
+                          : (BackupBackend.restoreState === "succeeded" ? "check_circle" : "error")
+                    size: 24
+                    color: (BackupBackend.restoreState === "failed"
+                            || BackupBackend.restoreState === "partial-failure")
+                           ? MeoTheme.error : MeoTheme.primary
+                }
+
+                Column {
+                    width: parent.width - 36 * MeoTheme.globalScale
+                    spacing: 4 * MeoTheme.globalScale
+
+                    MeoText {
+                        width: parent.width
+                        text: BackupBackend.restoreState === "applying"
+                              ? qsTr("Applying portable settings")
+                              : (BackupBackend.restoreState === "succeeded"
+                                 ? qsTr("Portable settings restored")
+                                 : qsTr("Portable settings restore stopped"))
+                        typeRole: "title"
+                        typeSize: "small"
+                        emphasized: true
+                        color: MeoTheme.contentOnSurface
+                    }
+
+                    MeoText {
+                        width: parent.width
+                        text: BackupBackend.restoreSummary
+                        typeRole: "body"
+                        typeSize: "medium"
+                        color: MeoTheme.contentOnSurfaceVariant
+                        wrapMode: Text.WordWrap
+                    }
+
+                    MeoProgressBar {
+                        width: parent.width
+                        visible: BackupBackend.restoreState === "applying"
+                        type: "linear"
+                        indeterminate: true
+                    }
+                }
+            }
         }
 
         MeoCard {
@@ -524,7 +617,7 @@ Item {
                     }
                     MeoText {
                         width: parent.width
-                        visible: BackupBackend.previewValid
+                        visible: BackupBackend.previewValid && BackupBackend.restoreState === "idle"
                         text: qsTr("Preview only · no settings, applications, or data have been changed.")
                         typeRole: "label"
                         typeSize: "small"
@@ -1057,6 +1150,72 @@ Item {
         RepairEntry {
             category: "storage"
             entryTitle: qsTr("Troubleshoot storage")
+        }
+    }
+
+    MeoSettingsTaskSheet {
+        id: restoreApplySheet
+        popupParent: Overlay.overlay
+        title: qsTr("Apply portable settings?")
+        subtitle: qsTr("Only included Meo-owned presentation settings will change. Settings are applied one group at a time; if a later group fails, already confirmed earlier groups remain applied and the restore stops with a partial-failure report.")
+        acceptText: qsTr("Apply settings")
+        rejectText: qsTr("Cancel")
+        acceptEnabled: root.hasPortableRestoreSettings && BackupBackend.canApplyRestore
+
+        onAccepted: BackupBackend.applyPreviewSettings()
+
+        content: Component {
+            Flickable {
+                clip: true
+                contentWidth: width
+                contentHeight: restoreConfirmation.implicitHeight + 40 * MeoTheme.globalScale
+
+                MeoSettingsGroup {
+                    id: restoreConfirmation
+                    width: parent.width - 40 * MeoTheme.globalScale
+                    x: 20 * MeoTheme.globalScale
+                    y: 20 * MeoTheme.globalScale
+                    title: qsTr("What this Apply does")
+                    subtitle: qsTr("The selected file is reopened and validated again immediately before any setting changes are sent to the owning Meo backends.")
+                    model: [
+                        {
+                            "title": qsTr("Portable presentation settings"),
+                            "subtitle": qsTr("Included Control Center, Top Bar, Shelf, Notifications, Time Center, and Top Tasks settings are applied in a verified serial order."),
+                            "icon": "tune", "tone": "primary",
+                            "trailingKind": "status", "trailingText": qsTr("Will apply"),
+                            "interactive": false
+                        },
+                        {
+                            "title": qsTr("Applications"),
+                            "subtitle": qsTr("Application reinstall records remain preview-only. OmniStore is not asked to install or remove anything."),
+                            "icon": "apps", "tone": "neutral",
+                            "trailingKind": "status", "trailingText": qsTr("Not changed"),
+                            "interactive": false
+                        },
+                        {
+                            "title": qsTr("User data"),
+                            "subtitle": qsTr("Manifest v1 has no user-data payload, so personal files are not copied, replaced, or deleted."),
+                            "icon": "folder", "tone": "neutral",
+                            "trailingKind": "status", "trailingText": qsTr("Not changed"),
+                            "interactive": false
+                        },
+                        {
+                            "title": qsTr("Accounts & secrets"),
+                            "subtitle": qsTr("Passwords, Meo Account sessions, KWallet contents, OAuth/device credentials, and AI provider keys are excluded from this restore."),
+                            "icon": "shield", "tone": "neutral",
+                            "trailingKind": "status", "trailingText": qsTr("Not changed"),
+                            "interactive": false
+                        },
+                        {
+                            "title": qsTr("Failure handling"),
+                            "subtitle": qsTr("Each group must report that it was saved before the next starts. The restore stops on the first backend error or confirmation timeout."),
+                            "icon": "verified", "tone": "secondary",
+                            "trailingKind": "status", "trailingText": qsTr("Stop on error"),
+                            "interactive": false
+                        }
+                    ]
+                }
+            }
         }
     }
 
