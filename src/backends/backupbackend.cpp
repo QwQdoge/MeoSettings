@@ -53,6 +53,15 @@ bool safeVersion(const QString &value)
     }
     return true;
 }
+
+bool containsOnlyKeys(const QJsonObject &object, const QSet<QString> &allowed)
+{
+    for (auto iterator = object.begin(); iterator != object.end(); ++iterator) {
+        if (!allowed.contains(iterator.key()))
+            return false;
+    }
+    return true;
+}
 }
 
 QJsonObject BackupManifestContract::build(const QVariantList &applications,
@@ -103,6 +112,16 @@ QJsonObject BackupManifestContract::build(const QVariantList &applications,
 
 bool BackupManifestContract::validate(const QJsonObject &manifest, QString *error)
 {
+    const QSet<QString> allowedManifestKeys{
+        QStringLiteral("schema"),
+        QStringLiteral("createdAt"),
+        QStringLiteral("contents"),
+        QStringLiteral("secretsIncluded"),
+    };
+    if (!containsOnlyKeys(manifest, allowedManifestKeys)) {
+        setContractError(error, QStringLiteral("The backup manifest contains unsupported top-level fields."));
+        return false;
+    }
     if (manifest.value(QStringLiteral("schema")).toString() != kSchema) {
         setContractError(error, QStringLiteral("Unsupported backup manifest format."));
         return false;
@@ -123,6 +142,15 @@ bool BackupManifestContract::validate(const QJsonObject &manifest, QString *erro
         return false;
     }
     const QJsonObject contents = contentsValue.toObject();
+    const QSet<QString> allowedContentKeys{
+        QStringLiteral("applications"),
+        QStringLiteral("settings"),
+        QStringLiteral("userData"),
+    };
+    if (!containsOnlyKeys(contents, allowedContentKeys)) {
+        setContractError(error, QStringLiteral("The backup contents section contains unsupported fields."));
+        return false;
+    }
     const QJsonValue applicationsValue = contents.value(QStringLiteral("applications"));
     if (!applicationsValue.isArray()) {
         setContractError(error, QStringLiteral("The backup application list is missing."));
@@ -147,11 +175,9 @@ bool BackupManifestContract::validate(const QJsonObject &manifest, QString *erro
         }
         const QSet<QString> allowedKeys{
             QStringLiteral("id"), QStringLiteral("sourceId"), QStringLiteral("version")};
-        for (auto iterator = row.begin(); iterator != row.end(); ++iterator) {
-            if (!allowedKeys.contains(iterator.key())) {
-                setContractError(error, QStringLiteral("The backup application list contains unsupported fields."));
-                return false;
-            }
+        if (!containsOnlyKeys(row, allowedKeys)) {
+            setContractError(error, QStringLiteral("The backup application list contains unsupported fields."));
+            return false;
         }
     }
 
