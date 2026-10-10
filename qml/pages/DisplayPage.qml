@@ -9,9 +9,11 @@ Item {
 
     property var navigateTo: function(route) {}
     property var rootMetrics: null
+    property string focusSection: ""
     Component.onDestruction: DisplayBackend.revertChanges()
 
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
+    readonly property bool nightLightOnly: focusSection === "night-light"
 
     readonly property string nightLightSummary: {
         if (!Platform.nightLightEnabled)
@@ -95,12 +97,14 @@ Item {
         id: page
         anchors.fill: parent
         metricsOverride: root.rootMetrics
-        title: root.isCompact ? "" : qsTr("Display & touch")
-        subtitle: ""
+        title: root.isCompact ? "" : (root.nightLightOnly ? qsTr("Night Light") : qsTr("Display & touch"))
+        subtitle: root.nightLightOnly
+                  ? qsTr("Reduce blue light with a warmer display color and schedule")
+                  : ""
 
         MeoCard {
             width: parent.width
-            visible: DisplayBackend.confirmationPending
+            visible: !root.nightLightOnly && DisplayBackend.confirmationPending
             type: "filled"
             ColumnLayout {
                 anchors.fill: parent
@@ -121,6 +125,7 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
+            visible: !root.nightLightOnly
             title: qsTr("Lock display")
             subtitle: ""
             model: root.lockDisplayRows
@@ -129,7 +134,7 @@ Item {
 
         Column {
             width: parent.width
-            visible: DisplayBackend.error !== ""
+            visible: !root.nightLightOnly && DisplayBackend.error !== ""
             spacing: MeoTheme.space4
 
             MeoBanner {
@@ -175,7 +180,7 @@ Item {
 
         ColumnLayout {
             width: parent.width
-            visible: Platform.brightnessAvailable
+            visible: !root.nightLightOnly && Platform.brightnessAvailable
             spacing: MeoTheme.space8
 
             MeoText {
@@ -241,6 +246,7 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
+            visible: !root.nightLightOnly
             title: qsTr("Appearance")
             subtitle: ""
             model: root.textAppearanceRows
@@ -278,7 +284,7 @@ Item {
         MeoCard {
             width: parent.width
             type: "outlined"
-            visible: !Platform.brightnessAvailable && !Platform.nightLightAvailable
+            visible: !root.nightLightOnly && !Platform.brightnessAvailable && !Platform.nightLightAvailable
 
             Row {
                 width: parent.width
@@ -295,9 +301,21 @@ Item {
             }
         }
 
+        MeoEmptyState {
+            width: parent.width
+            height: 220 * MeoTheme.globalScale
+            visible: root.nightLightOnly && !Platform.nightLightAvailable
+            icon: "dark_mode"
+            title: qsTr("Night Light unavailable")
+            description: qsTr("This session does not expose Night Light controls on this device.")
+            actionText: KcmBridge.isAvailable("kcm_nightlight") ? qsTr("Open advanced settings") : ""
+            onActionClicked: root.navigateTo("kcm:kcm_nightlight")
+        }
+
         Flow {
             width: parent.width
             spacing: 8 * MeoTheme.globalScale
+            visible: !root.nightLightOnly
             MeoButton {
                 text: DisplayBackend.busy ? qsTr("Refreshing…") : qsTr("Refresh")
                 type: "tonal"
@@ -312,7 +330,7 @@ Item {
             typeSize: "small"
             emphasized: true
             color: MeoTheme.contentOnSurface
-            visible: DisplayBackend.available
+            visible: !root.nightLightOnly && DisplayBackend.available
         }
 
         GridLayout {
@@ -320,7 +338,7 @@ Item {
             columns: Math.max(1, Math.min(3, page.contentPreferredColumns))
             columnSpacing: 12 * MeoTheme.globalScale
             rowSpacing: 12 * MeoTheme.globalScale
-            visible: DisplayBackend.outputs.length > 0
+            visible: !root.nightLightOnly && DisplayBackend.outputs.length > 0
 
             Repeater {
                 model: DisplayBackend.outputs
@@ -460,7 +478,7 @@ Item {
         MeoEmptyState {
             width: parent.width
             height: 260 * MeoTheme.globalScale
-            visible: DisplayBackend.available && DisplayBackend.outputs.length === 0
+            visible: !root.nightLightOnly && DisplayBackend.available && DisplayBackend.outputs.length === 0
             icon: "monitor_off"
             title: qsTr("No connected displays")
             description: qsTr("No display configuration was reported by this session.")
@@ -470,14 +488,32 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
-            visible: root.advancedRows.length > 0
+            visible: !root.nightLightOnly && root.advancedRows.length > 0
             title: qsTr("Advanced display configuration")
             subtitle: qsTr("Use these tools for display options that need device-specific recovery or scheduling.")
             model: root.advancedRows
             onRowActivated: (index, row) => root.navigateTo(row.route)
         }
 
+        MeoSettingsGroup {
+            width: parent.width
+            visible: root.nightLightOnly && KcmBridge.isAvailable("kcm_nightlight")
+            title: qsTr("Advanced")
+            subtitle: qsTr("Use KDE's maintained module for additional device-specific scheduling controls.")
+            model: [{
+                "title": qsTr("Night Light schedule and temperature"),
+                "subtitle": qsTr("Open advanced Night Light settings"),
+                "icon": "schedule",
+                "tone": "tertiary",
+                "route": "kcm:kcm_nightlight",
+                "trailingKind": "choice",
+                "trailingText": qsTr("Advanced")
+            }]
+            onRowActivated: (index, row) => root.navigateTo(row.route)
+        }
+
         RepairEntry {
+            visible: !root.nightLightOnly
             category: "display"
             entryTitle: qsTr("Troubleshoot displays")
         }
