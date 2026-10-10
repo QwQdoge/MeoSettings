@@ -1,7 +1,9 @@
 #include "../src/backends/backupbackend.h"
 
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QTemporaryDir>
 #include <QTest>
 
 namespace
@@ -98,6 +100,7 @@ private Q_SLOTS:
     void buildsOnlyWhitelistedApplicationMetadata();
     void buildsPortableMeoSettings();
     void representsUnavailableApplicationInventory();
+    void buildsStructuredRestorePreviewPlan();
     void rejectsSecretsAndUnexpectedFields();
     void rejectsNonCanonicalSettings();
     void rejectsUnsafeApplicationMetadata();
@@ -187,6 +190,63 @@ void BackupBackendTest::representsUnavailableApplicationInventory()
     });
     tampered.insert(QStringLiteral("contents"), tamperedContents);
     QVERIFY(!BackupManifestContract::validate(tampered, &error));
+}
+
+void BackupBackendTest::buildsStructuredRestorePreviewPlan()
+{
+    QString error;
+    const QVariantList apps{
+        QVariantMap{
+            {QStringLiteral("id"), QStringLiteral("org.example.App")},
+            {QStringLiteral("sourceId"), QStringLiteral("flatpak")},
+        },
+    };
+    const auto manifest = BackupManifestContract::build(
+        apps, portableSettings(), QStringLiteral("2026-10-10T02:00:00Z"), &error);
+    QVERIFY2(!manifest.isEmpty(), qPrintable(error));
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("backup.json"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write(QJsonDocument(manifest).toJson(QJsonDocument::Compact)) > 0, true);
+    file.close();
+
+    BackupBackend backend(nullptr);
+    QVERIFY(backend.previewLocalManifest(path));
+    QVERIFY(backend.previewValid());
+    const QVariantList plan = backend.previewPlan();
+    QCOMPARE(plan.size(), 9);
+
+    const auto rowFor = [&plan](const QString &id) {
+        for (const QVariant &value : plan) {
+            const QVariantMap row = value.toMap();
+            if (row.value(QStringLiteral("id")).toString() == id)
+                return row;
+        }
+        return QVariantMap{};
+    };
+
+    QCOMPARE(rowFor(QStringLiteral("applications")).value(QStringLiteral("state")).toString(),
+             QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("applications")).value(QStringLiteral("count")).toInt(), 1);
+    QCOMPARE(rowFor(QStringLiteral("control-center")).value(QStringLiteral("state")).toString(),
+             QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("top-bar")).value(QStringLiteral("state")).toString(),
+             QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("shelf")).value(QStringLiteral("state")).toString(),
+             QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("notifications")).value(QStringLiteral("state")).toString(),
+             QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("time-center")).value(QStringLiteral("state")).toString(),
+             QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("top-tasks")).value(QStringLiteral("state")).toString(),
+             QStringLiteral("included"));
+    QCOMPARE(rowFor(QStringLiteral("user-data")).value(QStringLiteral("state")).toString(),
+             QStringLiteral("not-included"));
+    QCOMPARE(rowFor(QStringLiteral("accounts-secrets")).value(QStringLiteral("state")).toString(),
+             QStringLiteral("not-included"));
 }
 
 void BackupBackendTest::rejectsSecretsAndUnexpectedFields()
