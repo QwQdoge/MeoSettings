@@ -337,19 +337,17 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Backup & restore")
-            subtitle: qsTr("Local manifests are saved to Documents/Meo Backups. They contain the verified application reinstall list and available portable Meo presentation settings. User-data payloads and Apply Restore remain disabled.")
+            subtitle: qsTr("Local manifests are saved to Documents/Meo Backups. Portable Meo settings are always backed up; the verified application reinstall list is included when OmniStore inventory is available and otherwise marked unavailable. User-data payloads and Apply Restore remain disabled.")
             model: [
                 {
                     "id": "local-manifest",
                     "title": qsTr("Local backup manifest"),
-                    "subtitle": OmniStoreAppsBackend.available
-                                ? BackupBackend.summary
-                                : qsTr("Refresh the OmniStore application inventory before creating a backup."),
+                    "subtitle": BackupBackend.summary,
                     "icon": "backup",
                     "tone": "tertiary",
                     "trailingKind": "action",
                     "actionText": BackupBackend.busy ? qsTr("Backing up…") : qsTr("Back up now"),
-                    "enabled": BackupBackend.available && OmniStoreAppsBackend.available && !BackupBackend.busy
+                    "enabled": BackupBackend.available && !BackupBackend.busy
                 },
                 {
                     "id": "restore-preview",
