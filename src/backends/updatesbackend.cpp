@@ -317,7 +317,13 @@ UpdatesBackend::UpdatesBackend(QObject *parent)
         }
     });
     connect(m_timeoutTimer, &QTimer::timeout, this, &UpdatesBackend::stageTimedOut);
-    refresh();
+    // Keep construction cheap. Reading update candidates can launch a chain of
+    // helpers with a 15-second timeout per stage, so only probe local
+    // capabilities here. The Updates page requests the snapshot after it has
+    // painted its shell.
+    updateRuntimeAvailability();
+    updateCachedMetadataTimestamp();
+    setAvailable(pacmanAvailable());
 }
 
 QVariantList UpdatesBackend::updates() const { return m_updates; }
