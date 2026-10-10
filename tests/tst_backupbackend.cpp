@@ -1,6 +1,7 @@
 #include "../src/backends/backupbackend.h"
 
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QTest>
 
 namespace
