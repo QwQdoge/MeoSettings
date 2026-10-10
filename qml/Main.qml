@@ -16,6 +16,7 @@ ApplicationWindow {
 
     property string currentRoute: "home"
     property string lastLoadedRoute: ""
+    property var navigationHistory: []
     // A Settings session is required to consume the complete platform HCT
     // palette before it shows content.  Fixed MeoUI colors remain available
     // only for non-session previews, not as a silent product fallback.
@@ -37,6 +38,9 @@ ApplicationWindow {
     readonly property bool usesDesktopSettingsIndex: rootMetrics.isExpandedWidth
                                                      || rootMetrics.isLargeWidth
                                                      || rootMetrics.isExtraLargeWidth
+    readonly property bool desktopDetailRoute: usesDesktopSettingsIndex
+                                                && currentRoute !== "home"
+                                                && !currentRoute.startsWith("category:")
     signal pageReady(string route)
 
     MeoWindowMetrics {
@@ -132,6 +136,17 @@ ApplicationWindow {
         return navigationRouteFor(route)
     }
 
+    function activationRoute(entry) {
+        if (!entry)
+            return ""
+        // Some registry entries intentionally share a native implementation.
+        // Keep their identity when navigating so the destination can present
+        // the requested section instead of dropping users at a generic page.
+        if (entry.id === "night-light" || entry.id === "app-permissions")
+            return entry.id
+        return entry.route || entry.id || ""
+    }
+
     // Desktop follows Caelestia Nexus' search-first, connected-group rhythm:
     // a small set of high-signal destinations stays visible, while the full
     // registry remains available through category pages and search. Nothing is
@@ -213,8 +228,9 @@ ApplicationWindow {
             const entry = results[index]
             if (!root.capabilityAvailable(entry.capability))
                 continue
-            const kcmRoute = String(entry.route || "").startsWith("kcm:")
-            const available = !kcmRoute || KcmBridge.isAvailable(String(entry.route).slice(4))
+            const route = root.activationRoute(entry)
+            const kcmRoute = String(route).startsWith("kcm:")
+            const available = !kcmRoute || KcmBridge.isAvailable(String(route).slice(4))
             rows.push({
                 "title": entry.title,
                 "subtitle": available ? entry.category + " · " + entry.description
@@ -222,7 +238,7 @@ ApplicationWindow {
                 "leadingIcon": entry.icon,
                 "leadingTone": entry.tone || "primary",
                 "leadingStyle": "tonal",
-                "route": entry.route,
+                "route": route,
                 "enabled": available,
                 "trailingKind": kcmRoute ? "choice" : "navigation",
                 "trailingText": kcmRoute ? qsTr("Advanced") : ""
@@ -232,7 +248,7 @@ ApplicationWindow {
     }
 
     function pageSource(route) {
-        if (route === "category:privacy" || route === "privacy")
+        if (route === "category:privacy" || route === "privacy" || route === "app-permissions")
             return Qt.resolvedUrl("pages/PrivacyPage.qml")
         if (route.startsWith("category:"))
             return Qt.resolvedUrl("pages/CategoryPage.qml")
@@ -248,7 +264,8 @@ ApplicationWindow {
         case "keyboard": return Qt.resolvedUrl("pages/KeyboardPage.qml")
         case "mouse":
         case "touchpad": return Qt.resolvedUrl("pages/InputDevicesPage.qml")
-        case "display": return Qt.resolvedUrl("pages/DisplayPage.qml")
+        case "display":
+        case "night-light": return Qt.resolvedUrl("pages/DisplayPage.qml")
         case "power": return Qt.resolvedUrl("pages/PowerPage.qml")
         case "performance": return Qt.resolvedUrl("pages/PerformancePage.qml")
         case "date-time": return Qt.resolvedUrl("pages/DateTimePage.qml")
@@ -288,8 +305,16 @@ ApplicationWindow {
             "rootMetrics": rootMetrics
         }
         if (route === "filetypes") common.fileTypesOnly = true
-        if (route === "mouse" || route === "touchpad") {
-            common.deviceFilter = route
+        if (route === "mouse") {
+            // The registry labels this route “Mouse & touchpad”, so show both
+            // families instead of silently filtering the touchpad out.
+            common.deviceFilter = "all"
+        } else if (route === "touchpad") {
+            common.deviceFilter = "touchpad"
+        } else if (route === "night-light") {
+            common.focusSection = "night-light"
+        } else if (route === "app-permissions") {
+            common.focusSection = "app-permissions"
         } else if (route === "applications") {
             common.requestedAppId = requestedApplicationId
             common.requestedAppName = requestedApplicationName
@@ -330,18 +355,34 @@ ApplicationWindow {
     }
 
     function navigateBack() {
+        if (navigationHistory.length > 0) {
+            const previousRoute = navigationHistory[navigationHistory.length - 1]
+            navigationHistory = navigationHistory.slice(0, navigationHistory.length - 1)
+            navigate(previousRoute, false)
+            return
+        }
         const parentRoute = parentRouteFor(currentRoute)
         if (parentRoute)
-            navigate(parentRoute)
+            navigate(parentRoute, false)
     }
 
-    function navigate(route) {
+    function navigate(route, recordHistory) {
         if (!route)
             return
+        const shouldRecordHistory = recordHistory === undefined ? true : Boolean(recordHistory)
         const targetRoute = pageSource(route) === Qt.resolvedUrl("pages/HomePage.qml") && route !== "home"
                             ? "home" : route
         if (targetRoute === currentRoute && pageHost.initialized)
             return
+
+        if (shouldRecordHistory && currentRoute !== targetRoute) {
+            const nextHistory = navigationHistory.slice(0)
+            if (nextHistory.length === 0 || nextHistory[nextHistory.length - 1] !== currentRoute)
+                nextHistory.push(currentRoute)
+            // Settings navigation should stay bounded even during long search
+            // sessions; old entries are no longer useful after many hops.
+            navigationHistory = nextHistory.slice(Math.max(0, nextHistory.length - 32))
+        }
 
         const previousIndex = sidebarIndexForRoute(currentRoute)
         const nextIndex = sidebarIndexForRoute(targetRoute)
@@ -433,7 +474,7 @@ ApplicationWindow {
                     icon.name: root.currentRoute === "home" ? "menu" : "arrow_back"
                     Accessible.name: root.currentRoute === "home"
                                      ? qsTr("Open settings categories")
-                                     : qsTr("Back to settings category")
+                                     : qsTr("Back")
                     onClicked: {
                         if (root.currentRoute === "home")
                             navigation.openSidebar()
@@ -444,11 +485,32 @@ ApplicationWindow {
             }
         }
 
+        // Wide layouts retain the persistent sidebar, but a detail page still
+        // needs an explicit way to leave its second-level context. Showing the
+        // parent category here avoids duplicating the page's own large title.
+        MeoTopAppBar {
+            id: desktopBackBar
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            visible: root.desktopDetailRoute
+            title: root.titleForRoute(root.parentRouteFor(root.currentRoute))
+            type: "small"
+            navigationIcon: Component {
+                MeoIconButton {
+                    icon.name: "arrow_back"
+                    Accessible.name: qsTr("Back")
+                    onClicked: root.navigateBack()
+                }
+            }
+        }
+
         MeoPageHost {
             id: pageHost
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: compactTopBar.visible ? compactTopBar.bottom : parent.top
+            anchors.top: compactTopBar.visible ? compactTopBar.bottom
+                         : (desktopBackBar.visible ? desktopBackBar.bottom : parent.top)
             anchors.bottom: parent.bottom
             transitionDistance: 32 * MeoTheme.globalScale
             loadingPlaceholder: settingsPageLoadingPlaceholder
@@ -467,6 +529,6 @@ ApplicationWindow {
         // The bridge only reads the active KDE theme; it never applies or
         // rewrites desktop colors from Settings.
         MeoShellTheme.sync()
-        navigate("home")
+        navigate("home", false)
     }
 }
