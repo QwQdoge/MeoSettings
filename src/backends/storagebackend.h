@@ -67,6 +67,7 @@ class StorageBackend final : public BackendBase
     Q_PROPERTY(QVariantList volumes READ volumes NOTIFY changed)
     Q_PROPERTY(QString summary READ summary NOTIFY changed)
     Q_PROPERTY(int mountedVolumeCount READ mountedVolumeCount NOTIFY changed)
+    Q_PROPERTY(bool initialized READ initialized NOTIFY changed)
     Q_PROPERTY(QVariantList categoryUsage READ categoryUsage NOTIFY usageChanged)
     Q_PROPERTY(bool usageScanActive READ usageScanActive NOTIFY usageChanged)
     Q_PROPERTY(QString usageScanSummary READ usageScanSummary NOTIFY usageChanged)
@@ -80,6 +81,7 @@ public:
     QVariantList volumes() const;
     QString summary() const;
     int mountedVolumeCount() const;
+    bool initialized() const;
     QVariantList categoryUsage() const;
     bool usageScanActive() const;
     QString usageScanSummary() const;
@@ -115,4 +117,5 @@ private:
     QString m_usageScanError;
     QString m_usageScanUpdatedAt;
     bool m_usageScanActive = false;
+    bool m_initialized = false;
 };
