@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import MeoUI
 
 Item {
@@ -313,6 +314,14 @@ Item {
         return rows
     }
 
+    FileDialog {
+        id: restoreManifestDialog
+        title: qsTr("Choose a Meo backup manifest")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [qsTr("Meo backup manifests (*.json)"), qsTr("JSON files (*.json)")]
+        onAccepted: BackupBackend.previewManifestUrl(selectedFile)
+    }
+
     MeoPageLayout {
         id: page
         anchors.fill: parent
@@ -321,14 +330,14 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : qsTr("Storage & backup")
-        subtitle: qsTr("Inspect storage, create a safe local backup manifest, and keep system recovery as a separate verified workflow.")
+        subtitle: qsTr("Inspect storage, create safe portable backups, and keep system recovery as a separate verified workflow.")
 
         MeoBanner { width: parent.width; visible: StorageBackend.error !== ""; title: qsTr("Storage operation needs attention"); text: StorageBackend.error; tone: "error" }
 
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Backup & restore")
-            subtitle: qsTr("Local manifests are saved to Documents/Meo Backups. This first version records only the verified OmniStore application reinstall list; settings and user-data restore remain disabled until their backends are verified.")
+            subtitle: qsTr("Local manifests are saved to Documents/Meo Backups. They contain the verified application reinstall list and available portable Meo presentation settings. User-data payloads and Apply Restore remain disabled.")
             model: [
                 {
                     "id": "local-manifest",
@@ -343,6 +352,20 @@ Item {
                     "enabled": BackupBackend.available && OmniStoreAppsBackend.available && !BackupBackend.busy
                 },
                 {
+                    "id": "restore-preview",
+                    "title": BackupBackend.previewValid
+                             ? qsTr("Restore preview ready")
+                             : qsTr("Preview a backup"),
+                    "subtitle": BackupBackend.previewValid
+                                ? BackupBackend.previewSummary
+                                : qsTr("Choose a local Meo backup manifest to validate it. Previewing never changes the current system."),
+                    "icon": "preview",
+                    "tone": "secondary",
+                    "trailingKind": "action",
+                    "actionText": BackupBackend.previewValid ? qsTr("Choose another") : qsTr("Choose file"),
+                    "enabled": !BackupBackend.busy
+                },
+                {
                     "id": "system-recovery",
                     "title": qsTr("System recovery"),
                     "subtitle": qsTr("Snapshots, fallback kernel, repair, and OS rollback stay in Recovery."),
@@ -355,6 +378,8 @@ Item {
             onRowActionTriggered: (index, row) => {
                 if (row.id === "local-manifest")
                     BackupBackend.createLocalManifest()
+                else if (row.id === "restore-preview")
+                    restoreManifestDialog.open()
             }
             onRowActivated: (index, row) => {
                 if (row.route)
@@ -365,7 +390,7 @@ Item {
         MeoBanner {
             width: parent.width
             visible: BackupBackend.error !== ""
-            title: qsTr("Backup needs attention")
+            title: qsTr("Backup or restore preview needs attention")
             text: BackupBackend.error
             tone: "error"
         }
@@ -408,6 +433,15 @@ Item {
                         typeSize: "small"
                         color: MeoTheme.contentOnSurfaceVariant
                         wrapMode: Text.WrapAnywhere
+                    }
+                    MeoText {
+                        width: parent.width
+                        visible: BackupBackend.previewValid
+                        text: qsTr("Preview only · no settings, applications, or data have been changed.")
+                        typeRole: "label"
+                        typeSize: "small"
+                        color: MeoTheme.secondary
+                        wrapMode: Text.WordWrap
                     }
                 }
             }
