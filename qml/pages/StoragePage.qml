@@ -68,6 +68,88 @@ Item {
         }
     }
 
+    function restorePlanTitle(id) {
+        switch (id) {
+        case "applications": return qsTr("Applications")
+        case "control-center": return qsTr("Control Center")
+        case "top-bar": return qsTr("Top Bar")
+        case "shelf": return qsTr("Shelf & Launcher")
+        case "notifications": return qsTr("Notifications")
+        case "time-center": return qsTr("Time Center")
+        case "top-tasks": return qsTr("Top Tasks")
+        case "user-data": return qsTr("User data")
+        case "accounts-secrets": return qsTr("Accounts & secrets")
+        default: return qsTr("Backup category")
+        }
+    }
+
+    function restorePlanIcon(id) {
+        switch (id) {
+        case "applications": return "apps"
+        case "control-center": return "tune"
+        case "top-bar": return "dashboard"
+        case "shelf": return "apps"
+        case "notifications": return "notifications"
+        case "time-center": return "schedule"
+        case "top-tasks": return "checklist"
+        case "user-data": return "folder"
+        case "accounts-secrets": return "shield"
+        default: return "backup"
+        }
+    }
+
+    function restorePlanStatus(state) {
+        switch (state) {
+        case "included": return qsTr("Included")
+        case "unavailable": return qsTr("Unavailable")
+        default: return qsTr("Not included")
+        }
+    }
+
+    function restorePlanSubtitle(item) {
+        if (item.id === "applications") {
+            if (item.state === "included")
+                return qsTr("%n application reinstall record(s) are included.", "", Number(item.count) || 0)
+            return qsTr("Application inventory was unavailable when this backup was created.")
+        }
+        if (item.id === "control-center")
+            return item.state === "included" ? qsTr("Quick Settings tile order, size, visibility, and density can be restored.") : qsTr("Control Center layout is not included in this backup.")
+        if (item.id === "top-bar")
+            return item.state === "included" ? qsTr("Top Bar presentation and visibility settings can be restored.") : qsTr("Top Bar settings are not included in this backup.")
+        if (item.id === "shelf")
+            return item.state === "included" ? qsTr("Shelf and Launcher presentation settings can be restored.") : qsTr("Shelf and Launcher settings are not included in this backup.")
+        if (item.id === "notifications")
+            return item.state === "included" ? qsTr("Notification surface presentation settings can be restored.") : qsTr("Notification presentation settings are not included in this backup.")
+        if (item.id === "time-center")
+            return item.state === "included" ? qsTr("Time Center presentation settings can be restored.") : qsTr("Time Center settings are not included in this backup.")
+        if (item.id === "top-tasks")
+            return item.state === "included" ? qsTr("Top Tasks presentation settings can be restored.") : qsTr("Top Tasks settings are not included in this backup.")
+        if (item.id === "user-data")
+            return qsTr("Manifest v1 does not include user-data payloads.")
+        if (item.id === "accounts-secrets")
+            return qsTr("Passwords, sessions, credentials, KWallet contents, and provider keys are not included. Secret-backed services reconnect separately after restore.")
+        return qsTr("This category is not included in the selected backup.")
+    }
+
+    readonly property var restorePlanRows: {
+        const rows = []
+        const plan = BackupBackend.previewPlan || []
+        for (let index = 0; index < plan.length; ++index) {
+            const item = plan[index]
+            rows.push({
+                "id": item.id,
+                "title": root.restorePlanTitle(item.id),
+                "subtitle": root.restorePlanSubtitle(item),
+                "icon": root.restorePlanIcon(item.id),
+                "tone": item.state === "included" ? "primary" : (item.state === "unavailable" ? "tertiary" : "neutral"),
+                "trailingKind": "status",
+                "trailingText": root.restorePlanStatus(item.state),
+                "interactive": false
+            })
+        }
+        return rows
+    }
+
     function categoryIcon(categoryId) {
         switch (categoryId) {
         case "images": return "image"
@@ -391,6 +473,14 @@ Item {
             title: qsTr("Backup or restore preview needs attention")
             text: BackupBackend.error
             tone: "error"
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: BackupBackend.previewValid && root.restorePlanRows.length > 0
+            title: qsTr("Restore plan")
+            subtitle: qsTr("Preview only. These categories describe what the selected backup could restore. Nothing has been applied to this system.")
+            model: root.restorePlanRows
         }
 
         MeoCard {
