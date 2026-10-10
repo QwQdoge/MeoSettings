@@ -54,6 +54,7 @@ class BackupBackend final : public BackendBase
     Q_PROPERTY(QString lastBackupAt READ lastBackupAt NOTIFY changed)
     Q_PROPERTY(QString previewSummary READ previewSummary NOTIFY changed)
     Q_PROPERTY(QString previewPath READ previewPath NOTIFY changed)
+    Q_PROPERTY(QVariantList previewPlan READ previewPlan NOTIFY changed)
     Q_PROPERTY(bool previewValid READ previewValid NOTIFY changed)
 
 public:
@@ -65,6 +66,7 @@ public:
     QString lastBackupAt() const;
     QString previewSummary() const;
     QString previewPath() const;
+    QVariantList previewPlan() const;
     bool previewValid() const;
 
     void setPortableSettingsSources(QObject *controlCenterBackend,
@@ -89,6 +91,7 @@ Q_SIGNALS:
 
 private:
     QVariantMap portableSettingsSnapshot(QString *error = nullptr) const;
+    QVariantList restorePreviewPlan(const QJsonObject &manifest) const;
     bool createLocalManifestInternal(const QVariantMap &settings);
 
     OmniStoreAppsBackend *m_appsBackend = nullptr;
@@ -98,6 +101,7 @@ private:
     QString m_lastBackupAt;
     QString m_previewSummary;
     QString m_previewPath;
+    QVariantList m_previewPlan;
     bool m_lastApplicationInventoryIncluded = false;
     bool m_previewValid = false;
 };
