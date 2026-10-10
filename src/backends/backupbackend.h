@@ -1,8 +1,6 @@
 #pragma once
 
 #include "../core/backendbase.h"
-#include "controlcenterbackend.h"
-#include "shellsettingsbackend.h"
 
 #include <QFile>
 #include <QFileInfo>
@@ -17,8 +15,6 @@
 #include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
-
-#include <initializer_list>
 
 class OmniStoreAppsBackend;
 
@@ -43,19 +39,12 @@ public:
 /**
  * Creates and inspects a deliberately non-secret Meo backup manifest.
  *
- * The manifest is a portable product backup, not a filesystem snapshot. It
- * projects OmniStore's validated application inventory when one is available
- * and a tightly whitelisted set of Meo-owned presentation settings. An absent
- * application snapshot is recorded as unavailable rather than as zero apps.
- * It never copies KWallet, Account sessions, provider keys, device credentials,
- * filesystem paths, arbitrary application data, or privileged system config.
- *
- * Preview remains read-only. Applying a preview reopens and revalidates the
- * selected manifest to avoid trusting stale preview state, then serializes the
- * existing Meo-owned backend save operations. A step advances only after the
- * corresponding backend emits its explicit saved signal. Any backend error or
- * timeout stops the sequence and reports a partial result; applications,
- * user-data payloads, secrets, and system recovery are never applied here.
+ * Preview is read-only. Applying a preview reopens and revalidates the file,
+ * then serializes the already-registered Meo settings capabilities. The backup
+ * coordinator intentionally talks to those capabilities through QObject's
+ * public property/signal/invokable contract rather than linking their concrete
+ * implementations; this keeps the backup manifest contract independently
+ * testable and avoids creating a second settings authority.
  */
 class BackupBackend final : public BackendBase
 {
@@ -81,6 +70,8 @@ public:
     QString lastBackupAt() const;
     QString previewSummary() const;
     QString previewPath() const;
+    bool previewValid() const;
+
     QVariantList previewPlan() const
     {
         if (!m_previewValid || m_previewPath.isEmpty())
@@ -139,7 +130,6 @@ public:
             row(QStringLiteral("accounts-secrets"), QStringLiteral("not-included")),
         };
     }
-    bool previewValid() const;
 
     QString restoreState() const { return m_restoreState; }
     QString restoreSummary() const { return m_restoreSummary; }
@@ -163,6 +153,7 @@ public:
             setError(tr("Choose a local Meo backup manifest."));
             return false;
         }
+        resetRestoreStatus();
         return previewLocalManifest(url.toLocalFile());
     }
     Q_INVOKABLE void clearPreview();
@@ -226,20 +217,19 @@ public:
             return false;
         }
 
-        auto *control = qobject_cast<ControlCenterBackend *>(m_controlCenterBackend.data());
-        auto *shellBackend = qobject_cast<ShellSettingsBackend *>(m_shellSettingsBackend.data());
         const bool needsControl = controlCenter.contains(QStringLiteral("layout"))
             || controlCenter.contains(QStringLiteral("topBar"));
         const bool needsShell = !shell.isEmpty();
-        if (needsControl && (!control || !control->available())) {
+        if (needsControl && !backendReady(m_controlCenterBackend.data())) {
             setError(tr("The active Meo Control Center is unavailable, so this restore cannot start."));
             return false;
         }
-        if (needsShell && (!shellBackend || !shellBackend->available())) {
+        if (needsShell && !backendReady(m_shellSettingsBackend.data())) {
             setError(tr("The active Meo shell surfaces are unavailable, so this restore cannot start."));
             return false;
         }
-        if ((control && control->busy()) || (shellBackend && shellBackend->busy())) {
+        if ((m_controlCenterBackend && m_controlCenterBackend->property("busy").toBool())
+            || (m_shellSettingsBackend && m_shellSettingsBackend->property("busy").toBool())) {
             setError(tr("Wait for the current shell settings operation to finish before restoring."));
             return false;
         }
@@ -259,9 +249,44 @@ Q_SIGNALS:
     void changed();
     void restoreFinished(bool success);
 
+private Q_SLOTS:
+    void handleRestoreStepSaved()
+    {
+        finishRestoreStep();
+    }
+
+    void handleRestoreBackendError()
+    {
+        if (m_restoreState != QLatin1String("applying") || !m_restoreActiveBackend)
+            return;
+        const QString detail = m_restoreActiveBackend->property("error").toString();
+        if (!detail.isEmpty())
+            failRestoreStep(detail);
+    }
+
 private:
     QVariantMap portableSettingsSnapshot(QString *error = nullptr) const;
     bool createLocalManifestInternal(const QVariantMap &settings);
+
+    bool backendReady(QObject *backend) const
+    {
+        return backend && backend->property("available").toBool();
+    }
+
+    void resetRestoreStatus()
+    {
+        if (m_restoreState == QLatin1String("applying"))
+            return;
+        m_restoreSettings.clear();
+        m_restoreQueue.clear();
+        m_restoreResults.clear();
+        m_restoreCurrentStep.clear();
+        m_restoreState = QStringLiteral("idle");
+        m_restoreSummary.clear();
+        m_restoreCompletedCount = 0;
+        ++m_restoreGeneration;
+        Q_EMIT changed();
+    }
 
     void disconnectRestoreStep()
     {
@@ -269,6 +294,7 @@ private:
         QObject::disconnect(m_restoreErrorConnection);
         m_restoreSuccessConnection = {};
         m_restoreErrorConnection = {};
+        m_restoreActiveBackend.clear();
     }
 
     void appendRestoreResult(const QString &id, const QString &state, const QString &detail = {})
@@ -301,13 +327,32 @@ private:
 
     void finishRestoreStep()
     {
-        if (m_restoreState != QLatin1String("applying"))
+        if (m_restoreState != Qatin1String("applying"))
             return;
         disconnectRestoreStep();
         ++m_restoreGeneration;
         appendRestoreResult(m_restoreCurrentStep, QStringLiteral("applied"));
         ++m_restoreCompletedCount;
         startNextRestoreStep();
+    }
+
+    bool connectRestoreSignals(QObject *source, const char *successSignal)
+    {
+        if (!source)
+            return false;
+        m_restoreActiveBackend = source;
+        m_restoreSuccessConnection = QObject::connect(
+            source, successSignal, this, SLOT(handleRestoreStepSaved()));
+        m_restoreErrorConnection = QObject::connect(
+            source, SIGNAL(errorChanged()), this, SLOT(handleRestoreBackendError()));
+        return static_cast<bool>(m_restoreSuccessConnection)
+            && static_cast<bool>(m_restoreErrorConnection);
+    }
+
+    bool invokeMapSave(QObject *source, const char *method, const QVariantMap &settings)
+    {
+        return QMetaObject::invokeMethod(source, method, Qt::DirectConnection,
+                                         Q_ARG(QVariantMap, settings));
     }
 
     void startNextRestoreStep()
@@ -328,77 +373,72 @@ private:
 
         m_restoreCurrentStep = m_restoreQueue.takeFirst();
         const int generation = ++m_restoreGeneration;
-        auto *control = qobject_cast<ControlCenterBackend *>(m_controlCenterBackend.data());
-        auto *shellBackend = qobject_cast<ShellSettingsBackend *>(m_shellSettingsBackend.data());
-        QObject *errorSource = nullptr;
+        QObject *source = nullptr;
+        const char *successSignal = nullptr;
+        const char *method = nullptr;
+        QVariantMap mapArgument;
+        bool layoutCall = false;
 
         const QVariantMap controlSettings = m_restoreSettings.value(QStringLiteral("controlCenter")).toMap();
         const QVariantMap shellSettings = m_restoreSettings.value(QStringLiteral("shell")).toMap();
 
         if (m_restoreCurrentStep == QLatin1String("control-center")) {
-            if (!control || control->busy()) {
-                failRestoreStep(tr("Control Center became unavailable or busy."));
-                return;
-            }
-            errorSource = control;
-            m_restoreSuccessConnection = connect(control, &ControlCenterBackend::layoutSaved,
-                                                 this, &BackupBackend::finishRestoreStep);
-            const QVariantMap layout = controlSettings.value(QStringLiteral("layout")).toMap();
-            connectRestoreError(errorSource, generation);
-            control->saveLayout(layout.value(QStringLiteral("tiles")).toList(),
-                                layout.value(QStringLiteral("density")).toString());
+            source = m_controlCenterBackend.data();
+            successSignal = SIGNAL(layoutSaved());
+            method = "saveLayout";
+            layoutCall = true;
+            mapArgument = controlSettings.value(QStringLiteral("layout")).toMap();
         } else if (m_restoreCurrentStep == QLatin1String("top-bar")) {
-            if (!control || control->busy()) {
-                failRestoreStep(tr("Top Bar became unavailable or busy."));
-                return;
-            }
-            errorSource = control;
-            m_restoreSuccessConnection = connect(control, &ControlCenterBackend::topBarSaved,
-                                                 this, &BackupBackend::finishRestoreStep);
-            connectRestoreError(errorSource, generation);
-            control->saveTopBar(controlSettings.value(QStringLiteral("topBar")).toMap());
+            source = m_controlCenterBackend.data();
+            successSignal = SIGNAL(topBarSaved());
+            method = "saveTopBar";
+            mapArgument = controlSettings.value(QStringLiteral("topBar")).toMap();
         } else if (m_restoreCurrentStep == QLatin1String("shelf")) {
-            if (!shellBackend || shellBackend->busy()) {
-                failRestoreStep(tr("Shelf became unavailable or busy."));
-                return;
-            }
-            errorSource = shellBackend;
-            m_restoreSuccessConnection = connect(shellBackend, &ShellSettingsBackend::shelfSaved,
-                                                 this, &BackupBackend::finishRestoreStep);
-            connectRestoreError(errorSource, generation);
-            shellBackend->saveShelf(shellSettings.value(QStringLiteral("shelf")).toMap());
+            source = m_shellSettingsBackend.data();
+            successSignal = SIGNAL(shelfSaved());
+            method = "saveShelf";
+            mapArgument = shellSettings.value(QStringLiteral("shelf")).toMap();
         } else if (m_restoreCurrentStep == QLatin1String("notifications")) {
-            if (!shellBackend || shellBackend->busy()) {
-                failRestoreStep(tr("Notifications became unavailable or busy."));
-                return;
-            }
-            errorSource = shellBackend;
-            m_restoreSuccessConnection = connect(shellBackend, &ShellSettingsBackend::notificationsSaved,
-                                                 this, &BackupBackend::finishRestoreStep);
-            connectRestoreError(errorSource, generation);
-            shellBackend->saveNotifications(shellSettings.value(QStringLiteral("notifications")).toMap());
+            source = m_shellSettingsBackend.data();
+            successSignal = SIGNAL(notificationsSaved());
+            method = "saveNotifications";
+            mapArgument = shellSettings.value(QStringLiteral("notifications")).toMap();
         } else if (m_restoreCurrentStep == QLatin1String("time-center")) {
-            if (!shellBackend || shellBackend->busy()) {
-                failRestoreStep(tr("Time Center became unavailable or busy."));
-                return;
-            }
-            errorSource = shellBackend;
-            m_restoreSuccessConnection = connect(shellBackend, &ShellSettingsBackend::timeCenterSaved,
-                                                 this, &BackupBackend::finishRestoreStep);
-            connectRestoreError(errorSource, generation);
-            shellBackend->saveTimeCenter(shellSettings.value(QStringLiteral("timeCenter")).toMap());
+            source = m_shellSettingsBackend.data();
+            successSignal = SIGNAL(timeCenterSaved());
+            method = "saveTimeCenter";
+            mapArgument = shellSettings.value(QStringLiteral("timeCenter")).toMap();
         } else if (m_restoreCurrentStep == QLatin1String("top-tasks")) {
-            if (!shellBackend || shellBackend->busy()) {
-                failRestoreStep(tr("Top Tasks became unavailable or busy."));
-                return;
-            }
-            errorSource = shellBackend;
-            m_restoreSuccessConnection = connect(shellBackend, &ShellSettingsBackend::topTasksSaved,
-                                                 this, &BackupBackend::finishRestoreStep);
-            connectRestoreError(errorSource, generation);
-            shellBackend->saveTopTasks(shellSettings.value(QStringLiteral("topTasks")).toMap());
+            source = m_shellSettingsBackend.data();
+            successSignal = SIGNAL(topTasksSaved());
+            method = "saveTopTasks";
+            mapArgument = shellSettings.value(QStringLiteral("topTasks")).toMap();
         } else {
             failRestoreStep(tr("The restore plan contains an unknown portable setting group."));
+            return;
+        }
+
+        if (!backendReady(source) || source->property("busy").toBool()) {
+            failRestoreStep(tr("The target shell settings surface became unavailable or busy."));
+            return;
+        }
+        if (!connectRestoreSignals(source, successSignal)) {
+            failRestoreStep(tr("The target shell settings surface does not expose the required restore confirmation signal."));
+            return;
+        }
+
+        bool invoked = false;
+        if (layoutCall) {
+            const QVariantList tiles = mapArgument.value(QStringLiteral("tiles")).toList();
+            const QString density = mapArgument.value(QStringLiteral("density")).toString();
+            invoked = QMetaObject::invokeMethod(source, method, Qt::DirectConnection,
+                                                Q_ARG(QVariantList, tiles),
+                                                Q_ARG(QString, density));
+        } else {
+            invoked = invokeMapSave(source, method, mapArgument);
+        }
+        if (!invoked) {
+            failRestoreStep(tr("The target shell settings surface does not expose the required restore operation."));
             return;
         }
 
@@ -407,23 +447,6 @@ private:
                 && generation == m_restoreGeneration) {
                 failRestoreStep(tr("The shell did not confirm this setting group within 30 seconds."));
             }
-        });
-    }
-
-    void connectRestoreError(QObject *source, int generation)
-    {
-        auto *backend = qobject_cast<BackendBase *>(source);
-        if (!backend) {
-            failRestoreStep(tr("A restore backend is unavailable."));
-            return;
-        }
-        m_restoreErrorConnection = connect(backend, &BackendBase::errorChanged, this,
-                                           [this, backend, generation] {
-            if (m_restoreState != QLatin1String("applying")
-                || generation != m_restoreGeneration || backend->error().isEmpty()) {
-                return;
-            }
-            failRestoreStep(backend->error());
         });
     }
 
@@ -445,6 +468,7 @@ private:
     QString m_restoreSummary;
     int m_restoreCompletedCount = 0;
     int m_restoreGeneration = 0;
+    QPointer<QObject> m_restoreActiveBackend;
     QMetaObject::Connection m_restoreSuccessConnection;
     QMetaObject::Connection m_restoreErrorConnection;
 };
