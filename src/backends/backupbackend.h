@@ -327,7 +327,7 @@ private:
 
     void finishRestoreStep()
     {
-        if (m_restoreState != Qatin1String("applying"))
+        if (m_restoreState != QLatin1String("applying"))
             return;
         disconnectRestoreStep();
         ++m_restoreGeneration;
