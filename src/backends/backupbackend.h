@@ -7,9 +7,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 
-class ControlCenterBackend;
 class OmniStoreAppsBackend;
-class ShellSettingsBackend;
 
 class BackupManifestContract final
 {
@@ -32,9 +30,6 @@ public:
  * whitelisted set of Meo-owned presentation settings. It never copies KWallet,
  * Account sessions, provider keys, device credentials, filesystem paths,
  * arbitrary application data, or privileged system configuration.
- *
- * BackupBackend owns the projection from live Meo settings into the portable
- * schema. QML only asks for a backup; it never duplicates the schema itself.
  */
 class BackupBackend final : public BackendBase
 {
@@ -48,8 +43,6 @@ class BackupBackend final : public BackendBase
 
 public:
     explicit BackupBackend(OmniStoreAppsBackend *appsBackend,
-                           ControlCenterBackend *controlCenterBackend = nullptr,
-                           ShellSettingsBackend *shellSettingsBackend = nullptr,
                            QObject *parent = nullptr);
 
     QString summary() const;
@@ -60,6 +53,7 @@ public:
     bool previewValid() const;
 
     Q_INVOKABLE bool createLocalManifest();
+    Q_INVOKABLE bool createLocalManifestWithSettings(const QVariantMap &settings);
     Q_INVOKABLE bool previewLocalManifest(const QString &path);
     Q_INVOKABLE void clearPreview();
 
@@ -67,12 +61,9 @@ Q_SIGNALS:
     void changed();
 
 private:
-    QVariantMap portableSettingsSnapshot(QString *error = nullptr) const;
     bool createLocalManifestInternal(const QVariantMap &settings);
 
     OmniStoreAppsBackend *m_appsBackend = nullptr;
-    ControlCenterBackend *m_controlCenterBackend = nullptr;
-    ShellSettingsBackend *m_shellSettingsBackend = nullptr;
     QString m_lastBackupPath;
     QString m_lastBackupAt;
     QString m_previewSummary;
