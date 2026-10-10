@@ -481,7 +481,11 @@ OmniStoreAppsBackend::OmniStoreAppsBackend(QObject *parent)
         processError();
     });
     connect(m_timeoutTimer, &QTimer::timeout, this, &OmniStoreAppsBackend::processTimedOut);
-    refresh();
+    // Settings must not start a potentially 20-second application export just
+    // because the process was launched. Probe only the cheap executable
+    // capability here; Applications requests the snapshot after its first frame.
+    updateExecutableAvailability();
+    setAvailable(exporterAvailable());
 }
 
 QVariantList OmniStoreAppsBackend::sources() const
