@@ -129,7 +129,8 @@ public:
                                            const QString &displayName,
                                            const QString &endpoint,
                                            const QString &defaultModel,
-                                           const QString &apiKey);
+                                           const QString &apiKey,
+                                           bool automaticInferenceEnabled);
     Q_INVOKABLE void removeLocalAiConnection(const QString &id);
     Q_INVOKABLE void discoverLocalAiModels(const QString &id);
     Q_INVOKABLE void prepareIconImage(const QString &desktopId, const QString &applicationName,

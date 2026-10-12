@@ -129,6 +129,7 @@ Item {
         localAiEditor.displayName = connection.displayName || qsTr("Local Ollama")
         localAiEditor.endpoint = connection.endpoint || "http://127.0.0.1:11434"
         localAiEditor.defaultModel = connection.defaultModel || ""
+        localAiEditor.automaticInferenceEnabled = !!(connection.automaticInference && connection.automaticInference.enabled)
         localAiEditor.apiKey = ""
         localAiEditor.discoveredModels = []
         localAiEditor.saveThenDiscover = false
@@ -292,7 +293,7 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("AI & application icons")
-            subtitle: qsTr("Account AI keys stay encrypted in Meo Account. Device-only keys stay in the password wallet. Every prompt request must show provider, model, purpose and data before it runs.")
+            subtitle: qsTr("Account AI keys stay encrypted in Meo Account. Device-only keys stay in the password wallet. Per-request consent applies unless you explicitly allow typed system AI requests for a connection.")
             model: root.aiRows
             onRowActivated: (index, row) => { if (row.interactive) AccountBackend.openHostedAction("ai_providers") }
         }
@@ -355,6 +356,7 @@ Item {
         property string endpoint: "http://127.0.0.1:11434"
         property string defaultModel: ""
         property string apiKey: ""
+        property bool automaticInferenceEnabled: false
         property var discoveredModels: []
         property bool saveThenDiscover: false
         readonly property bool cloudProvider: provider !== "ollama"
@@ -369,7 +371,8 @@ Item {
             saveThenDiscover = defaultModel.trim() === ""
             AccountBackend.saveLocalAiConnection(connectionId, provider,
                                                    displayName, endpoint,
-                                                   defaultModel, apiKey)
+                                                   defaultModel, apiKey,
+                                                   automaticInferenceEnabled)
             apiKey = ""
         }
         onRejected: {
@@ -405,7 +408,10 @@ Item {
                             const providers = ["ollama", "openai_compatible"]
                             if (currentIndex < 0 || currentIndex >= providers.length)
                                 return
+                            if (localAiEditor.provider === providers[currentIndex])
+                                return
                             localAiEditor.provider = providers[currentIndex]
+                            localAiEditor.automaticInferenceEnabled = false
                             localAiEditor.discoveredModels = []
                             if (localAiEditor.provider === "ollama")
                                 localAiEditor.endpoint = "http://127.0.0.1:11434"
@@ -430,7 +436,10 @@ Item {
                                     ? qsTr("Only a loopback HTTP(S) address is accepted")
                                     : qsTr("Only a public HTTPS OpenAI-compatible endpoint is accepted")
                         maxLength: 2048
-                        onTextEdited: localAiEditor.endpoint = text
+                        onTextEdited: {
+                            localAiEditor.endpoint = text
+                            localAiEditor.automaticInferenceEnabled = false
+                        }
                     }
                     MeoTextField {
                         width: parent.width
@@ -482,6 +491,27 @@ Item {
                         onTextEdited: localAiEditor.apiKey = text
                     }
                     MeoButton {
+                        width: parent.width
+                        text: localAiEditor.automaticInferenceEnabled
+                              ? qsTr("Disable prompt-free system AI")
+                              : qsTr("Enable prompt-free system AI")
+                        type: "outlined"
+                        onClicked: {
+                            if (localAiEditor.automaticInferenceEnabled)
+                                localAiEditor.automaticInferenceEnabled = false
+                            else
+                                automaticInferenceDialog.open()
+                        }
+                    }
+                    MeoText {
+                        width: parent.width
+                        text: qsTr("When enabled, Meo AI Router may send your typed request text to this connection without asking each time. Files, screen content and system state are excluded. Save to apply or revoke this choice.")
+                        typeRole: "body"
+                        typeSize: "small"
+                        color: MeoTheme.contentOnSurfaceVariant
+                        wrapMode: Text.WordWrap
+                    }
+                    MeoButton {
                         visible: localAiEditor.connectionId !== ""
                         text: qsTr("Remove connection")
                         type: "text"
@@ -494,6 +524,16 @@ Item {
                 }
             }
         }
+    }
+
+    MeoDialog {
+        id: automaticInferenceDialog
+        title: qsTr("Allow prompt-free system AI?")
+        message: qsTr("Meo AI Router may send text you type in Meo AI to %1 for intent recognition without asking on each request. This permission does not include files, screen content or system state. You can disable it here at any time.")
+                 .arg(localAiEditor.displayName || qsTr("this AI connection"))
+        confirmText: qsTr("Allow typed requests")
+        cancelText: qsTr("Keep asking")
+        onConfirmed: localAiEditor.automaticInferenceEnabled = true
     }
 
     MeoDialog {

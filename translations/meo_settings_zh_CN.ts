@@ -138,6 +138,38 @@
 <context>
     <name>AccountsPage</name>
     <message>
+        <source>Enable prompt-free system AI</source>
+        <translation>启用免逐次提示的系统 AI</translation>
+    </message>
+    <message>
+        <source>Disable prompt-free system AI</source>
+        <translation>关闭免逐次提示的系统 AI</translation>
+    </message>
+    <message>
+        <source>When enabled, Meo AI Router may send your typed request text to this connection without asking each time. Files, screen content and system state are excluded. Save to apply or revoke this choice.</source>
+        <translation>启用后，Meo AI Router 可将你输入的请求文字发送到此连接，无须每次询问。文件、屏幕内容和系统状态不在授权范围内。保存后生效或撤销。</translation>
+    </message>
+    <message>
+        <source>Allow prompt-free system AI?</source>
+        <translation>允许系统 AI 免逐次提示吗？</translation>
+    </message>
+    <message>
+        <source>Meo AI Router may send text you type in Meo AI to %1 for intent recognition without asking on each request. This permission does not include files, screen content or system state. You can disable it here at any time.</source>
+        <translation>Meo AI Router 可将你在 Meo AI 中输入的文字发送到 %1 以识别意图，无须每次询问。此权限不包括文件、屏幕内容或系统状态。你可以随时在这里关闭。</translation>
+    </message>
+    <message>
+        <source>Allow typed requests</source>
+        <translation>允许发送输入的请求</translation>
+    </message>
+    <message>
+        <source>Keep asking</source>
+        <translation>继续逐次询问</translation>
+    </message>
+    <message>
+        <source>Account AI keys stay encrypted in Meo Account. Device-only keys stay in the password wallet. Per-request consent applies unless you explicitly allow typed system AI requests for a connection.</source>
+        <translation>账户 AI 密钥由 Meo Account 加密保存，设备连接的密钥保存在密码钱包中。除非你明确允许某个连接接收系统 AI 的输入请求，否则每次调用仍需同意。</translation>
+    </message>
+    <message>
         <location filename="../qml/pages/AccountsPage.qml" line="13"/>
         <location filename="../qml/pages/AccountsPage.qml" line="14"/>
         <source>Meo Account</source>
@@ -3959,6 +3991,10 @@ Total prompt: %7 characters</source>
 </context>
 <context>
     <name>PrivacyPage</name>
+    <message>
+        <source>May list enabled connection metadata; inference needs consent or a narrow permission you enable. Saved keys remain private.</source>
+        <translation>可列出已启用连接的元数据；推理需要你的同意或你开启的限定权限。已保存的密钥保持私密。</translation>
+    </message>
     <message>
         <location filename="../qml/pages/PrivacyPage.qml" line="16"/>
         <source>This advanced system tool is not installed</source>

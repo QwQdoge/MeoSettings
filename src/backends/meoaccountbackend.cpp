@@ -527,7 +527,8 @@ void MeoAccountBackend::saveLocalAiConnection(const QString &id,
                                               const QString &displayName,
                                               const QString &endpoint,
                                               const QString &defaultModel,
-                                              const QString &apiKey)
+                                              const QString &apiKey,
+                                              bool automaticInferenceEnabled)
 {
     clearError();
     if (!brokerIsRunning()) {
@@ -540,7 +541,8 @@ void MeoAccountBackend::saveLocalAiConnection(const QString &id,
                                  {QStringLiteral("displayName"), displayName},
                                  {QStringLiteral("endpoint"), endpoint},
                                  {QStringLiteral("defaultModel"), defaultModel},
-                                 {QStringLiteral("enabled"), true}};
+                                 {QStringLiteral("enabled"), true},
+                                 {QStringLiteral("automaticInferenceEnabled"), automaticInferenceEnabled}};
     QDBusInterface broker(serviceName(), objectPath(), interfaceName(), QDBusConnection::sessionBus());
     auto *watcher = new QDBusPendingCallWatcher(
         broker.asyncCall(QStringLiteral("UpsertLocalAiConnection"), connection, apiKey), this);

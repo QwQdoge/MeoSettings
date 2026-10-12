@@ -85,7 +85,7 @@ Item {
             rows.push({
                 "id": consumer.id,
                 "title": consumer.name || consumer.id,
-                "subtitle": qsTr("May list enabled connection metadata and request an operation after confirmation; cannot read saved keys"),
+                "subtitle": qsTr("May list enabled connection metadata; inference needs consent or a narrow permission you enable. Saved keys remain private."),
                 "icon": consumer.id === "org.meo.OmniStore" ? "apps" : "verified_user",
                 "tone": "secondary",
                 "trailingKind": "choice",
