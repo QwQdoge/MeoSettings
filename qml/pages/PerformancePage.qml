@@ -11,6 +11,8 @@ Item {
     property var rootMetrics: null
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
     readonly property int sampleInterval: 1000
+    readonly property int detailSampleInterval: 2000
+    readonly property int capacitySampleInterval: 5000
 
     function clamp(value, minimum, maximum) {
         if (!isFinite(value))
@@ -162,6 +164,9 @@ Item {
         "trailingKind": "navigation"
     }]
 
+    // High-signal usage values remain at 1 Hz. Temperatures, capacities and
+    // other slow-changing details sample less often so opening this page does
+    // not wake every KDE System Stats sensor at the same cadence.
     Sensors.Sensor {
         id: cpuUsage
         sensorId: "cpu/all/usage"
@@ -172,13 +177,13 @@ Item {
         id: cpuFrequency
         sensorId: "cpu/all/averageFrequency"
         enabled: root.visible
-        updateRateLimit: root.sampleInterval
+        updateRateLimit: root.detailSampleInterval
     }
     Sensors.Sensor {
         id: cpuTemperature
         sensorId: "cpu/all/maximumTemperature"
         enabled: root.visible
-        updateRateLimit: root.sampleInterval
+        updateRateLimit: root.detailSampleInterval
     }
     Sensors.Sensor {
         id: gpuUsage
@@ -190,13 +195,13 @@ Item {
         id: gpuUsedVram
         sensorId: "gpu/all/usedVram"
         enabled: root.visible
-        updateRateLimit: root.sampleInterval
+        updateRateLimit: root.detailSampleInterval
     }
     Sensors.Sensor {
         id: gpuTotalVram
         sensorId: "gpu/all/totalVram"
         enabled: root.visible
-        updateRateLimit: root.sampleInterval
+        updateRateLimit: root.capacitySampleInterval
     }
     Sensors.Sensor {
         id: memoryUsed
@@ -208,19 +213,19 @@ Item {
         id: memoryTotal
         sensorId: "memory/physical/total"
         enabled: root.visible
-        updateRateLimit: root.sampleInterval
+        updateRateLimit: root.capacitySampleInterval
     }
     Sensors.Sensor {
         id: swapUsed
         sensorId: "memory/swap/used"
         enabled: root.visible
-        updateRateLimit: root.sampleInterval
+        updateRateLimit: root.detailSampleInterval
     }
     Sensors.Sensor {
         id: swapTotal
         sensorId: "memory/swap/total"
         enabled: root.visible
-        updateRateLimit: root.sampleInterval
+        updateRateLimit: root.capacitySampleInterval
     }
     Sensors.Sensor {
         id: networkDownload
@@ -238,25 +243,25 @@ Item {
         id: gpuTemperatureModel
         sensors: ["gpu/(?!all).*/temperature"]
         enabled: root.visible
-        updateRateLimit: root.sampleInterval
+        updateRateLimit: root.detailSampleInterval
     }
     Sensors.SensorDataModel {
         id: diskReadModel
         sensors: ["disk/(?!all).*/read"]
         enabled: root.visible
-        updateRateLimit: root.sampleInterval
+        updateRateLimit: root.detailSampleInterval
     }
     Sensors.SensorDataModel {
         id: diskWriteModel
         sensors: ["disk/(?!all).*/write"]
         enabled: root.visible
-        updateRateLimit: root.sampleInterval
+        updateRateLimit: root.detailSampleInterval
     }
     Sensors.SensorDataModel {
         id: diskUsageModel
         sensors: ["disk/(?!all).*/usedPercent"]
         enabled: root.visible
-        updateRateLimit: 2000
+        updateRateLimit: root.capacitySampleInterval
     }
 
     MeoPageLayout {
@@ -449,15 +454,19 @@ Item {
                     width: parent.width
                     label: qsTr("Read")
                     iconName: "download"
-                    value: root.modelSum(diskReadModel) >= 0
-                           ? root.formatRate(root.modelSum(diskReadModel)) : "—"
+                    value: {
+                        const rate = root.modelSum(diskReadModel)
+                        return rate >= 0 ? root.formatRate(rate) : "—"
+                    }
                 }
                 MetricRow {
                     width: parent.width
                     label: qsTr("Write")
                     iconName: "upload"
-                    value: root.modelSum(diskWriteModel) >= 0
-                           ? root.formatRate(root.modelSum(diskWriteModel)) : "—"
+                    value: {
+                        const rate = root.modelSum(diskWriteModel)
+                        return rate >= 0 ? root.formatRate(rate) : "—"
+                    }
                 }
             }
         }

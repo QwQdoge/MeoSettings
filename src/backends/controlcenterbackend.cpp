@@ -118,7 +118,10 @@ QString scriptErrorMessage(const QDBusError &error)
 ControlCenterBackend::ControlCenterBackend(QObject *parent)
     : BackendBase(parent)
 {
-    refresh();
+    // Do not evaluate a PlasmaShell script while the Settings process is still
+    // building its first frame. The page requests the current layout after its
+    // shell is visible; construction only records whether PlasmaShell exists.
+    setAvailable(plasmaShellIsAvailable());
 }
 
 QVariantList ControlCenterBackend::tiles() const

@@ -7,7 +7,7 @@ class DefaultAppsBackend final : public BackendBase
 {
     Q_OBJECT
     Q_PROPERTY(QVariantList roles READ roles NOTIFY changed)
-    Q_PROPERTY(QStringList mimeTypes READ mimeTypes CONSTANT)
+    Q_PROPERTY(QStringList mimeTypes READ mimeTypes NOTIFY changed)
 public:
     explicit DefaultAppsBackend(QObject *parent = nullptr);
     QVariantList roles() const { return m_roles; }
@@ -19,6 +19,7 @@ public:
 Q_SIGNALS:
     void changed();
 private:
+    void ensureMimeTypes();
     bool supportedMime(const QString &mime) const;
     QVariantList m_roles;
     QStringList m_mimeTypes;

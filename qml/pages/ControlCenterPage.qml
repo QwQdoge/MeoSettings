@@ -371,11 +371,6 @@ Item {
         }
     ]
 
-    Component.onCompleted: {
-        loadDraft()
-        loadTopBarDraft()
-    }
-
     Connections {
         target: ControlCenterBackend
         function onChanged() {
@@ -386,6 +381,17 @@ Item {
         }
         function onLayoutSaved() { root.loadDraft() }
         function onTopBarSaved() { root.loadTopBarDraft() }
+    }
+
+    // Rendering the editor and all of its settings rows is independent from
+    // reading the live Plasma layout. Start the DBus script only after the page
+    // has had a frame to paint; onChanged above hydrates the drafts when it
+    // completes.
+    Timer {
+        interval: 50
+        repeat: false
+        running: true
+        onTriggered: ControlCenterBackend.refresh()
     }
 
     MeoPageLayout {

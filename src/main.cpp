@@ -407,7 +407,8 @@ int main(int argc, char *argv[])
                                          ? QStringLiteral("session-entry") : QString()));
     if (!startupRoute.isEmpty()
         && !QMetaObject::invokeMethod(root, "navigate",
-                                      Q_ARG(QVariant, QVariant(startupRoute)))) {
+                                      Q_ARG(QVariant, QVariant(startupRoute)),
+                                      Q_ARG(QVariant, QVariant(true)))) {
         qCritical() << "Meo Settings could not navigate to" << startupRoute;
         return EXIT_FAILURE;
     }
@@ -523,7 +524,8 @@ int main(int argc, char *argv[])
                                  return;
                              }
                              if (!QMetaObject::invokeMethod(rootObject, "navigate",
-                                                               Q_ARG(QVariant, QVariant(smokeRoutes.at(*routeIndex))))) {
+                                                               Q_ARG(QVariant, QVariant(smokeRoutes.at(*routeIndex))),
+                                                               Q_ARG(QVariant, QVariant(true)))) {
                                  qCritical() << "Meo Settings smoke navigation failed for" << smokeRoutes.at(*routeIndex);
                                  QCoreApplication::exit(EXIT_FAILURE);
                                  return;

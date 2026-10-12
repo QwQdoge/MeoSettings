@@ -100,6 +100,19 @@ Item {
         updateDetails.open()
     }
 
+    // A package inspection can involve several helper stages. Let the route,
+    // title, status card and controls render first, then begin that work. Even
+    // a slow helper now leaves a responsive Settings page on screen.
+    Timer {
+        interval: 50
+        repeat: false
+        running: true
+        onTriggered: {
+            if (!UpdatesBackend.busy && UpdatesBackend.pacmanAvailable)
+                UpdatesBackend.refresh()
+        }
+    }
+
     MeoPageLayout {
         id: page
         anchors.fill: parent

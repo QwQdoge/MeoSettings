@@ -7,7 +7,9 @@ Item {
 
     property var navigateTo: function(route) {}
     property var rootMetrics: null
+    property string focusSection: ""
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
+    readonly property bool appPermissionsOnly: focusSection === "app-permissions"
 
     function moduleRow(id, title, subtitle, icon) {
         const available = KcmBridge.isAvailable(id)
@@ -123,13 +125,26 @@ Item {
     MeoPageLayout {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
-        title: root.isCompact ? "" : qsTr("Privacy & security")
-        subtitle: qsTr("Review verifiable app sandbox access, then use maintained system tools for security-sensitive controls.")
+        title: root.isCompact ? "" : (root.appPermissionsOnly ? qsTr("App permissions") : qsTr("Privacy & security"))
+        subtitle: root.appPermissionsOnly
+                  ? qsTr("Review verified Flatpak sandbox permissions by application.")
+                  : qsTr("Review verifiable app sandbox access, then use maintained system tools for security-sensitive controls.")
 
-        MeoBanner { width: parent.width; visible: PortalPermissionsBackend.error !== ""; title: qsTr("Portal permission needs attention"); text: PortalPermissionsBackend.error; tone: "error" }
-        MeoText { width: parent.width; text: qsTr("Portal decisions apply to applications using that portal. They do not block direct device access by unsandboxed applications or end an existing capture session."); wrapMode: Text.WordWrap }
+        MeoBanner {
+            width: parent.width
+            visible: !root.appPermissionsOnly && PortalPermissionsBackend.error !== ""
+            title: qsTr("Portal permission needs attention")
+            text: PortalPermissionsBackend.error
+            tone: "error"
+        }
+        MeoText {
+            width: parent.width
+            visible: !root.appPermissionsOnly
+            text: qsTr("Portal decisions apply to applications using that portal. They do not block direct device access by unsandboxed applications or end an existing capture session.")
+            wrapMode: Text.WordWrap
+        }
         Repeater {
-            model: PortalPermissionsBackend.permissions
+            model: root.appPermissionsOnly ? [] : PortalPermissionsBackend.permissions
             delegate: MeoExposedDropdown {
                 required property var modelData
                 width: parent.width
@@ -140,7 +155,13 @@ Item {
                 onSelected: (index, value) => PortalPermissionsBackend.setPermission(modelData.resource, modelData.appId, modelData.choices[index])
             }
         }
-        MeoButton { text: qsTr("Refresh portal decisions"); type: "text"; enabled: !PortalPermissionsBackend.busy; onClicked: PortalPermissionsBackend.refresh() }
+        MeoButton {
+            visible: !root.appPermissionsOnly
+            text: qsTr("Refresh portal decisions")
+            type: "text"
+            enabled: !PortalPermissionsBackend.busy
+            onClicked: PortalPermissionsBackend.refresh()
+        }
 
         MeoCard {
             width: parent.width
@@ -180,6 +201,7 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
+            visible: !root.appPermissionsOnly
             title: qsTr("Credentials, AI, and account data")
             subtitle: qsTr("Local secrets stay in KWallet. Cloud privacy changes and exports require account verification.")
             model: root.credentialRows
@@ -188,7 +210,7 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
-            visible: root.localAiConsumerRows.length > 0
+            visible: !root.appPermissionsOnly && root.localAiConsumerRows.length > 0
             title: qsTr("Applications allowed to use device AI")
             subtitle: qsTr("These permissions come from root-installed package manifests. Remove the application package to revoke one; no application receives the provider key.")
             model: root.localAiConsumerRows
@@ -209,6 +231,7 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
+            visible: !root.appPermissionsOnly
             title: qsTr("Meo session entry")
             subtitle: qsTr("Preview Meo lock-screen presentation without changing KDE authentication")
             model: [{
@@ -224,6 +247,7 @@ Item {
 
         MeoSettingsGroup {
             width: parent.width
+            visible: !root.appPermissionsOnly
             title: qsTr("Security controls")
             subtitle: qsTr("These protected workflows retain their established system owner")
             model: [
@@ -270,6 +294,7 @@ Item {
         }
 
         RepairEntry {
+            visible: !root.appPermissionsOnly
             category: "security"
             entryTitle: qsTr("Check security problems")
         }
