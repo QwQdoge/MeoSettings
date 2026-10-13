@@ -705,8 +705,17 @@ Item {
                 if (row.id === "lock-screen")
                     Platform.lockScreen()
                 else if (row.id === "schedule-logout")
-                    SessionActions.scheduleLogout(30)
+                    signOutConfirmation.open()
             }
+        }
+
+        MeoDialog {
+            id: signOutConfirmation
+            title: qsTr("Sign out of this session?")
+            message: qsTr("Your session will close in 30 seconds. You can cancel the countdown.")
+            confirmText: qsTr("Sign out in 30 seconds")
+            cancelText: qsTr("Cancel")
+            onConfirmed: SessionActions.scheduleLogout(30)
         }
 
         MeoCard {
