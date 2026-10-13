@@ -182,7 +182,7 @@ private:
     void applyStatus(const QVariantMap &status, const QVariantMap &identity);
     void setBusy(bool busy);
     void startSignOutOperation();
-    void startClientRevocation(const QString &requestId, const QString &clientId);
+    void startClientRevocation(const QString &clientId);
     void startAiOperation(const QString &action, const QVariantMap &arguments,
                           const QString &state);
     QVariantMap iconImageArguments(const QString &desktopId, const QString &applicationName,
