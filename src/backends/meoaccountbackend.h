@@ -4,6 +4,7 @@
 
 #include <QString>
 #include <QVariant>
+#include <QVariantList>
 
 class MeoAccountContract final
 {
@@ -131,6 +132,15 @@ public:
                                            const QString &defaultModel,
                                            const QString &apiKey,
                                            bool automaticInferenceEnabled);
+    Q_INVOKABLE void saveLocalAiConnectionWithCapabilities(
+        const QString &id,
+        const QString &provider,
+        const QString &displayName,
+        const QString &endpoint,
+        const QString &defaultModel,
+        const QString &apiKey,
+        const QVariantList &visionModels,
+        bool automaticInferenceEnabled);
     Q_INVOKABLE void removeLocalAiConnection(const QString &id);
     Q_INVOKABLE void discoverLocalAiModels(const QString &id);
     Q_INVOKABLE void prepareIconImage(const QString &desktopId, const QString &applicationName,
@@ -172,7 +182,7 @@ private:
     void applyStatus(const QVariantMap &status, const QVariantMap &identity);
     void setBusy(bool busy);
     void startSignOutOperation();
-    void startClientRevocation(const QString &clientId);
+    void startClientRevocation(const QString &requestId, const QString &clientId);
     void startAiOperation(const QString &action, const QVariantMap &arguments,
                           const QString &state);
     QVariantMap iconImageArguments(const QString &desktopId, const QString &applicationName,
@@ -247,3 +257,5 @@ private:
     bool m_signOutAfterReauth = false;
     QString m_clientToRevokeAfterReauth;
 };
+
+#include "meoaccountbackend_localai.inl"
