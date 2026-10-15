@@ -1,7 +1,7 @@
 {
   "id": "org.meo.Settings",
   "name": "Meo Settings",
-  "oauthClientId": "registered-meo-settings-oauth-client-id",
+  "oauthClientId": "org.meo.settings",
   "redirectUri": "meo-settings://auth/callback",
   "executables": ["/usr/bin/meo-settings"],
   "scopes": ["openid", "profile"],
