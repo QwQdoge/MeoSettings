@@ -17,7 +17,7 @@ find_package(KF6NetworkManagerQt REQUIRED)
 find_package(KF6BluezQt REQUIRED)
 find_package(KF6Solid REQUIRED)
 find_package(KF6PulseAudioQt REQUIRED)
-find_package(KF6Screen REQUIRED)
+find_package(KF6Screen 6.8 REQUIRED)
 find_package(KF6Service REQUIRED)
 
 qt_standard_project_setup(REQUIRES 6.8)

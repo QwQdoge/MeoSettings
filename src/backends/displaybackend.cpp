@@ -95,7 +95,10 @@ void DisplayBackend::refresh()
                         {QStringLiteral("rotation"), int(output->rotation())},
                         {QStringLiteral("x"), output->pos().x()},
                         {QStringLiteral("y"), output->pos().y()},
-                        {QStringLiteral("scaleSupported"), configuration->supportedFeatures().testFlag(KScreen::Config::Feature::PerOutputScaling)},
+                        // libkscreen 6.8 removed the feature mask: its supported
+                        // backend always supports per-output scaling. This row
+                        // is emitted only for a real connected output.
+                        {QStringLiteral("scaleSupported"), true},
                         {QStringLiteral("name"), label},
                         {QStringLiteral("connector"), output->name()},
                         {QStringLiteral("vendor"), output->vendor()},

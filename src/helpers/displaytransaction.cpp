@@ -84,8 +84,9 @@ private:
             }
             if (request.contains("scale")) {
                 const double scale = request.value("scale").toDouble(-1);
-                if (!request.value("scale").isDouble() || scale < 0.5 || scale > 4.0
-                    || !next->supportedFeatures().testFlag(KScreen::Config::Feature::PerOutputScaling)) {
+                // libkscreen 6.8's supported backend always provides scaling;
+                // keep validating the request and Config::canBeApplied below.
+                if (!request.value("scale").isDouble() || !qIsFinite(scale) || scale < 0.5 || scale > 4.0) {
                     fail(QStringLiteral("Unsupported display scale.")); return;
                 }
                 output->setScale(scale);
