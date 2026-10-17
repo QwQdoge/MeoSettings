@@ -2,7 +2,7 @@
 
 Meo Settings owns the user-facing backup and restore experience for MeoArch.
 
-Backup is a system/settings concern, not a Meo Account settings page. Meo Account remains the identity and authorization authority when a cloud destination is used, but it does not own backup UI, backup scheduling, backup selection, or restore workflows.
+Meo Settings owns local capture, restore preview and application of portable settings. Meo Account owns identity and authorization and also provides the user-requested cloud-copy management entry point. Account can upload, list, download and delete copies; restoration remains in Settings.
 
 ## Product boundary
 
@@ -152,3 +152,29 @@ Existing historical server-side backup data is intentionally not deleted during 
 4. Add user-selected data only after a bounded path/category contract and local encrypted archive design exist.
 5. Add scheduled local backups only after the local manifest and restore transaction are stable.
 6. Add an optional Meo Account cloud destination only after local format and restore behavior are stable.
+
+## Account cloud destination implementation
+
+`BackupBackend` exposes `refreshCloudBackups`, `uploadCloudBackup`,
+`previewCloudBackup`, and `deleteCloudBackup`. It calls the installed Account
+broker rather than reading or storing a token. The broker verifies the exact
+Settings executable, uses its KWallet session and calls Meo API `/v1/backups`.
+API ownership is derived from authentication. Bounded JSON manifests are stored
+in the existing Account Neon database through Cloudflare Hyperdrive.
+
+Cloud copies are immutable and capped at 512 KiB and 20 copies per account. A
+full destination requires an explicit user-selected deletion before retrying.
+Local manifests retain their existing 2 MiB limit. Backup content travels as
+private JSON request results rather than D-Bus broadcasts.
+
+Downloads are revalidated with `BackupManifestContract`, staged with owner-only
+permissions and enter the existing preview/confirmation workflow. Changing
+accounts clears cloud lists and pending results. Download never applies a
+setting automatically. Isolated D-Bus tests cover list, download, local
+validation, private staging and account-state clearing.
+
+The user-approved Account/Settings backup controls are integrated into local source.
+The API, broker and client rollout, authenticated production CRUD and a real
+Plasma/VM restore still require acceptance; source and offscreen checks do not
+prove those boundaries. This work does not add scheduled backups, user-file
+archives, automatic app reinstalls or infrastructure disaster recovery.

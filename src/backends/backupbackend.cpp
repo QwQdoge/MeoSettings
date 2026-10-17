@@ -3,6 +3,11 @@
 #include "omnistoreappsbackend.h"
 
 #include <QDateTime>
+#include <QDBusArgument>
+#include <QDBusConnection>
+#include <QDBusInterface>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -17,6 +22,11 @@
 
 namespace
 {
+QVariantMap backupMap(const QVariant &value)
+{
+    return value.metaType().id() == qMetaTypeId<QDBusArgument>()
+        ? qdbus_cast<QVariantMap>(value.value<QDBusArgument>()) : value.toMap();
+}
 constexpr qsizetype kMaximumManifestBytes = 2 * 1024 * 1024;
 constexpr int kMaximumApplications = 10000;
 const QString kSchema = QStringLiteral("org.meo.backup/v1");
@@ -528,6 +538,9 @@ BackupBackend::BackupBackend(OmniStoreAppsBackend *appsBackend, QObject *parent)
     , m_appsBackend(appsBackend)
 {
     setAvailable(true);
+    QDBusConnection::sessionBus().connect(QStringLiteral("org.meo.Accounts1"),
+        QStringLiteral("/org/meo/Accounts1"), QStringLiteral("org.meo.Accounts1"),
+        QStringLiteral("accountChanged"), this, SLOT(clearCloudAccountState()));
 }
 
 QString BackupBackend::summary() const
@@ -762,5 +775,162 @@ void BackupBackend::clearPreview()
     m_previewPath.clear();
     m_previewSummary.clear();
     m_previewValid = false;
+    Q_EMIT changed();
+}
+
+void BackupBackend::refreshCloudBackups()
+{
+    startCloudOperation(QStringLiteral("list_backups"));
+}
+
+void BackupBackend::clearCloudAccountState()
+{
+    ++m_cloudGeneration;
+    m_cloudBusy = false;
+    m_cloudState = QStringLiteral("not_loaded");
+    m_cloudBackups.clear();
+    if (m_cloudPreviewFile && m_previewPath == m_cloudPreviewFile->fileName()
+        && m_restoreState != QLatin1String("applying")) {
+        clearPreview();
+        delete m_cloudPreviewFile;
+    }
+    Q_EMIT changed();
+}
+
+void BackupBackend::uploadCloudBackup()
+{
+    if (m_cloudBusy || busy()) return;
+    if (!createLocalManifest()) return;
+    QFile file(m_lastBackupPath);
+    if (!file.open(QIODevice::ReadOnly) || file.size() > 2 * 1024 * 1024) {
+        setError(tr("The local backup could not be opened for upload."));
+        return;
+    }
+    const auto document = QJsonDocument::fromJson(file.readAll());
+    if (!document.isObject() || !BackupManifestContract::validate(document.object())) {
+        setError(tr("The local backup is no longer valid."));
+        return;
+    }
+    if (document.toJson(QJsonDocument::Compact).size() > 524288) {
+        setError(tr("Cloud backups accept manifests up to 512 KiB. Your local backup is still available."));
+        return;
+    }
+    startCloudOperation(QStringLiteral("upload_backup"),
+                        {{QStringLiteral("manifestJson"), QString::fromUtf8(document.toJson(QJsonDocument::Compact))}});
+}
+
+void BackupBackend::previewCloudBackup(const QString &id)
+{
+    startCloudOperation(QStringLiteral("download_backup"), {{QStringLiteral("backupId"), id}});
+}
+
+void BackupBackend::deleteCloudBackup(const QString &id)
+{
+    startCloudOperation(QStringLiteral("delete_backup"), {{QStringLiteral("backupId"), id}});
+}
+
+void BackupBackend::startCloudOperation(const QString &action, const QVariantMap &arguments)
+{
+    if (m_cloudBusy || busy() || m_restoreState == QLatin1String("applying")) return;
+    clearError();
+    if (action == QLatin1String("download_backup")) clearPreview();
+    m_cloudBusy = true;
+    m_cloudState = QStringLiteral("working");
+    const quint64 generation = ++m_cloudGeneration;
+    Q_EMIT changed();
+    QDBusInterface broker(QStringLiteral("org.meo.Accounts1"), QStringLiteral("/org/meo/Accounts1"),
+                          QStringLiteral("org.meo.Accounts1"), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(
+        broker.asyncCall(QStringLiteral("StartAccountOperation"), action, arguments), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, action, generation](QDBusPendingCallWatcher *call) {
+        const QDBusPendingReply<QString> reply = *call;
+        call->deleteLater();
+        if (generation != m_cloudGeneration) return;
+        if (reply.isError() || reply.value().isEmpty()) {
+            m_cloudBusy = false;
+            m_cloudState = QStringLiteral("failed");
+            setError(tr("Meo Account could not start the backup operation. Connect your account and retry."));
+            Q_EMIT changed();
+            return;
+        }
+        pollCloudOperation(reply.value(), action, 0);
+    });
+}
+
+void BackupBackend::pollCloudOperation(const QString &requestId, const QString &action, int attempts)
+{
+    const quint64 generation = m_cloudGeneration;
+    QDBusInterface broker(QStringLiteral("org.meo.Accounts1"), QStringLiteral("/org/meo/Accounts1"),
+                          QStringLiteral("org.meo.Accounts1"), QDBusConnection::sessionBus());
+    auto *watcher = new QDBusPendingCallWatcher(broker.asyncCall(QStringLiteral("GetRequest"), requestId), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this, requestId, action, attempts, generation](QDBusPendingCallWatcher *call) {
+        const QDBusPendingReply<QVariantMap> reply = *call;
+        call->deleteLater();
+        if (generation != m_cloudGeneration) return;
+        const QVariantMap result = reply.value();
+        const QString state = result.value(QStringLiteral("state")).toString();
+        if (reply.isError() || result.isEmpty() || attempts >= 120
+            || QStringList{QStringLiteral("failed"), QStringLiteral("expired"), QStringLiteral("cancelled")}.contains(state)) {
+            m_cloudBusy = false;
+            m_cloudState = QStringLiteral("failed");
+            setError(tr("The cloud backup operation failed or timed out. Retry from Meo Account."));
+            Q_EMIT changed();
+            return;
+        }
+        if (state == QLatin1String("completed")) {
+            const QByteArray bytes = result.value(QStringLiteral("backupResultJson")).toString().toUtf8();
+            const QJsonDocument document = QJsonDocument::fromJson(bytes);
+            if (bytes.size() > 600000 || !document.isObject()) {
+                m_cloudBusy = false;
+                m_cloudState = QStringLiteral("failed");
+                setError(tr("The backup service returned an unreadable response."));
+                Q_EMIT changed();
+                return;
+            }
+            finishCloudOperation(action, document.object().toVariantMap());
+            return;
+        }
+        QTimer::singleShot(500, this, [this, requestId, action, attempts, generation] {
+            if (generation != m_cloudGeneration) return;
+            pollCloudOperation(requestId, action, attempts + 1);
+        });
+    });
+}
+
+void BackupBackend::finishCloudOperation(const QString &action, const QVariantMap &result)
+{
+    m_cloudBusy = false;
+    m_cloudState = QStringLiteral("ready");
+    if (action == QLatin1String("list_backups")) {
+        const QVariant rows = result.value(QStringLiteral("backups"));
+        m_cloudBackups = rows.metaType().id() == qMetaTypeId<QDBusArgument>()
+            ? qdbus_cast<QVariantList>(rows.value<QDBusArgument>()) : rows.toList();
+        for (QVariant &row : m_cloudBackups) row = backupMap(row);
+    } else if (action == QLatin1String("download_backup")) {
+        const QVariantMap backup = backupMap(result.value(QStringLiteral("backup")));
+        const QJsonObject manifest = QJsonObject::fromVariantMap(backupMap(backup.value(QStringLiteral("content"))));
+        if (!BackupManifestContract::validate(manifest)) {
+            m_cloudState = QStringLiteral("failed");
+            setError(tr("The downloaded backup did not pass local validation."));
+            Q_EMIT changed();
+            return;
+        }
+        auto *file = new QTemporaryFile(QDir::tempPath() + QStringLiteral("/meo-cloud-backup-XXXXXX.json"), this);
+        const QByteArray bytes = QJsonDocument(manifest).toJson(QJsonDocument::Compact);
+        if (!file->open() || !file->setPermissions(QFile::ReadOwner | QFile::WriteOwner)
+            || file->write(bytes) != bytes.size() || !file->flush()) {
+            delete file;
+            m_cloudState = QStringLiteral("failed");
+            setError(tr("The downloaded backup could not be staged privately."));
+        } else {
+            file->close();
+            if (m_cloudPreviewFile) delete m_cloudPreviewFile;
+            m_cloudPreviewFile = file;
+            if (!previewLocalManifest(file->fileName())) m_cloudState = QStringLiteral("failed");
+        }
+    } else {
+        refreshCloudBackups();
+    }
     Q_EMIT changed();
 }

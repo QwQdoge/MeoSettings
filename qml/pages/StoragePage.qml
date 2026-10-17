@@ -8,6 +8,7 @@ Item {
 
     property var navigateTo: function(route) {}
     property var rootMetrics: null
+    property string pendingBackupDelete: ""
     property var selectedVolume: ({})
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
 
@@ -500,6 +501,38 @@ Item {
             onRowActivated: (index, row) => {
                 if (row.route)
                     root.navigateTo(row.route)
+            }
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("Meo Account cloud backups")
+            subtitle: qsTr("Save portable settings and the application inventory to this account. Cloud manifests are limited to 512 KiB and 20 copies. Downloaded backups require preview and confirmation before restoration.")
+            model: [
+                {"id": "upload", "title": qsTr("Back up to Meo Account"), "subtitle": AccountBackend.signedIn ? qsTr("Uses the account connected on this device.") : qsTr("Connect Meo Account in Settings first."), "icon": "backup", "trailingKind": "action", "actionText": BackupBackend.cloudBusy ? qsTr("Working…") : qsTr("Back up now"), "enabled": AccountBackend.signedIn && !BackupBackend.cloudBusy && !BackupBackend.busy},
+                {"id": "refresh", "title": qsTr("Saved cloud backups"), "subtitle": BackupBackend.cloudState === "not_loaded" ? qsTr("Refresh to load backups for this account.") : qsTr("%n saved backup(s)", "", BackupBackend.cloudBackups.length), "icon": "cloud", "trailingKind": "action", "actionText": qsTr("Refresh"), "enabled": AccountBackend.signedIn && !BackupBackend.cloudBusy}
+            ]
+            onRowActionTriggered: (index, row) => {
+                if (row.id === "upload") BackupBackend.uploadCloudBackup()
+                else BackupBackend.refreshCloudBackups()
+            }
+        }
+
+        Repeater {
+            model: BackupBackend.cloudBackups
+            delegate: MeoSettingsGroup {
+                required property var modelData
+                width: parent.width
+                title: qsTr("Meo Settings backup")
+                subtitle: String(modelData.created_at || "")
+                model: [
+                    {"id": "preview", "title": qsTr("Preview cloud backup"), "subtitle": qsTr("Validate the downloaded manifest before applying settings."), "icon": "preview", "trailingKind": "action", "actionText": qsTr("Preview"), "enabled": !BackupBackend.cloudBusy && !BackupBackend.busy},
+                    {"id": "delete", "title": qsTr("Delete cloud copy"), "subtitle": qsTr("Local backup files and current settings are kept."), "icon": "delete", "trailingKind": "action", "actionText": qsTr("Delete"), "enabled": !BackupBackend.cloudBusy}
+                ]
+                onRowActionTriggered: (index, row) => {
+                    if (row.id === "preview") BackupBackend.previewCloudBackup(String(modelData.id))
+                    else { root.pendingBackupDelete = String(modelData.id); cloudDeleteSheet.open() }
+                }
             }
         }
 
@@ -1151,6 +1184,16 @@ Item {
             category: "storage"
             entryTitle: qsTr("Troubleshoot storage")
         }
+    }
+
+    MeoSettingsTaskSheet {
+        id: cloudDeleteSheet
+        popupParent: Overlay.overlay
+        title: qsTr("Delete this cloud backup?")
+        subtitle: qsTr("This removes only the selected cloud copy. Downloaded copies and current settings are kept.")
+        acceptText: qsTr("Delete")
+        rejectText: qsTr("Cancel")
+        onAccepted: BackupBackend.deleteCloudBackup(root.pendingBackupDelete)
     }
 
     MeoSettingsTaskSheet {

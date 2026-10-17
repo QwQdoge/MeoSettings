@@ -12,6 +12,7 @@
 #include <QString>
 #include <QStringList>
 #include <QTimer>
+#include <QTemporaryFile>
 #include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
@@ -60,8 +61,18 @@ class BackupBackend final : public BackendBase
     Q_PROPERTY(QString restoreSummary READ restoreSummary NOTIFY changed)
     Q_PROPERTY(QVariantList restoreResults READ restoreResults NOTIFY changed)
     Q_PROPERTY(bool canApplyRestore READ canApplyRestore NOTIFY changed)
+    Q_PROPERTY(bool cloudBusy READ cloudBusy NOTIFY changed)
+    Q_PROPERTY(QString cloudState READ cloudState NOTIFY changed)
+    Q_PROPERTY(QVariantList cloudBackups READ cloudBackups NOTIFY changed)
 
 public:
+    bool cloudBusy() const { return m_cloudBusy; }
+    QString cloudState() const { return m_cloudState; }
+    QVariantList cloudBackups() const { return m_cloudBackups; }
+    Q_INVOKABLE void refreshCloudBackups();
+    Q_INVOKABLE void uploadCloudBackup();
+    Q_INVOKABLE void previewCloudBackup(const QString &id);
+    Q_INVOKABLE void deleteCloudBackup(const QString &id);
     explicit BackupBackend(OmniStoreAppsBackend *appsBackend,
                            QObject *parent = nullptr);
 
@@ -136,7 +147,7 @@ public:
     QVariantList restoreResults() const { return m_restoreResults; }
     bool canApplyRestore() const
     {
-        return m_previewValid && !m_previewPath.isEmpty() && !busy()
+        return m_previewValid && !m_previewPath.isEmpty() && !busy() && !m_cloudBusy
             && m_restoreState != QLatin1String("applying");
     }
 
@@ -250,6 +261,7 @@ Q_SIGNALS:
     void restoreFinished(bool success);
 
 private Q_SLOTS:
+    void clearCloudAccountState();
     void handleRestoreStepSaved()
     {
         finishRestoreStep();
@@ -451,6 +463,14 @@ private:
     }
 
     OmniStoreAppsBackend *m_appsBackend = nullptr;
+    void startCloudOperation(const QString &action, const QVariantMap &arguments = {});
+    void pollCloudOperation(const QString &requestId, const QString &action, int attempts);
+    void finishCloudOperation(const QString &action, const QVariantMap &result);
+    bool m_cloudBusy = false;
+    quint64 m_cloudGeneration = 0;
+    QString m_cloudState = QStringLiteral("not_loaded");
+    QVariantList m_cloudBackups;
+    QPointer<QTemporaryFile> m_cloudPreviewFile;
     QPointer<QObject> m_controlCenterBackend;
     QPointer<QObject> m_shellSettingsBackend;
     QString m_lastBackupPath;

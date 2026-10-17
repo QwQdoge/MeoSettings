@@ -1,6 +1,8 @@
 #include "../src/backends/backupbackend.h"
 
 #include <QFile>
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QTemporaryDir>
@@ -115,14 +117,21 @@ public:
     bool busy() const { return false; }
     QString error() const { return m_error; }
 
-    Q_INVOKABLE void saveLayout(const QVariantList &, const QString &)
+    QVariantList receivedTiles;
+    QString receivedDensity;
+    QVariantMap receivedTopBar;
+
+    Q_INVOKABLE void saveLayout(const QVariantList &tiles, const QString &density)
     {
+        receivedTiles = tiles;
+        receivedDensity = density;
         m_calls->push_back(QStringLiteral("control-center"));
         Q_EMIT layoutSaved();
     }
 
-    Q_INVOKABLE void saveTopBar(const QVariantMap &)
+    Q_INVOKABLE void saveTopBar(const QVariantMap &values)
     {
+        receivedTopBar = values;
         m_calls->push_back(QStringLiteral("top-bar"));
         Q_EMIT topBarSaved();
     }
@@ -154,10 +163,11 @@ public:
     bool busy() const { return false; }
     QString error() const { return m_error; }
 
-    Q_INVOKABLE void saveShelf(const QVariantMap &) { complete(QStringLiteral("shelf"), &FakeShellSettingsSource::shelfSaved); }
-    Q_INVOKABLE void saveNotifications(const QVariantMap &) { complete(QStringLiteral("notifications"), &FakeShellSettingsSource::notificationsSaved); }
-    Q_INVOKABLE void saveTimeCenter(const QVariantMap &) { complete(QStringLiteral("time-center"), &FakeShellSettingsSource::timeCenterSaved); }
-    Q_INVOKABLE void saveTopTasks(const QVariantMap &) { complete(QStringLiteral("top-tasks"), &FakeShellSettingsSource::topTasksSaved); }
+    QVariantMap receivedShelf, receivedNotifications, receivedTimeCenter, receivedTopTasks;
+    Q_INVOKABLE void saveShelf(const QVariantMap &values) { receivedShelf = values; complete(QStringLiteral("shelf"), &FakeShellSettingsSource::shelfSaved); }
+    Q_INVOKABLE void saveNotifications(const QVariantMap &values) { receivedNotifications = values; complete(QStringLiteral("notifications"), &FakeShellSettingsSource::notificationsSaved); }
+    Q_INVOKABLE void saveTimeCenter(const QVariantMap &values) { receivedTimeCenter = values; complete(QStringLiteral("time-center"), &FakeShellSettingsSource::timeCenterSaved); }
+    Q_INVOKABLE void saveTopTasks(const QVariantMap &values) { receivedTopTasks = values; complete(QStringLiteral("top-tasks"), &FakeShellSettingsSource::topTasksSaved); }
 
 Q_SIGNALS:
     void errorChanged();
@@ -185,11 +195,32 @@ private:
     QString m_error;
 };
 
+class BackupBrokerFixture final : public QObject
+{
+    Q_OBJECT
+    Q_CLASSINFO("D-Bus Interface", "org.meo.Accounts1")
+public:
+    QVariantMap payload;
+    QString lastAction;
+    QVariantMap lastArguments;
+public Q_SLOTS:
+    QString StartAccountOperation(const QString &action, const QVariantMap &arguments) {
+        lastArguments = arguments;
+        lastAction = action;
+        return QStringLiteral("test-request");
+    }
+    QVariantMap GetRequest(const QString &) {
+        return {{QStringLiteral("state"), QStringLiteral("completed")},
+                {QStringLiteral("backupResultJson"), QString::fromUtf8(QJsonDocument::fromVariant(payload).toJson(QJsonDocument::Compact))}};
+    }
+};
+
 class BackupBackendTest final : public QObject
 {
     Q_OBJECT
 
 private Q_SLOTS:
+    void cloudDownloadRequiresLocalValidation();
     void buildsOnlyWhitelistedApplicationMetadata();
     void buildsPortableMeoSettings();
     void representsUnavailableApplicationInventory();
@@ -202,6 +233,71 @@ private Q_SLOTS:
     void rejectsNonCanonicalSettings();
     void rejectsUnsafeApplicationMetadata();
 };
+
+void BackupBackendTest::cloudDownloadRequiresLocalValidation()
+{
+    auto bus = QDBusConnection::sessionBus();
+    if (!bus.isConnected()) QSKIP("Run under dbus-run-session for cloud broker checks");
+    if (bus.interface()->isServiceRegistered(QStringLiteral("org.meo.Accounts1")))
+        QSKIP("Do not replace a real Account broker; use an isolated session bus");
+    BackupBrokerFixture broker;
+    QVERIFY(bus.registerService(QStringLiteral("org.meo.Accounts1")));
+    QVERIFY(bus.registerObject(QStringLiteral("/org/meo/Accounts1"), &broker, QDBusConnection::ExportAllSlots));
+    BackupBackend backend(nullptr);
+    broker.payload = {{QStringLiteral("backups"), QVariantList{
+        QVariantMap{{QStringLiteral("id"), QStringLiteral("fixture-backup")}}}}};
+    backend.refreshCloudBackups();
+    QTRY_VERIFY_WITH_TIMEOUT(!backend.cloudBusy(), 2000);
+    QCOMPARE(backend.cloudBackups().size(), 1);
+    QJsonObject manifest = BackupManifestContract::build({}, portableSettings(), QStringLiteral("2026-10-16T12:00:00Z"));
+    const QString fixturePath = qEnvironmentVariable("MEO_BACKUP_TEST_MANIFEST");
+    if (!fixturePath.isEmpty()) {
+        QFile fixture(fixturePath);
+        QVERIFY(fixture.open(QIODevice::ReadOnly));
+        manifest = QJsonDocument::fromJson(fixture.readAll()).object();
+        QVERIFY(BackupManifestContract::validate(manifest));
+    }
+    broker.payload = {{QStringLiteral("backup"), QVariantMap{{QStringLiteral("content"), manifest.toVariantMap()}}}};
+    backend.previewCloudBackup(QStringLiteral("fixture-backup"));
+    QTRY_VERIFY_WITH_TIMEOUT(!backend.cloudBusy(), 2000);
+    QVERIFY(backend.previewValid());
+    QCOMPARE(backend.restoreState(), QStringLiteral("idle"));
+    const QFileInfo staged(backend.previewPath());
+    QVERIFY(staged.exists());
+    QVERIFY(!(staged.permissions() & (QFile::ReadOther | QFile::WriteOther)));
+    QStringList applied;
+    FakeControlSettingsSource control(&applied);
+    FakeShellSettingsSource shell(&applied);
+    backend.setPortableSettingsSources(&control, &shell);
+    QVERIFY(backend.applyPreviewSettings());
+    QCOMPARE(backend.restoreState(), QStringLiteral("succeeded"));
+    QCOMPARE(applied, QStringList({QStringLiteral("control-center"), QStringLiteral("top-bar"),
+        QStringLiteral("shelf"), QStringLiteral("notifications"), QStringLiteral("time-center"), QStringLiteral("top-tasks")}));
+    QCOMPARE(backend.restoreResults().size(), 6);
+    const auto expected = manifest.value(QStringLiteral("contents")).toObject().value(QStringLiteral("settings")).toObject();
+    const auto expectedControl = expected.value(QStringLiteral("controlCenter")).toObject();
+    const auto expectedShell = expected.value(QStringLiteral("shell")).toObject();
+    QCOMPARE(control.receivedTiles, expectedControl.value(QStringLiteral("layout")).toObject().value(QStringLiteral("tiles")).toArray().toVariantList());
+    QCOMPARE(control.receivedDensity, expectedControl.value(QStringLiteral("layout")).toObject().value(QStringLiteral("density")).toString());
+    QCOMPARE(control.receivedTopBar, expectedControl.value(QStringLiteral("topBar")).toObject().toVariantMap());
+    QCOMPARE(shell.receivedShelf, expectedShell.value(QStringLiteral("shelf")).toObject().toVariantMap());
+    QCOMPARE(shell.receivedNotifications, expectedShell.value(QStringLiteral("notifications")).toObject().toVariantMap());
+    QCOMPARE(shell.receivedTimeCenter, expectedShell.value(QStringLiteral("timeCenter")).toObject().toVariantMap());
+    QCOMPARE(shell.receivedTopTasks, expectedShell.value(QStringLiteral("topTasks")).toObject().toVariantMap());
+
+
+    auto unsafe = manifest;
+    unsafe.insert(QStringLiteral("secretsIncluded"), true);
+    broker.payload = {{QStringLiteral("backup"), QVariantMap{{QStringLiteral("content"), unsafe.toVariantMap()}}}};
+    backend.previewCloudBackup(QStringLiteral("fixture-backup"));
+    QTRY_VERIFY_WITH_TIMEOUT(!backend.cloudBusy(), 2000);
+    QCOMPARE(backend.cloudState(), QStringLiteral("failed"));
+    QVERIFY(QMetaObject::invokeMethod(&backend, "clearCloudAccountState"));
+    QVERIFY(backend.cloudBackups().isEmpty());
+    QVERIFY(!backend.previewValid());
+    bus.unregisterObject(QStringLiteral("/org/meo/Accounts1"));
+    bus.unregisterService(QStringLiteral("org.meo.Accounts1"));
+}
 
 void BackupBackendTest::buildsOnlyWhitelistedApplicationMetadata()
 {

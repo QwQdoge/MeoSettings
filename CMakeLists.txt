@@ -433,7 +433,7 @@ add_executable(meo-settings-backupbackend-test
     src/backends/omnistoreappsbackend.cpp
     src/backends/omnistoreappsbackend.h
 )
-target_link_libraries(meo-settings-backupbackend-test PRIVATE Qt6::Core Qt6::Test)
+target_link_libraries(meo-settings-backupbackend-test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
 add_test(NAME meo-settings-backupbackend COMMAND meo-settings-backupbackend-test)
 
 add_executable(meo-settings-packageinventorybackend-test
