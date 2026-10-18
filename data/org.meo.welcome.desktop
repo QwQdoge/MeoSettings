@@ -8,6 +8,4 @@ Exec=meo-welcome
 Icon=org.meo.welcome
 Categories=Settings;Qt;KDE;
 OnlyShowIn=KDE;
-X-KDE-autostart-phase=2
-X-systemd-skip=true
 NoDisplay=true

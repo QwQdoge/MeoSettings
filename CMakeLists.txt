@@ -713,6 +713,11 @@ install(FILES
     data/org.meo.welcome.desktop
     DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
 )
+# KGlobalAccel owns launch shortcuts; keep the desktop entry's Exec/identity
+# identical to the application launcher instead of adding a hotkey daemon.
+install(FILES data/org.meo.settings.desktop
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/kglobalaccel"
+)
 # Original application identities remain package-owned artwork. The Studio
 # package owns only its reviewed source sheet and generated user overlay, so a
 # normal FreeDesktop lookup keeps resolving the real Meo app after Undo.

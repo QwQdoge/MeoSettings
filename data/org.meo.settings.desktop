@@ -11,3 +11,4 @@ MimeType=x-scheme-handler/meosettings;
 Keywords=settings;system;wifi;network;bluetooth;sound;display;power;updates;recovery;
 Keywords[zh_CN]=设置;系统;Wi-Fi;网络;蓝牙;声音;显示器;电源;更新;恢复;
 StartupNotify=true
+X-KDE-Shortcuts=Meta+I
