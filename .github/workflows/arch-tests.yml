@@ -30,7 +30,7 @@ jobs:
           pacman -S --needed --noconfirm \
             base-devel cmake ninja git extra-cmake-modules \
             qt6-base qt6-declarative qt6-tools qt6-shadertools \
-            kcoreaddons kconfig ki18n kguiaddons kirigami \
+            kcoreaddons kconfig kservice ki18n kguiaddons kirigami \
             networkmanager-qt bluez-qt solid pulseaudio-qt libkscreen \
             libplasma libksysguard plasma-workspace
           mkdir -p "$HOME"
