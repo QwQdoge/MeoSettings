@@ -29,8 +29,8 @@ jobs:
           pacman -Syu --noconfirm
           pacman -S --needed --noconfirm \
             base-devel cmake ninja git \
-            qt6-base qt6-declarative qt6-tools qt6-shadertools \
-            kcoreaddons kconfig networkmanager-qt bluez-qt solid pulseaudio-qt libkscreen
+            qt6-base qt6-declarative qt6-tools qt6-shadertools qt6-multimedia vulkan-headers \
+            kcoreaddons kconfig kservice networkmanager-qt bluez-qt solid pulseaudio-qt libkscreen
           mkdir -p "$HOME"
 
       - name: Check out MeoSettings
