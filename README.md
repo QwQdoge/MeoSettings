@@ -2,6 +2,16 @@
 
 Meo Settings 是 MeoArch 的日常系统设置应用。它以 MeoUI 提供的通用界面为基础，通过稳定的 Qt/KDE API、已安装的 MeoKDE 运行时和明确的 KCM 交接提供真实设置流程；它不取代 NetworkManager、BlueZ、PipeWire、KScreen、PowerDevil、KWin 或 System Settings。
 
+## 安装 / Install
+
+单独安装本组件（AUR）/ Install just this component from the AUR:
+
+```bash
+yay -Syu meo-settings
+```
+
+要一次装好全部 MeoArch 软件，请使用已签名的 Meo 软件源和 pacman，见[工作区说明](https://github.com/QwQdoge/MeoArch-os-workspace#install-meo-desktop-on-an-existing-arch-system)。To install the whole MeoArch software set, use the signed Meo repository with pacman; see the [workspace README](https://github.com/QwQdoge/MeoArch-os-workspace#install-meo-desktop-on-an-existing-arch-system).
+
 ## License
 
 除另有文件级声明或第三方说明外，本仓库原创代码以 GNU General Public
