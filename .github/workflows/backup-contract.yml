@@ -52,7 +52,7 @@ jobs:
           set(CMAKE_CXX_STANDARD 20)
           set(CMAKE_CXX_STANDARD_REQUIRED ON)
           set(CMAKE_CXX_EXTENSIONS OFF)
-          find_package(Qt6 6.8 REQUIRED COMPONENTS Core Test)
+          find_package(Qt6 6.8 REQUIRED COMPONENTS Core DBus Test)
           add_executable(meo-backup-contract-test
               "$ENV{GITHUB_WORKSPACE}/tests/tst_backupbackend.cpp"
               "$ENV{GITHUB_WORKSPACE}/src/core/backendbase.cpp"
@@ -62,7 +62,7 @@ jobs:
               "$ENV{GITHUB_WORKSPACE}/src/backends/omnistoreappsbackend.cpp"
               "$ENV{GITHUB_WORKSPACE}/src/backends/omnistoreappsbackend.h"
           )
-          target_link_libraries(meo-backup-contract-test PRIVATE Qt6::Core Qt6::Test)
+          target_link_libraries(meo-backup-contract-test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
           EOF
           cmake -S /tmp/meo-backup-contract -B /tmp/meo-backup-build -G Ninja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo
