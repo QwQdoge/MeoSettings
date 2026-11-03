@@ -14,6 +14,9 @@ ApplicationWindow {
     title: qsTr("Meo Settings")
     color: MeoTheme.surface
 
+    // Standard App Shell shortcuts (MeoUI APP_SHELL.md).
+    Shortcut { sequences: [StandardKey.Quit]; onActivated: Qt.quit() }
+
     property string currentRoute: "home"
     property string lastLoadedRoute: ""
     property var navigationHistory: []

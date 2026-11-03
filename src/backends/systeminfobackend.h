@@ -22,6 +22,9 @@ public:
     QString operatingSystemName() const;
 
     Q_INVOKABLE void refresh();
+    // Text of an installed file in share/licenses/meo-settings ("LICENSE" or
+    // "THIRD_PARTY_NOTICES.md"); empty when the package did not install it.
+    Q_INVOKABLE QString installedLicenseText(const QString &name) const;
 
 Q_SIGNALS:
     void changed();

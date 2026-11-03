@@ -4,8 +4,10 @@
 #include <KOSRelease>
 #include <KUser>
 
+#include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QStandardPaths>
 #include <QSysInfo>
 #include <QUrl>
 
@@ -105,4 +107,18 @@ void SystemInfoBackend::refresh()
     m_deviceName = nextDeviceName;
     m_operatingSystemName = nextOperatingSystemName;
     Q_EMIT changed();
+}
+
+QString SystemInfoBackend::installedLicenseText(const QString &name) const
+{
+    if (name != QLatin1String("LICENSE") && name != QLatin1String("THIRD_PARTY_NOTICES.md")) {
+        return {};
+    }
+    const QString path = QStandardPaths::locate(QStandardPaths::GenericDataLocation,
+                                                QStringLiteral("licenses/meo-settings/") + name);
+    QFile file(path);
+    if (path.isEmpty() || !file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return {};
+    }
+    return QString::fromUtf8(file.readAll());
 }

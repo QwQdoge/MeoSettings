@@ -148,5 +148,68 @@ Item {
                     root.navigateTo("kcm:kcm_about-distro")
             }
         }
+
+        // MeoUI APP_SHELL.md section 4: credits come from the installed
+        // notices file, never from a list kept in QML.
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("Legal")
+            model: [{
+                "objectName": "aboutLicenseRow",
+                "title": qsTr("License"),
+                "subtitle": "GPL-3.0",
+                "leadingIcon": "gavel",
+                "leadingStyle": "tonal",
+                "trailingKind": "navigation",
+                "enabled": root.licenseText.length > 0
+            }, {
+                "objectName": "aboutNoticesRow",
+                "title": qsTr("Open-source licenses"),
+                "subtitle": root.noticesText.length > 0
+                            ? qsTr("Components Meo Settings uses")
+                            : qsTr("License information is not available in this build"),
+                "leadingIcon": "description",
+                "leadingStyle": "tonal",
+                "trailingKind": "navigation",
+                "enabled": root.noticesText.length > 0
+            }]
+            onRowActivated: (index, row) => {
+                if (!row.enabled)
+                    return
+                legalSheet.title = row.title
+                legalSheet.markdown = index === 1
+                legalSheet.open()
+            }
+        }
+    }
+
+    readonly property string licenseText: SystemInfoBackend.installedLicenseText("LICENSE")
+    readonly property string noticesText: SystemInfoBackend.installedLicenseText("THIRD_PARTY_NOTICES.md")
+
+    MeoSettingsTaskSheet {
+        id: legalSheet
+        property bool markdown: false
+        popupParent: Overlay.overlay
+        content: Component {
+            ScrollView {
+                implicitWidth: 560 * MeoTheme.globalScale
+                implicitHeight: 520 * MeoTheme.globalScale
+                clip: true
+                contentWidth: availableWidth
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                TextEdit {
+                    width: parent.width
+                    readOnly: true
+                    selectByMouse: true
+                    wrapMode: Text.WordWrap
+                    textFormat: legalSheet.markdown ? Text.MarkdownText : Text.PlainText
+                    text: legalSheet.markdown ? root.noticesText : root.licenseText
+                    font.family: legalSheet.markdown ? MeoTheme.fontFamily : MeoTheme.fontFamilyMonospace
+                    font.pixelSize: MeoTheme.bodySmall.size * MeoTheme.globalScale
+                    color: MeoTheme.contentOnSurface
+                    onLinkActivated: (link) => Qt.openUrlExternally(link)
+                }
+            }
+        }
     }
 }

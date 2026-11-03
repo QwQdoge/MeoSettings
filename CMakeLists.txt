@@ -744,7 +744,7 @@ install(FILES
 install(FILES data/meo-account/clients/org.meo.Settings.json
     DESTINATION "${CMAKE_INSTALL_DATADIR}/meo-account/clients"
 )
-install(FILES LICENSE
+install(FILES LICENSE THIRD_PARTY_NOTICES.md
     DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/meo-settings"
 )
 

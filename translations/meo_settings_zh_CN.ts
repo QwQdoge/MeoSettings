@@ -134,6 +134,26 @@
         <source>The advanced system information tool is not installed</source>
         <translation>未安装高级系统信息工具</translation>
     </message>
+    <message>
+        <source>Legal</source>
+        <translation>法律信息</translation>
+    </message>
+    <message>
+        <source>License</source>
+        <translation>许可证</translation>
+    </message>
+    <message>
+        <source>Open-source licenses</source>
+        <translation>开源许可</translation>
+    </message>
+    <message>
+        <source>Components Meo Settings uses</source>
+        <translation>Meo 设置使用的组件</translation>
+    </message>
+    <message>
+        <source>License information is not available in this build</source>
+        <translation>此版本未包含许可信息</translation>
+    </message>
 </context>
 <context>
     <name>AccountsPage</name>
