@@ -36,17 +36,17 @@ jobs:
           mkdir -p "$HOME"
 
       - name: Check out MeoSettings
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Check out MeoUI
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: QwQdoge/MeoUI
           ref: main
           path: deps/MeoUI
 
       - name: Check out MeoKDE dependency
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: QwQdoge/meo-kde
           ref: main
