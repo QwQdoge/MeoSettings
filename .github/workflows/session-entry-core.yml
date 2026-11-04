@@ -31,7 +31,7 @@ jobs:
           pacman -S --needed --noconfirm base-devel cmake ninja qt6-base
 
       - name: Check out MeoSettings
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Configure focused tests
         run: >-
