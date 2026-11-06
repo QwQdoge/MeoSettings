@@ -1,3 +1,5 @@
+> 📚 [MeoArch 主文档 / Master Doc](https://github.com/QwQdoge/MeoArch-os-workspace/blob/main/docs/MEOARCH_MASTER.md)：全部仓库地图、操作手册、Cloudflare 清单、全部文档链接。<!-- meoarch-master -->
+
 # Meo Settings
 
 Meo Settings 是 MeoArch 的日常系统设置应用。它以 MeoUI 提供的通用界面为基础，通过稳定的 Qt/KDE API、已安装的 MeoKDE 运行时和明确的 KCM 交接提供真实设置流程；它不取代 NetworkManager、BlueZ、PipeWire、KScreen、PowerDevil、KWin 或 System Settings。
