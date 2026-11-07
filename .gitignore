@@ -18,3 +18,4 @@ secrets*.json
 .netrc
 .npmrc
 .pypirc
+build/
