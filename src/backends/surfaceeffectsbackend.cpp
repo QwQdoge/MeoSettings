@@ -2,6 +2,8 @@
 
 #include <KConfigGroup>
 #include <KSharedConfig>
+#include <QDBusConnection>
+#include <QDBusMessage>
 
 namespace
 {
@@ -9,6 +11,29 @@ constexpr auto configFile = "meo-shellrc";
 constexpr auto groupName = "Appearance";
 constexpr auto transparencyKey = "SurfaceTransparency";
 constexpr auto blurKey = "SurfaceBlur";
+// KWin's default blur strength (5) is faint. A Pixel-like frosted look needs a
+// stronger, soft blur with no grain. Only applied when the user has not chosen
+// a strength themselves.
+constexpr int frostedBlurStrength = 10;
+
+void applyFrostedKWinBlur()
+{
+    auto group = KSharedConfig::openConfig(QStringLiteral("kwinrc"))->group(QStringLiteral("Effect-blur"));
+    if (group.hasKey("BlurStrength")) {
+        return;
+    }
+    group.writeEntry("BlurStrength", frostedBlurStrength, KConfig::Notify);
+    if (!group.hasKey("NoiseStrength")) {
+        group.writeEntry("NoiseStrength", 0, KConfig::Notify);
+    }
+    if (group.sync()) {
+        auto reload = QDBusMessage::createMethodCall(QStringLiteral("org.kde.KWin"), QStringLiteral("/Effects"),
+                                                     QStringLiteral("org.kde.kwin.Effects"),
+                                                     QStringLiteral("reconfigureEffect"));
+        reload.setArguments({QStringLiteral("blur")});
+        QDBusConnection::sessionBus().send(reload);
+    }
+}
 }
 
 SurfaceEffectsBackend::SurfaceEffectsBackend(QObject *parent)
@@ -41,7 +66,9 @@ void SurfaceEffectsBackend::refresh()
 void SurfaceEffectsBackend::setBlur(bool enabled)
 {
     // Blur needs a translucent surface to show through.
-    write(enabled ? true : m_transparency, enabled);
+    if (write(enabled ? true : m_transparency, enabled) && enabled) {
+        applyFrostedKWinBlur();
+    }
 }
 
 void SurfaceEffectsBackend::setTransparency(bool enabled)

@@ -38,6 +38,28 @@ private Q_SLOTS:
         QVERIFY(group.readEntry("SurfaceTransparency", false));
     }
 
+    void enablingBlurRaisesKWinStrengthOnlyWhenUnset()
+    {
+        const auto kwinrc = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
+                            + QStringLiteral("/kwinrc");
+        QFile::remove(kwinrc);
+        {
+            SurfaceEffectsBackend backend;
+            backend.setBlur(true);
+        }
+        auto config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
+        config->reparseConfiguration();
+        QCOMPARE(KConfigGroup(config, QStringLiteral("Effect-blur")).readEntry("BlurStrength", 0), 10);
+
+        KConfigGroup(config, QStringLiteral("Effect-blur")).writeEntry("BlurStrength", 3);
+        config->sync();
+        SurfaceEffectsBackend again;
+        again.setBlur(false);
+        again.setBlur(true);
+        config->reparseConfiguration();
+        QCOMPARE(KConfigGroup(config, QStringLiteral("Effect-blur")).readEntry("BlurStrength", 0), 3);
+    }
+
     void disablingBlurKeepsTransparency()
     {
         SurfaceEffectsBackend backend;
