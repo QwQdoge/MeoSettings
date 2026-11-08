@@ -51,6 +51,7 @@
 #include <QLocale>
 #include <QRegularExpression>
 #include <QQuickWindow>
+#include <QSurfaceFormat>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QSize>
@@ -111,6 +112,13 @@ bool installCatalog(QGuiApplication &app,
 
 int main(int argc, char *argv[])
 {
+    // The window background becomes a thin tint when the optional frosted blur
+    // is enabled at runtime, so the surface needs an alpha channel from the
+    // start (it cannot be added after the window is created).
+    QSurfaceFormat format = QSurfaceFormat::defaultFormat();
+    format.setAlphaBufferSize(8);
+    QSurfaceFormat::setDefaultFormat(format);
+
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Meo Settings"));
     app.setApplicationDisplayName(QStringLiteral("Meo Settings"));
