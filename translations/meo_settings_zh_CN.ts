@@ -757,6 +757,26 @@
 <context>
     <name>AppearancePage</name>
     <message>
+        <source>Toolbar labels and icons in applications</source>
+        <translation>应用中的工具栏文字和图标</translation>
+    </message>
+    <message>
+        <source>Icons used by applications and the workspace</source>
+        <translation>应用和工作区使用的图标</translation>
+    </message>
+    <message>
+        <source>Title-bar buttons and window borders</source>
+        <translation>标题栏按钮和窗口边框</translation>
+    </message>
+    <message>
+        <source>Animation shown while the session starts</source>
+        <translation>会话启动时显示的动画</translation>
+    </message>
+    <message>
+        <source>Panels, widgets, popups and notifications are drawn by Meo Shell and follow the Meo color scheme</source>
+        <translation>面板、小部件、弹窗和通知由 Meo Shell 绘制，并跟随 Meo 配色</translation>
+    </message>
+    <message>
         <location filename="../qml/pages/AppearancePage.qml" line="16"/>
         <location filename="../qml/pages/AppearancePage.qml" line="191"/>
         <location filename="../qml/pages/AppearancePage.qml" line="1051"/>
@@ -6846,6 +6866,118 @@ Total prompt: %7 characters</source>
 <context>
     <name>KdeConfigBackend</name>
     <message>
+        <source>Toolbar buttons</source>
+        <translation>工具栏按钮</translation>
+    </message>
+    <message>
+        <source>How icons and labels are shown on application toolbars</source>
+        <translation>应用工具栏中图标和文字的显示方式</translation>
+    </message>
+    <message>
+        <source>Icons only</source>
+        <translation>仅图标</translation>
+    </message>
+    <message>
+        <source>Text only</source>
+        <translation>仅文字</translation>
+    </message>
+    <message>
+        <source>Text beside icons</source>
+        <translation>文字在图标旁</translation>
+    </message>
+    <message>
+        <source>Text under icons</source>
+        <translation>文字在图标下</translation>
+    </message>
+    <message>
+        <source>Show icons on buttons</source>
+        <translation>在按钮上显示图标</translation>
+    </message>
+    <message>
+        <source>Show icons in menus</source>
+        <translation>在菜单中显示图标</translation>
+    </message>
+    <message>
+        <source>Title-bar buttons</source>
+        <translation>标题栏按钮</translation>
+    </message>
+    <message>
+        <source>Window controls shown on the right of the title bar</source>
+        <translation>显示在标题栏右侧的窗口控制</translation>
+    </message>
+    <message>
+        <source>Minimize, maximize, close</source>
+        <translation>最小化、最大化、关闭</translation>
+    </message>
+    <message>
+        <source>Maximize, close</source>
+        <translation>最大化、关闭</translation>
+    </message>
+    <message>
+        <source>Close only</source>
+        <translation>仅关闭</translation>
+    </message>
+    <message>
+        <source>Window menu</source>
+        <translation>窗口菜单</translation>
+    </message>
+    <message>
+        <source>Controls shown on the left of the title bar</source>
+        <translation>显示在标题栏左侧的控制</translation>
+    </message>
+    <message>
+        <source>Window menu and keep on all desktops</source>
+        <translation>窗口菜单和“在所有桌面显示”</translation>
+    </message>
+    <message>
+        <source>Keep on all desktops</source>
+        <translation>在所有桌面显示</translation>
+    </message>
+    <message>
+        <source>Window border size</source>
+        <translation>窗口边框大小</translation>
+    </message>
+    <message>
+        <source>No borders</source>
+        <translation>无边框</translation>
+    </message>
+    <message>
+        <source>No side borders</source>
+        <translation>无侧边框</translation>
+    </message>
+    <message>
+        <source>Tiny</source>
+        <translation>极小</translation>
+    </message>
+    <message>
+        <source>Normal</source>
+        <translation>正常</translation>
+    </message>
+    <message>
+        <source>Large</source>
+        <translation>较大</translation>
+    </message>
+    <message>
+        <source>Startup animation</source>
+        <translation>启动动画</translation>
+    </message>
+    <message>
+        <source>Shown while the desktop session starts</source>
+        <translation>桌面会话启动时显示</translation>
+    </message>
+    <message>
+        <source>No startup animation</source>
+        <translation>无启动动画</translation>
+    </message>
+    <message>
+        <source>System icon theme</source>
+        <translation>系统图标主题</translation>
+    </message>
+    <message>
+        <source>Icons used by applications and the workspace; application identity icons are set separately</source>
+        <translation>应用和工作区使用的图标；应用身份图标另行设置</translation>
+    </message>
+    <message>
         <source>Sound theme</source>
         <translation>声音主题</translation>
     </message>
@@ -7422,6 +7554,13 @@ Total prompt: %7 characters</source>
     <message>
         <source>Starting hotspot…</source>
         <translation>正在启动热点…</translation>
+    </message>
+</context>
+<context>
+    <name>ConfigSchemaGroups</name>
+    <message>
+        <source>Setting applied</source>
+        <translation>设置已应用</translation>
     </message>
 </context>
 </TS>

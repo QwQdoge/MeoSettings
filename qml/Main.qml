@@ -303,7 +303,6 @@ ApplicationWindow {
         case "spell-checking":
         case "workspace":
         case "automount":
-        case "sound-theme":
         case "wallet": return Qt.resolvedUrl("pages/ConfigSchemaPage.qml")
         case "about": return Qt.resolvedUrl("pages/AboutPage.qml")
         default:

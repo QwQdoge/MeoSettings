@@ -201,6 +201,7 @@ qt_add_qml_module(meo-settings
         qml/components/RepairEntry.qml
         qml/components/PageHero.qml
         qml/components/ApplyToast.qml
+        qml/components/ConfigSchemaGroups.qml
 )
 
 qt_add_executable(meo-welcome
@@ -265,6 +266,7 @@ qt_add_lupdate(
         qml/components/RepairEntry.qml
         qml/components/PageHero.qml
         qml/components/ApplyToast.qml
+        qml/components/ConfigSchemaGroups.qml
         qml/pages/AboutPage.qml
         qml/pages/AccountsPage.qml
         qml/pages/ConfigSchemaPage.qml

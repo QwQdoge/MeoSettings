@@ -10,6 +10,21 @@ Item {
     property var navigateTo: function(route) {}
     property var rootMetrics: null
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
+    // Search results for the merged style pages open this page scrolled to
+    // the matching section.
+    property string focusSection: ""
+    readonly property var styleSections: [
+        { "id": "application-style", "title": qsTr("Application style"), "subtitle": qsTr("Toolbar labels and icons in applications") },
+        { "id": "icons", "title": qsTr("System icon theme"), "subtitle": qsTr("Icons used by applications and the workspace") },
+        { "id": "window-decorations", "title": qsTr("Window decorations"), "subtitle": qsTr("Title-bar buttons and window borders") },
+        { "id": "welcome-screen", "title": qsTr("Welcome screen"), "subtitle": qsTr("Animation shown while the session starts") },
+        { "id": "sound-theme", "title": qsTr("Sound theme"), "subtitle": qsTr("Notification and desktop event sounds") }
+    ]
+    function scrollToSection(item) {
+        if (!item) return
+        const point = item.mapToItem(page.contentItem, 0, 0)
+        page.contentY = Math.max(0, point.y - 16 * MeoTheme.globalScale)
+    }
 
     function dynamicSourceTitle(source) {
         switch (source) {
@@ -188,14 +203,9 @@ Item {
         root.moduleRow("kcm_lookandfeel", qsTr("Global theme"), qsTr("Apply a complete platform look-and-feel package"), "palette"),
         root.moduleRow("kcm_colors", qsTr("Color scheme & contrast"), qsTr("Inspect installed platform color schemes and compatibility colors"), "contrast"),
         ({"title": qsTr("Wallpaper"), "subtitle": qsTr("Choose a desktop image and layout"), "icon": "wallpaper", "route": "wallpaper", "enabled": true, "trailingKind": "chevron"}),
-        root.moduleRow("kcm_style", qsTr("Application style"), qsTr("Widget style, toolbar labels, and application behavior"), "web_asset"),
-        root.moduleRow("kcm_desktoptheme", qsTr("Plasma style"), qsTr("Panel, widget, popup, and notification appearance"), "dashboard"),
-        root.moduleRow("kcm_icons", qsTr("System icon theme"), qsTr("Installed platform icon themes for apps and the workspace"), "apps"),
+        ({"title": qsTr("Plasma style"), "subtitle": qsTr("Panels, widgets, popups and notifications are drawn by Meo Shell and follow the Meo color scheme"), "icon": "dashboard", "tone": "tertiary", "enabled": false, "trailingKind": "none"}),
         ({"title": qsTr("Cursors"), "subtitle": qsTr("Installed pointer themes and sizes"), "icon": "mouse", "route": "cursors", "enabled": true, "trailingKind": "chevron"}),
-        ({"title": qsTr("Fonts"), "subtitle": qsTr("Interface, fixed width, menus and window titles"), "icon": "format_size", "route": "fonts", "enabled": true, "trailingKind": "chevron"}),
-        root.moduleRow("kcm_kwindecoration", qsTr("Window decorations"), qsTr("Title bars, borders, buttons, and decoration themes"), "select_window"),
-        root.moduleRow("kcm_splashscreen", qsTr("Welcome screen"), qsTr("Plasma session startup animation"), "animation"),
-        root.moduleRow("kcm_soundtheme", qsTr("Sound theme"), qsTr("Notification and desktop event sounds"), "music_note")
+        ({"title": qsTr("Fonts"), "subtitle": qsTr("Interface, fixed width, menus and window titles"), "icon": "format_size", "route": "fonts", "enabled": true, "trailingKind": "chevron"})
     ]
 
     MeoPageLayout {
@@ -259,6 +269,27 @@ Item {
                     root.applyDynamicColor()
             }
         }
+
+        Repeater {
+            model: root.styleSections
+            delegate: Column {
+                id: styleBlock
+                required property var modelData
+                width: parent.width
+                spacing: MeoTheme.space8
+                visible: styleGroups.hasContent
+                Component.onCompleted: if (root.focusSection === modelData.id) Qt.callLater(root.scrollToSection, styleBlock)
+                MeoText { width: parent.width; text: styleBlock.modelData.title; typeRole: "title"; typeSize: "small"; emphasized: true; color: MeoTheme.contentOnSurface }
+                MeoText { width: parent.width; text: styleBlock.modelData.subtitle; typeRole: "body"; typeSize: "medium"; color: MeoTheme.contentOnSurfaceVariant; wrapMode: Text.WordWrap }
+                ConfigSchemaGroups {
+                    id: styleGroups
+                    width: parent.width
+                    schemaId: styleBlock.modelData.id
+                    onApplied: (message) => styleToast.show(message)
+                }
+            }
+        }
+        ApplyToast { id: styleToast }
 
         MeoSettingsGroup {
             width: parent.width

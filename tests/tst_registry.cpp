@@ -314,22 +314,15 @@ void SettingsRegistryTest::exposesNativeAccountAndUpdateRoutes()
 void SettingsRegistryTest::exposesCompleteAppearanceAndIntegrationRoutes()
 {
     SettingsRegistry registry;
-    const QStringList appearanceEntries{
-        QStringLiteral("application-style"),
-        QStringLiteral("plasma-style"),
-        QStringLiteral("window-decorations"),
-        QStringLiteral("welcome-screen"),
-    };
-    for (const auto &id : appearanceEntries) {
-        const auto entry = registry.entry(id);
-        QVERIFY2(!entry.isEmpty(), qPrintable(id));
-        QCOMPARE(entry.value(QStringLiteral("categoryId")).toString(), QStringLiteral("personalization"));
-        QCOMPARE(entry.value(QStringLiteral("authority")).toString(), QStringLiteral("kde"));
-    }
-
-    const auto soundTheme = registry.entry(QStringLiteral("sound-theme"));
-    QVERIFY(soundTheme.value(QStringLiteral("direct")).toBool());
-    QCOMPARE(soundTheme.value(QStringLiteral("authority")).toString(), QStringLiteral("meo"));
+    // Style, icon, decoration, startup and sound settings live inside the
+    // Appearance page now; they stay searchable through its keywords.
+    for (const auto &id : {QStringLiteral("application-style"), QStringLiteral("plasma-style"),
+                           QStringLiteral("window-decorations"), QStringLiteral("welcome-screen"),
+                           QStringLiteral("sound-theme"), QStringLiteral("icons"), QStringLiteral("colors")})
+        QVERIFY2(registry.entry(id).isEmpty(), qPrintable(id));
+    const auto appearanceKeywords = registry.entry(QStringLiteral("appearance")).value(QStringLiteral("keywords")).toStringList();
+    QVERIFY(appearanceKeywords.contains(QStringLiteral("icon theme")));
+    QVERIFY(appearanceKeywords.contains(QStringLiteral("sound theme")));
 
     const auto cursors = registry.entry(QStringLiteral("cursors"));
     QCOMPARE(cursors.value(QStringLiteral("route")).toString(), QStringLiteral("cursors"));

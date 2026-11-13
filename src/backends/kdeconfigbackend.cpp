@@ -301,6 +301,62 @@ QVariantList build(const QString &page)
             }),
         };
     }
+    if (page == QLatin1String("application-style")) {
+        return {
+            section(nullptr, {
+                choice("toolbarStyle", QT_TRANSLATE_NOOP("KdeConfigBackend", "Toolbar buttons"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "How icons and labels are shown on application toolbars"),
+                       "kdeglobals", "Toolbar style", "ToolButtonStyle", "TextBesideIcon",
+                       options({{"NoText", QT_TRANSLATE_NOOP("KdeConfigBackend", "Icons only")},
+                                {"TextOnly", QT_TRANSLATE_NOOP("KdeConfigBackend", "Text only")},
+                                {"TextBesideIcon", QT_TRANSLATE_NOOP("KdeConfigBackend", "Text beside icons")},
+                                {"TextUnderIcon", QT_TRANSLATE_NOOP("KdeConfigBackend", "Text under icons")}}), "globals"),
+                toggle("iconsOnButtons", QT_TRANSLATE_NOOP("KdeConfigBackend", "Show icons on buttons"), nullptr,
+                       "kdeglobals", "KDE", "ShowIconsOnPushButtons", true, "globals"),
+                toggle("iconsInMenus", QT_TRANSLATE_NOOP("KdeConfigBackend", "Show icons in menus"), nullptr,
+                       "kdeglobals", "KDE", "ShowIconsInMenuItems", true, "globals"),
+            }),
+        };
+    }
+    if (page == QLatin1String("window-decorations")) {
+        return {
+            section(nullptr, {
+                choice("buttonsRight", QT_TRANSLATE_NOOP("KdeConfigBackend", "Title-bar buttons"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "Window controls shown on the right of the title bar"),
+                       "kwinrc", "org.kde.kdecoration2", "ButtonsOnRight", "IAX",
+                       options({{"IAX", QT_TRANSLATE_NOOP("KdeConfigBackend", "Minimize, maximize, close")},
+                                {"AX", QT_TRANSLATE_NOOP("KdeConfigBackend", "Maximize, close")},
+                                {"X", QT_TRANSLATE_NOOP("KdeConfigBackend", "Close only")}}), "kwin"),
+                choice("buttonsLeft", QT_TRANSLATE_NOOP("KdeConfigBackend", "Window menu"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "Controls shown on the left of the title bar"),
+                       "kwinrc", "org.kde.kdecoration2", "ButtonsOnLeft", "M",
+                       options({{"M", QT_TRANSLATE_NOOP("KdeConfigBackend", "Window menu")},
+                                {"MS", QT_TRANSLATE_NOOP("KdeConfigBackend", "Window menu and keep on all desktops")},
+                                {"S", QT_TRANSLATE_NOOP("KdeConfigBackend", "Keep on all desktops")}}), "kwin"),
+                choice("borderSize", QT_TRANSLATE_NOOP("KdeConfigBackend", "Window border size"), nullptr,
+                       "kwinrc", "org.kde.kdecoration2", "BorderSize", "Normal",
+                       options({{"None", QT_TRANSLATE_NOOP("KdeConfigBackend", "No borders")},
+                                {"NoSides", QT_TRANSLATE_NOOP("KdeConfigBackend", "No side borders")},
+                                {"Tiny", QT_TRANSLATE_NOOP("KdeConfigBackend", "Tiny")},
+                                {"Normal", QT_TRANSLATE_NOOP("KdeConfigBackend", "Normal")},
+                                {"Large", QT_TRANSLATE_NOOP("KdeConfigBackend", "Large")}}), "kwin"),
+            }),
+        };
+    }
+    if (page == QLatin1String("welcome-screen")) {
+        Map splash = choice("splash", QT_TRANSLATE_NOOP("KdeConfigBackend", "Startup animation"),
+                            QT_TRANSLATE_NOOP("KdeConfigBackend", "Shown while the desktop session starts"),
+                            "ksplashrc", "KSplash", "Theme", "None", {});
+        splash.insert("dynamic", QStringLiteral("splash-themes"));
+        return {section(nullptr, {splash})};
+    }
+    if (page == QLatin1String("icons")) {
+        Map icons = choice("iconTheme", QT_TRANSLATE_NOOP("KdeConfigBackend", "System icon theme"),
+                           QT_TRANSLATE_NOOP("KdeConfigBackend", "Icons used by applications and the workspace; application identity icons are set separately"),
+                           "kdeglobals", "Icons", "Theme", "breeze", {}, "icons");
+        icons.insert("dynamic", QStringLiteral("icon-themes"));
+        return {section(nullptr, {icons})};
+    }
     if (page == QLatin1String("sound-theme")) {
         Map theme = choice("theme", QT_TRANSLATE_NOOP("KdeConfigBackend", "Sound theme"),
                            QT_TRANSLATE_NOOP("KdeConfigBackend", "Sounds for notifications, alerts, and system events"),
@@ -339,6 +395,47 @@ QVariantList soundThemes()
     return out;
 }
 
+// Splash themes are Look-and-Feel packages that ship a splash component.
+QVariantList splashThemes()
+{
+    QVariantList out{Map{{"value", QStringLiteral("None")}, {"label", QCoreApplication::translate("KdeConfigBackend", "No startup animation")}}};
+    QStringList seen;
+    for (const QString &root : QStandardPaths::locateAll(QStandardPaths::GenericDataLocation,
+                                                         QStringLiteral("plasma/look-and-feel"), QStandardPaths::LocateDirectory)) {
+        for (const QString &name : QDir(root).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+            if (seen.contains(name) || !QDir(root + QLatin1Char('/') + name + QStringLiteral("/contents/splash")).exists())
+                continue;
+            seen.append(name);
+            out.append(Map{{"value", name}, {"label", name}});
+        }
+    }
+    return out;
+}
+
+// Icon themes that declare directories and are not hidden (cursor-only
+// themes are skipped), matching what the platform theme chooser lists.
+QVariantList iconThemes()
+{
+    QVariantList out;
+    QStringList seen;
+    for (const QString &root : QStandardPaths::locateAll(QStandardPaths::GenericDataLocation,
+                                                         QStringLiteral("icons"), QStandardPaths::LocateDirectory)) {
+        for (const QString &name : QDir(root).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+            const QString index = root + QLatin1Char('/') + name + QStringLiteral("/index.theme");
+            if (seen.contains(name) || !QFile::exists(index))
+                continue;
+            KConfig theme(index, KConfig::SimpleConfig);
+            const KConfigGroup group = theme.group(QStringLiteral("Icon Theme"));
+            if (group.readEntry("Hidden", false) || !group.hasKey("Directories"))
+                continue;
+            seen.append(name);
+            const QString label = group.readEntry("Name", name);
+            out.append(Map{{"value", name}, {"label", label.isEmpty() ? name : label}});
+        }
+    }
+    return out;
+}
+
 bool needsKwin(const QString &hook)
 {
     return hook == QLatin1String("kwin") || hook.startsWith(QLatin1String("effect:")) || hook.startsWith(QLatin1String("vdesktop:"));
@@ -354,7 +451,8 @@ KdeConfigBackend::KdeConfigBackend(QObject *parent) : BackendBase(parent)
 {
     const QStringList files{QStringLiteral("kwinrc"), QStringLiteral("kdeglobals"), QStringLiteral("baloofilerc"),
                             QStringLiteral("ksmserverrc"), QStringLiteral("sonnetrc"), QStringLiteral("plasmarc"),
-                            QStringLiteral("device_automounter_kcmrc"), QStringLiteral("kwalletrc")};
+                            QStringLiteral("device_automounter_kcmrc"), QStringLiteral("kwalletrc"),
+                            QStringLiteral("ksplashrc")};
     for (const QString &file : files) {
         auto watcher = KConfigWatcher::create(KSharedConfig::openConfig(file));
         connect(watcher.data(), &KConfigWatcher::configChanged, this, [this] { refresh(); });
@@ -390,6 +488,10 @@ QVariantList KdeConfigBackend::sectionsFor(const QString &pageId) const
             Map row = rowValue.toMap();
             if (row.value("dynamic").toString() == QLatin1String("sound-themes"))
                 row.insert("choices", soundThemes());
+            else if (row.value("dynamic").toString() == QLatin1String("splash-themes"))
+                row.insert("choices", splashThemes());
+            else if (row.value("dynamic").toString() == QLatin1String("icon-themes"))
+                row.insert("choices", iconThemes());
             rowValue = row;
         }
         sectionMap.insert("rows", rows);
@@ -488,6 +590,8 @@ void KdeConfigBackend::setValue(const QString &pageId, const QString &rowId, con
         else
             group.writeEntry(key, text, KConfig::Notify);
     }
+    if (row.value("dynamic").toString() == QLatin1String("splash-themes"))
+        group.writeEntry("Engine", value.toString() == QLatin1String("None") ? QStringLiteral("none") : QStringLiteral("KSplashQML"), KConfig::Notify);
     if (!group.sync()) {
         setError(tr("The setting could not be saved."));
         return;
@@ -528,6 +632,11 @@ void KdeConfigBackend::runHook(const QString &hook, const QVariant &value)
         auto signal = QDBusMessage::createSignal(QStringLiteral("/KGlobalSettings"), QStringLiteral("org.kde.KGlobalSettings"),
                                                   QStringLiteral("notifyChange"));
         signal << 3 << 4;
+        bus.send(signal);
+    } else if (hook == QLatin1String("icons")) {
+        auto signal = QDBusMessage::createSignal(QStringLiteral("/KGlobalSettings"), QStringLiteral("org.kde.KGlobalSettings"),
+                                                  QStringLiteral("notifyChange"));
+        signal << 4 << 0; // IconChanged, desktop group
         bus.send(signal);
     } else if (hook.startsWith(QLatin1String("effect:"))) {
         const bool enable = value.isValid() ? value.toBool() : false;
