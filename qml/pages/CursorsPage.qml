@@ -10,10 +10,12 @@ Item {
     property int selectedSize: InputDevices.cursorSettings.size
     readonly property var selected: InputDevices.cursorThemes.find(theme => theme.id === selectedTheme) || ({"sizes": [], "preview": ""})
     Component.onCompleted: InputDevices.refreshCursorThemes()
+    ApplyToast { id: toast }
     MeoPageLayout {
         anchors.fill: parent; metricsOverride: root.rootMetrics
         title: qsTr("Cursors")
         subtitle: qsTr("Choose an installed pointer theme and size for this desktop session")
+        PageHero { anchors.horizontalCenter: parent.horizontalCenter; icon: "mouse"; tone: "secondary"; shapeA: "Arrow"; shapeB: "Circle"; artSize: 112 * MeoTheme.globalScale }
         MeoBanner {
             width: parent.width; visible: InputDevices.error !== ""
             title: qsTr("Cursor preference needs attention"); text: InputDevices.error; tone: "error"
@@ -35,7 +37,7 @@ Item {
             }
         }
         Image {
-            width: 96; height: 96; fillMode: Image.PreserveAspectFit
+            width: 96 * MeoTheme.globalScale; height: width; fillMode: Image.PreserveAspectFit
             source: root.selected.preview; visible: source.toString() !== ""
             Accessible.name: qsTr("Selected cursor theme preview")
         }
@@ -49,7 +51,7 @@ Item {
         MeoButton {
             text: qsTr("Apply pointer preferences")
             enabled: InputDevices.cursorSettings.available && InputDevices.cursorSettings.writable && root.selected.sizes.indexOf(root.selectedSize) >= 0
-            onClicked: InputDevices.configureCursor(root.selectedTheme, root.selectedSize)
+            onClicked: { InputDevices.configureCursor(root.selectedTheme, root.selectedSize); toast.show(qsTr("Pointer preferences applied")) }
         }
         MeoText {
             width: parent.width; wrapMode: Text.WordWrap

@@ -12,11 +12,15 @@ Item {
     Component.onCompleted: syncSelection()
     property string configuredKey: JSON.stringify(InputDevices.configuredLayouts)
     onConfiguredKeyChanged: syncSelection()
+    ApplyToast { id: toast }
     MeoPageLayout {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
         title: qsTr("Keyboard")
+        subtitle: qsTr("Typing layouts, key repeat, and the active input language")
+        PageHero { anchors.horizontalCenter: parent.horizontalCenter; icon: "keyboard"; tone: "secondary"; shapeA: "Square"; shapeB: "Clover4Leaf"; artSize: 112 * MeoTheme.globalScale }
         MeoBanner { width: parent.width; visible: InputDevices.error !== ""; title: qsTr("Keyboard setting needs attention"); text: InputDevices.error; tone: "error" }
+        MeoEmptyState { width: parent.width; visible: InputDevices.keyboardLayouts.length === 0 && !InputDevices.keyRepeat.available; icon: "keyboard"; title: qsTr("Keyboard controls unavailable"); description: qsTr("These controls need the KDE Wayland input service, which is not running in this session.") }
         Column {
             width: parent.width; spacing: MeoTheme.space8
             visible: InputDevices.keyRepeat.available
@@ -41,7 +45,7 @@ Item {
             MeoButton {
                 text: qsTr("Apply key repeat"); type: "tonal"
                 enabled: InputDevices.keyRepeat.writable && !InputDevices.busy && repeatDelay.acceptableInput && repeatRate.acceptableInput
-                onClicked: InputDevices.configureKeyRepeat(parent.repeatMode, Number(repeatDelay.text), Number(repeatRate.text))
+                onClicked: { InputDevices.configureKeyRepeat(parent.repeatMode, Number(repeatDelay.text), Number(repeatRate.text)); toast.show(qsTr("Key repeat applied")) }
             }
         }
         MeoExposedDropdown {
@@ -69,7 +73,7 @@ Item {
                 if (root.selectedIds.indexOf(id) < 0) root.selectedIds = root.selectedIds.concat([id])
             }
         }
-        MeoButton { text: qsTr("Apply layouts"); enabled: !InputDevices.busy && root.selectedIds.length > 0; onClicked: InputDevices.configureKeyboardLayouts(root.selectedIds) }
+        MeoButton { text: qsTr("Apply layouts"); enabled: !InputDevices.busy && root.selectedIds.length > 0; onClicked: { InputDevices.configureKeyboardLayouts(root.selectedIds); toast.show(qsTr("Keyboard layouts applied")) } }
         MeoButton { text: qsTr("Advanced keyboard settings"); type: "text"; onClicked: root.navigateTo("kcm:kcm_keyboard") }
         MeoButton { text: qsTr("Keyboard shortcuts"); type: "text"; onClicked: root.navigateTo("kcm:kcm_keys") }
     }

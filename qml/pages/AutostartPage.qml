@@ -20,6 +20,7 @@ Item {
         anchors.fill: parent; metricsOverride: root.rootMetrics
         title: qsTr("Autostart")
         subtitle: qsTr("Choose applications allowed to start at your next sign-in")
+        PageHero { anchors.horizontalCenter: parent.horizontalCenter; icon: "play_circle"; tone: "tertiary"; shapeA: "Pill"; shapeB: "Cookie7Sided"; artSize: 112 * MeoTheme.globalScale }
         MeoBanner { width: parent.width; visible: AutostartBackend.error !== ""; title: qsTr("Startup preference needs attention"); text: AutostartBackend.error; tone: "error" }
         MeoText {
             width: parent.width; wrapMode: Text.WordWrap

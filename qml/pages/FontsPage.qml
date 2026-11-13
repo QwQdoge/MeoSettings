@@ -6,10 +6,14 @@ Item {
     id: root
     property var navigateTo: function(route) {}
     property var rootMetrics: null
+    ApplyToast { id: toast }
     MeoPageLayout {
         anchors.fill: parent
         metricsOverride: root.rootMetrics
         title: qsTr("Fonts")
+        subtitle: qsTr("Typefaces and sizes used across the desktop and applications")
+        PageHero { anchors.horizontalCenter: parent.horizontalCenter; icon: "text_fields"; tone: "tertiary"; shapeA: "Clover8Leaf"; shapeB: "Cookie12Sided"; artSize: 112 * MeoTheme.globalScale }
+        MeoEmptyState { width: parent.width; visible: FontSettingsBackend.fonts.length === 0; icon: "text_fields"; title: qsTr("No font settings available"); description: qsTr("The font configuration could not be read on this device.") }
         MeoBanner { width: parent.width; visible: FontSettingsBackend.error !== ""; title: qsTr("Font setting needs attention"); text: FontSettingsBackend.error; tone: "error" }
         Repeater {
             model: FontSettingsBackend.fonts
@@ -39,7 +43,7 @@ Item {
                 MeoButton {
                     text: qsTr("Apply %1 font").arg(entry.modelData.label)
                     type: "tonal"; enabled: sizeField.acceptableInput && entry.chosenStyle !== ""
-                    onClicked: FontSettingsBackend.setFont(entry.modelData.id, entry.chosenFamily, entry.chosenStyle, Number(sizeField.text))
+                    onClicked: { FontSettingsBackend.setFont(entry.modelData.id, entry.chosenFamily, entry.chosenStyle, Number(sizeField.text)); toast.show(qsTr("%1 font applied").arg(entry.modelData.label)) }
                 }
             }
         }

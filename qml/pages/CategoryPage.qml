@@ -63,6 +63,22 @@ Item {
         return rows
     }
 
+    // Each category gets its own pair of silhouettes so the illustration
+    // reads as a place, not a repeated decoration.
+    readonly property var heroShapes: ({
+        "network": ["Cookie6Sided", "Flower"],
+        "devices": ["Clover4Leaf", "Pentagon"],
+        "display-sound": ["Oval", "SoftBurst"],
+        "personalization": ["Flower", "Sunny"],
+        "apps": ["Cookie9Sided", "Clover8Leaf"],
+        "accounts": ["Circle", "Cookie7Sided"],
+        "storage": ["Pill", "Square"],
+        "system": ["Gem", "Cookie12Sided"],
+        "privacy": ["Hexagon", "Clover4Leaf"],
+        "accessibility": ["Puffy", "Circle"],
+        "updates": ["SoftBurst", "VerySunny"]
+    })
+
     MeoPageLayout {
         id: page
         anchors.fill: parent
@@ -72,6 +88,15 @@ Item {
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : (root.categoryInfo.title || qsTr("Settings"))
         subtitle: root.categoryInfo.description || qsTr("Browse settings available on this device")
+
+        PageHero {
+            anchors.horizontalCenter: parent.horizontalCenter
+            icon: root.categoryInfo.icon || "settings"
+            tone: root.categoryInfo.tone || "primary"
+            shapeA: (root.heroShapes[root.categoryId] || ["SoftBurst", "Cookie9Sided"])[0]
+            shapeB: (root.heroShapes[root.categoryId] || ["SoftBurst", "Cookie9Sided"])[1]
+            artSize: (root.isCompact ? 112 : 148) * MeoTheme.globalScale
+        }
 
         MeoSettingsGroup {
             width: parent.width
