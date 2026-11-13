@@ -16,6 +16,7 @@
 #include "backends/appearancebackend.h"
 #include "backends/portalpermissionsbackend.h"
 #include "backends/accessibilitybackend.h"
+#include "backends/kdeconfigbackend.h"
 #include "backends/proxybackend.h"
 #include "backends/documentationprovider.h"
 #include "backends/fingerprintbackend.h"
@@ -268,6 +269,7 @@ int main(int argc, char *argv[])
     DisplayBackend displayBackend;
     ProxyBackend proxyBackend;
     AccessibilityBackend accessibilityBackend;
+    KdeConfigBackend kdeConfigBackend;
     PortalPermissionsBackend portalPermissionsBackend;
     WallpaperBackend wallpaperBackend;
     AppearanceBackend appearanceBackend;
@@ -334,6 +336,7 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("DisplayBackend"), &displayBackend);
     context->setContextProperty(QStringLiteral("ProxyBackend"), &proxyBackend);
     context->setContextProperty(QStringLiteral("AccessibilityBackend"), &accessibilityBackend);
+    context->setContextProperty(QStringLiteral("KdeConfigBackend"), &kdeConfigBackend);
     context->setContextProperty(QStringLiteral("PortalPermissionsBackend"), &portalPermissionsBackend);
     context->setContextProperty(QStringLiteral("WallpaperBackend"), &wallpaperBackend);
     context->setContextProperty(QStringLiteral("AppearanceBackend"), &appearanceBackend);

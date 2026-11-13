@@ -86,6 +86,8 @@ qt_add_executable(meo-settings
     src/backends/proxybackend.h
     src/backends/accessibilitybackend.cpp
     src/backends/accessibilitybackend.h
+    src/backends/kdeconfigbackend.cpp
+    src/backends/kdeconfigbackend.h
     src/backends/portalpermissionsbackend.cpp
     src/backends/portalpermissionsbackend.h
     src/backends/appearancebackend.cpp
@@ -157,6 +159,7 @@ qt_add_qml_module(meo-settings
         qml/Main.qml
         qml/pages/HomePage.qml
         qml/pages/CategoryPage.qml
+        qml/pages/ConfigSchemaPage.qml
         qml/pages/WifiPage.qml
         qml/pages/NetworkConnectionsPage.qml
         qml/pages/HotspotPage.qml
@@ -264,6 +267,7 @@ qt_add_lupdate(
         qml/components/ApplyToast.qml
         qml/pages/AboutPage.qml
         qml/pages/AccountsPage.qml
+        qml/pages/ConfigSchemaPage.qml
         qml/pages/AppearancePage.qml
         qml/pages/BluetoothPage.qml
         qml/pages/CategoryPage.qml

@@ -6843,4 +6843,506 @@ Total prompt: %7 characters</source>
         <translation>忘记网络</translation>
     </message>
 </context>
+<context>
+    <name>KdeConfigBackend</name>
+    <message>
+        <source>Activation delay</source>
+        <translation>触发延迟</translation>
+    </message>
+    <message>
+        <source>Animate switching between desktops</source>
+        <translation>切换桌面时播放动画</translation>
+    </message>
+    <message>
+        <source>Animation speed</source>
+        <translation>动画速度</translation>
+    </message>
+    <message>
+        <source>Applications can keep saved passwords encrypted in the wallet</source>
+        <translation>应用可将保存的密码加密存放在钱包中</translation>
+    </message>
+    <message>
+        <source>Background contrast</source>
+        <translation>背景对比度</translation>
+    </message>
+    <message>
+        <source>Behavior</source>
+        <translation>行为</translation>
+    </message>
+    <message>
+        <source>Blur</source>
+        <translation>模糊</translation>
+    </message>
+    <message>
+        <source>Blur behind translucent surfaces</source>
+        <translation>为半透明表面添加背景模糊</translation>
+    </message>
+    <message>
+        <source>Bottom edge</source>
+        <translation>下边缘</translation>
+    </message>
+    <message>
+        <source>Bottom left</source>
+        <translation>左下角</translation>
+    </message>
+    <message>
+        <source>Bottom right</source>
+        <translation>右下角</translation>
+    </message>
+    <message>
+        <source>Centered</source>
+        <translation>居中</translation>
+    </message>
+    <message>
+        <source>Check spelling by default</source>
+        <translation>默认检查拼写</translation>
+    </message>
+    <message>
+        <source>Check while typing</source>
+        <translation>输入时检查</translation>
+    </message>
+    <message>
+        <source>Click to focus</source>
+        <translation>点击获得焦点</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <source>Confirm before signing out</source>
+        <translation>退出登录前确认</translation>
+    </message>
+    <message>
+        <source>Corners</source>
+        <translation>角落</translation>
+    </message>
+    <message>
+        <source>Default</source>
+        <translation>默认</translation>
+    </message>
+    <message>
+        <source>Delay before raising</source>
+        <translation>置顶前延迟</translation>
+    </message>
+    <message>
+        <source>Desktop grid</source>
+        <translation>桌面网格</translation>
+    </message>
+    <message>
+        <source>Desktops are arranged in this many rows</source>
+        <translation>桌面按此行数排列</translation>
+    </message>
+    <message>
+        <source>Detect language automatically</source>
+        <translation>自动检测语言</translation>
+    </message>
+    <message>
+        <source>Dim screen for permission prompts</source>
+        <translation>权限提示时调暗屏幕</translation>
+    </message>
+    <message>
+        <source>Distance at which windows snap to screen borders; 0 turns it off</source>
+        <translation>窗口吸附到屏幕边缘的距离；0 为关闭</translation>
+    </message>
+    <message>
+        <source>Double-click title bar</source>
+        <translation>双击标题栏</translation>
+    </message>
+    <message>
+        <source>Edges</source>
+        <translation>边缘</translation>
+    </message>
+    <message>
+        <source>Fade windows</source>
+        <translation>窗口淡入淡出</translation>
+    </message>
+    <message>
+        <source>Fade windows as they open and close</source>
+        <translation>窗口打开和关闭时淡入淡出</translation>
+    </message>
+    <message>
+        <source>Fast</source>
+        <translation>较快</translation>
+    </message>
+    <message>
+        <source>Focus</source>
+        <translation>焦点</translation>
+    </message>
+    <message>
+        <source>Focus follows mouse</source>
+        <translation>焦点跟随鼠标</translation>
+    </message>
+    <message>
+        <source>Focus strictly under mouse</source>
+        <translation>焦点严格位于鼠标下</translation>
+    </message>
+    <message>
+        <source>Focus under mouse</source>
+        <translation>鼠标下的窗口获得焦点</translation>
+    </message>
+    <message>
+        <source>How a window becomes the active one</source>
+        <translation>窗口如何成为活动窗口</translation>
+    </message>
+    <message>
+        <source>How long the pointer must rest on an edge</source>
+        <translation>指针需在边缘停留多久</translation>
+    </message>
+    <message>
+        <source>Ignore ALL-CAPS words</source>
+        <translation>忽略全大写单词</translation>
+    </message>
+    <message>
+        <source>Ignore run-together words</source>
+        <translation>忽略连写单词</translation>
+    </message>
+    <message>
+        <source>Include hidden folders</source>
+        <translation>包含隐藏文件夹</translation>
+    </message>
+    <message>
+        <source>Index file content</source>
+        <translation>索引文件内容</translation>
+    </message>
+    <message>
+        <source>Index files</source>
+        <translation>索引文件</translation>
+    </message>
+    <message>
+        <source>Instant</source>
+        <translation>立即</translation>
+    </message>
+    <message>
+        <source>Instant is the same as reducing motion</source>
+        <translation>“立即”等同于减少动效</translation>
+    </message>
+    <message>
+        <source>Left edge</source>
+        <translation>左边缘</translation>
+    </message>
+    <message>
+        <source>Lets search find files by name and content</source>
+        <translation>让搜索按名称和内容查找文件</translation>
+    </message>
+    <message>
+        <source>Lock after</source>
+        <translation>闲置后锁定</translation>
+    </message>
+    <message>
+        <source>Lock screen</source>
+        <translation>锁定屏幕</translation>
+    </message>
+    <message>
+        <source>Lock the wallet when idle</source>
+        <translation>闲置时锁定钱包</translation>
+    </message>
+    <message>
+        <source>Magic lamp</source>
+        <translation>魔灯</translation>
+    </message>
+    <message>
+        <source>Maximize</source>
+        <translation>最大化</translation>
+    </message>
+    <message>
+        <source>Maximized</source>
+        <translation>最大化</translation>
+    </message>
+    <message>
+        <source>Minimize</source>
+        <translation>最小化</translation>
+    </message>
+    <message>
+        <source>Minimize animation</source>
+        <translation>最小化动画</translation>
+    </message>
+    <message>
+        <source>Mount drives not seen before</source>
+        <translation>挂载未见过的驱动器</translation>
+    </message>
+    <message>
+        <source>Mount drives that are connected at sign-in</source>
+        <translation>挂载登录时已连接的驱动器</translation>
+    </message>
+    <message>
+        <source>Mount drives when they are plugged in</source>
+        <translation>插入时挂载驱动器</translation>
+    </message>
+    <message>
+        <source>Mount removable drives automatically</source>
+        <translation>自动挂载可移动驱动器</translation>
+    </message>
+    <message>
+        <source>New window placement</source>
+        <translation>新窗口位置</translation>
+    </message>
+    <message>
+        <source>No action</source>
+        <translation>无操作</translation>
+    </message>
+    <message>
+        <source>Number of desktops</source>
+        <translation>桌面数量</translation>
+    </message>
+    <message>
+        <source>Off jumps straight to the clicked position</source>
+        <translation>关闭后将直接跳到点击位置</translation>
+    </message>
+    <message>
+        <source>Off mounts only drives you have approved earlier</source>
+        <translation>关闭后只挂载你之前批准过的驱动器</translation>
+    </message>
+    <message>
+        <source>Offer shut down and restart</source>
+        <translation>提供关机和重启选项</translation>
+    </message>
+    <message>
+        <source>On-screen display</source>
+        <translation>屏幕提示</translation>
+    </message>
+    <message>
+        <source>Only applies when focus follows the mouse</source>
+        <translation>仅在焦点跟随鼠标时有效</translation>
+    </message>
+    <message>
+        <source>Open application launcher</source>
+        <translation>打开应用启动器</translation>
+    </message>
+    <message>
+        <source>Open files and folders</source>
+        <translation>打开文件和文件夹</translation>
+    </message>
+    <message>
+        <source>Open search</source>
+        <translation>打开搜索</translation>
+    </message>
+    <message>
+        <source>Overview</source>
+        <translation>概览</translation>
+    </message>
+    <message>
+        <source>Placement and title bar</source>
+        <translation>位置与标题栏</translation>
+    </message>
+    <message>
+        <source>Raise window when clicked</source>
+        <translation>点击时置顶窗口</translation>
+    </message>
+    <message>
+        <source>Raise window when hovered</source>
+        <translation>悬停时置顶窗口</translation>
+    </message>
+    <message>
+        <source>Random</source>
+        <translation>随机</translation>
+    </message>
+    <message>
+        <source>Re-activation delay</source>
+        <translation>再次触发延迟</translation>
+    </message>
+    <message>
+        <source>Relaxed</source>
+        <translation>较慢</translation>
+    </message>
+    <message>
+        <source>Restore a manually saved session</source>
+        <translation>恢复手动保存的会话</translation>
+    </message>
+    <message>
+        <source>Restore the previous session</source>
+        <translation>恢复上次的会话</translation>
+    </message>
+    <message>
+        <source>Right edge</source>
+        <translation>右边缘</translation>
+    </message>
+    <message>
+        <source>Roll up</source>
+        <translation>卷起</translation>
+    </message>
+    <message>
+        <source>Rows</source>
+        <translation>行数</translation>
+    </message>
+    <message>
+        <source>Scrollbar click jumps by one page</source>
+        <translation>点击滚动条按页跳转</translation>
+    </message>
+    <message>
+        <source>Send to back</source>
+        <translation>置于底层</translation>
+    </message>
+    <message>
+        <source>Show desktop</source>
+        <translation>显示桌面</translation>
+    </message>
+    <message>
+        <source>Show on all desktops</source>
+        <translation>在所有桌面显示</translation>
+    </message>
+    <message>
+        <source>Show volume and brightness pop-ups</source>
+        <translation>显示音量和亮度提示</translation>
+    </message>
+    <message>
+        <source>Slide animation</source>
+        <translation>滑动动画</translation>
+    </message>
+    <message>
+        <source>Sliding popups</source>
+        <translation>弹出窗口滑动</translation>
+    </message>
+    <message>
+        <source>Smart (least overlap)</source>
+        <translation>智能（重叠最少）</translation>
+    </message>
+    <message>
+        <source>Snap to other windows</source>
+        <translation>吸附到其他窗口</translation>
+    </message>
+    <message>
+        <source>Snap to screen edges</source>
+        <translation>吸附到屏幕边缘</translation>
+    </message>
+    <message>
+        <source>Snapping</source>
+        <translation>吸附</translation>
+    </message>
+    <message>
+        <source>Start with an empty session</source>
+        <translation>以空白会话启动</translation>
+    </message>
+    <message>
+        <source>Switching past the last desktop returns to the first</source>
+        <translation>越过最后一个桌面后回到第一个</translation>
+    </message>
+    <message>
+        <source>Timing</source>
+        <translation>时间</translation>
+    </message>
+    <message>
+        <source>Top edge</source>
+        <translation>上边缘</translation>
+    </message>
+    <message>
+        <source>Top left</source>
+        <translation>左上角</translation>
+    </message>
+    <message>
+        <source>Top right</source>
+        <translation>右上角</translation>
+    </message>
+    <message>
+        <source>Turn off to index only file names, which uses less disk and CPU</source>
+        <translation>关闭后仅索引文件名，占用更少磁盘和 CPU</translation>
+    </message>
+    <message>
+        <source>Under the pointer</source>
+        <translation>指针下方</translation>
+    </message>
+    <message>
+        <source>Use the wallet to store passwords</source>
+        <translation>使用钱包保存密码</translation>
+    </message>
+    <message>
+        <source>Visual effects</source>
+        <translation>视觉效果</translation>
+    </message>
+    <message>
+        <source>When signing in</source>
+        <translation>登录时</translation>
+    </message>
+    <message>
+        <source>Window focus</source>
+        <translation>窗口焦点</translation>
+    </message>
+    <message>
+        <source>Windows wobble while being moved</source>
+        <translation>移动窗口时产生摇晃效果</translation>
+    </message>
+    <message>
+        <source>With a double click</source>
+        <translation>双击</translation>
+    </message>
+    <message>
+        <source>With a single click</source>
+        <translation>单击</translation>
+    </message>
+    <message>
+        <source>Wobbly windows</source>
+        <translation>摇晃窗口</translation>
+    </message>
+    <message>
+        <source>Wrap around when switching</source>
+        <translation>切换时循环</translation>
+    </message>
+    <message>
+        <source>min</source>
+        <translation>分钟</translation>
+    </message>
+    <message>
+        <source>ms</source>
+        <translation>毫秒</translation>
+    </message>
+    <message>
+        <source>px</source>
+        <translation>像素</translation>
+    </message>
+    <message>
+        <source>This setting is not available.</source>
+        <translation>此设置不可用。</translation>
+    </message>
+    <message>
+        <source>That option is not supported.</source>
+        <translation>不支持该选项。</translation>
+    </message>
+    <message>
+        <source>The setting could not be saved.</source>
+        <translation>无法保存该设置。</translation>
+    </message>
+    <message>
+        <source>The settings could not be reset.</source>
+        <translation>无法重置这些设置。</translation>
+    </message>
+</context>
+<context>
+    <name>ConfigSchemaPage</name>
+    <message>
+        <source>Setting applied</source>
+        <translation>设置已应用</translation>
+    </message>
+    <message>
+        <source>Defaults restored</source>
+        <translation>已恢复默认值</translation>
+    </message>
+    <message>
+        <source>Setting needs attention</source>
+        <translation>设置需要注意</translation>
+    </message>
+    <message>
+        <source>Window manager is not running</source>
+        <translation>窗口管理器未运行</translation>
+    </message>
+    <message>
+        <source>Changes are saved and will apply the next time you sign in.</source>
+        <translation>更改已保存，将在下次登录时生效。</translation>
+    </message>
+    <message>
+        <source>Nothing to configure here</source>
+        <translation>这里没有可配置项</translation>
+    </message>
+    <message>
+        <source>This page has no settings available on this device.</source>
+        <translation>此设备上该页面没有可用设置。</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>恢复默认值</translation>
+    </message>
+    <message>
+        <source>Advanced options</source>
+        <translation>高级选项</translation>
+    </message>
+</context>
 </TS>

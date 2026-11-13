@@ -294,6 +294,16 @@ ApplicationWindow {
         case "hardware": return Qt.resolvedUrl("pages/HardwarePage.qml")
         case "recovery": return Qt.resolvedUrl("pages/RecoveryPage.qml")
         case "system-center": return Qt.resolvedUrl("pages/SystemCenterPage.qml")
+        case "window-behavior":
+        case "desktop-effects":
+        case "screen-edges":
+        case "virtual-desktops":
+        case "search-indexing":
+        case "startup-session":
+        case "spell-checking":
+        case "workspace":
+        case "automount":
+        case "wallet": return Qt.resolvedUrl("pages/ConfigSchemaPage.qml")
         case "about": return Qt.resolvedUrl("pages/AboutPage.qml")
         default:
             return route.startsWith("kcm:")
@@ -308,6 +318,7 @@ ApplicationWindow {
             "rootMetrics": rootMetrics
         }
         if (route === "filetypes") common.fileTypesOnly = true
+        if (KdeConfigBackend.hasSchema(route)) common.schemaId = route
         if (route === "mouse") {
             // The registry labels this route “Mouse & touchpad”, so show both
             // families instead of silently filtering the touchpad out.
