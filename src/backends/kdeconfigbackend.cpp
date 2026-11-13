@@ -1,6 +1,7 @@
 #include "kdeconfigbackend.h"
 
 #include <KConfigGroup>
+#include <KConfig>
 #include <KSharedConfig>
 #include <QCoreApplication>
 #include <QDBusConnection>
@@ -8,6 +9,7 @@
 #include <QDBusMessage>
 #include <QDBusVariant>
 #include <QDir>
+#include <QFile>
 #include <QStandardPaths>
 #include <algorithm>
 #include <cmath>
@@ -299,7 +301,42 @@ QVariantList build(const QString &page)
             }),
         };
     }
+    if (page == QLatin1String("sound-theme")) {
+        Map theme = choice("theme", QT_TRANSLATE_NOOP("KdeConfigBackend", "Sound theme"),
+                           QT_TRANSLATE_NOOP("KdeConfigBackend", "Sounds for notifications, alerts, and system events"),
+                           "kdeglobals", "Sounds", "Theme", "ocean", {}, "globals");
+        theme.insert("dynamic", QStringLiteral("sound-themes"));
+        return {
+            section(nullptr, {
+                toggle("enabled", QT_TRANSLATE_NOOP("KdeConfigBackend", "Play system sounds"), nullptr,
+                       "kdeglobals", "Sounds", "Enable", true, "globals"),
+                theme,
+            }),
+        };
+    }
     return {};
+}
+
+// Installed sound themes are discovered, never hard-coded: a theme is any
+// sounds/<name>/index.theme under the XDG data directories.
+QVariantList soundThemes()
+{
+    QVariantList out;
+    QStringList seen;
+    for (const QString &root : QStandardPaths::locateAll(QStandardPaths::GenericDataLocation, QStringLiteral("sounds"),
+                                                         QStandardPaths::LocateDirectory)) {
+        const auto names = QDir(root).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+        for (const QString &name : names) {
+            const QString index = root + QLatin1Char('/') + name + QStringLiteral("/index.theme");
+            if (seen.contains(name) || !QFile::exists(index))
+                continue;
+            seen.append(name);
+            KConfig theme(index, KConfig::SimpleConfig);
+            const QString label = theme.group(QStringLiteral("Sound Theme")).readEntry("Name", name);
+            out.append(Map{{"value", name}, {"label", label.isEmpty() ? name : label}});
+        }
+    }
+    return out;
 }
 
 bool needsKwin(const QString &hook)
@@ -345,7 +382,20 @@ bool KdeConfigBackend::hasSchema(const QString &pageId) const
 
 QVariantList KdeConfigBackend::sectionsFor(const QString &pageId) const
 {
-    return build(pageId);
+    QVariantList sections = build(pageId);
+    for (QVariant &sectionValue : sections) {
+        Map sectionMap = sectionValue.toMap();
+        QVariantList rows = sectionMap.value("rows").toList();
+        for (QVariant &rowValue : rows) {
+            Map row = rowValue.toMap();
+            if (row.value("dynamic").toString() == QLatin1String("sound-themes"))
+                row.insert("choices", soundThemes());
+            rowValue = row;
+        }
+        sectionMap.insert("rows", rows);
+        sectionValue = sectionMap;
+    }
+    return sections;
 }
 
 QVariantList KdeConfigBackend::schema(const QString &pageId) const

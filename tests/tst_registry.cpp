@@ -319,7 +319,6 @@ void SettingsRegistryTest::exposesCompleteAppearanceAndIntegrationRoutes()
         QStringLiteral("plasma-style"),
         QStringLiteral("window-decorations"),
         QStringLiteral("welcome-screen"),
-        QStringLiteral("sound-theme"),
     };
     for (const auto &id : appearanceEntries) {
         const auto entry = registry.entry(id);
@@ -327,6 +326,10 @@ void SettingsRegistryTest::exposesCompleteAppearanceAndIntegrationRoutes()
         QCOMPARE(entry.value(QStringLiteral("categoryId")).toString(), QStringLiteral("personalization"));
         QCOMPARE(entry.value(QStringLiteral("authority")).toString(), QStringLiteral("kde"));
     }
+
+    const auto soundTheme = registry.entry(QStringLiteral("sound-theme"));
+    QVERIFY(soundTheme.value(QStringLiteral("direct")).toBool());
+    QCOMPARE(soundTheme.value(QStringLiteral("authority")).toString(), QStringLiteral("meo"));
 
     const auto cursors = registry.entry(QStringLiteral("cursors"));
     QCOMPARE(cursors.value(QStringLiteral("route")).toString(), QStringLiteral("cursors"));

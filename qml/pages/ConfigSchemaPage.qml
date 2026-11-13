@@ -26,7 +26,8 @@ Item {
         "spell-checking": "kcmspellchecking",
         "workspace": "kcm_workspace",
         "automount": "kcm_device_automounter",
-        "wallet": "kcm_kwallet5"
+        "wallet": "kcm_kwallet5",
+        "sound-theme": "kcm_soundtheme"
     })
     readonly property var heroShapes: ({
         "window-behavior": ["Square", "Cookie4Sided"],
@@ -38,7 +39,8 @@ Item {
         "spell-checking": ["Puffy", "Cookie7Sided"],
         "workspace": ["Gem", "Cookie12Sided"],
         "automount": ["Pill", "Square"],
-        "wallet": ["Hexagon", "Clover4Leaf"]
+        "wallet": ["Hexagon", "Clover4Leaf"],
+        "sound-theme": ["Circle", "SoftBurst"]
     })
     readonly property string expertModule: expertModules[schemaId] || ""
 

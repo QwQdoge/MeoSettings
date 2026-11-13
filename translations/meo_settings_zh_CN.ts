@@ -6846,6 +6846,18 @@ Total prompt: %7 characters</source>
 <context>
     <name>KdeConfigBackend</name>
     <message>
+        <source>Sound theme</source>
+        <translation>声音主题</translation>
+    </message>
+    <message>
+        <source>Sounds for notifications, alerts, and system events</source>
+        <translation>通知、提醒和系统事件使用的声音</translation>
+    </message>
+    <message>
+        <source>Play system sounds</source>
+        <translation>播放系统声音</translation>
+    </message>
+    <message>
         <source>Activation delay</source>
         <translation>触发延迟</translation>
     </message>
@@ -7343,6 +7355,73 @@ Total prompt: %7 characters</source>
     <message>
         <source>Advanced options</source>
         <translation>高级选项</translation>
+    </message>
+</context>
+<context>
+    <name>ProxyPage</name>
+    <message>
+        <source>Proxy configuration applied</source>
+        <translation>代理配置已应用</translation>
+    </message>
+</context>
+<context>
+    <name>FontsPage</name>
+    <message>
+        <source>Typefaces and sizes used across the desktop and applications</source>
+        <translation>桌面和应用使用的字体及字号</translation>
+    </message>
+    <message>
+        <source>No font settings available</source>
+        <translation>没有可用的字体设置</translation>
+    </message>
+    <message>
+        <source>The font configuration could not be read on this device.</source>
+        <translation>无法在此设备上读取字体配置。</translation>
+    </message>
+    <message>
+        <source>%1 font applied</source>
+        <translation>已应用%1字体</translation>
+    </message>
+</context>
+<context>
+    <name>KeyboardPage</name>
+    <message>
+        <source>Typing layouts, key repeat, and the active input language</source>
+        <translation>键盘布局、按键重复和当前输入语言</translation>
+    </message>
+    <message>
+        <source>Keyboard controls unavailable</source>
+        <translation>键盘控制不可用</translation>
+    </message>
+    <message>
+        <source>These controls need the KDE Wayland input service, which is not running in this session.</source>
+        <translation>这些控制需要 KDE Wayland 输入服务，但它未在当前会话中运行。</translation>
+    </message>
+    <message>
+        <source>Key repeat applied</source>
+        <translation>按键重复已应用</translation>
+    </message>
+    <message>
+        <source>Keyboard layouts applied</source>
+        <translation>键盘布局已应用</translation>
+    </message>
+</context>
+<context>
+    <name>CursorsPage</name>
+    <message>
+        <source>Pointer preferences applied</source>
+        <translation>指针偏好已应用</translation>
+    </message>
+</context>
+<context>
+    <name>HotspotPage</name>
+    <message>
+        <source>Hotspot stopped</source>
+        <translation>热点已停止</translation>
+    </message>
+    <message>
+        <source>Starting hotspot…</source>
+        <translation>正在启动热点…</translation>
     </message>
 </context>
 </TS>

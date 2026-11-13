@@ -248,9 +248,9 @@ SettingsRegistry::SettingsRegistry(QObject *parent)
                 {QStringLiteral("splash"), QStringLiteral("welcome"), QStringLiteral("startup animation")},
                 false, QStringLiteral("handoff"), QStringLiteral("system"), QStringLiteral("tertiary")),
         setting(QStringLiteral("sound-theme"), tr("Sound theme"), tr("Notification and desktop event sounds"),
-                QStringLiteral("music_note"), QStringLiteral("kcm:kcm_soundtheme"), QStringLiteral("personalization"), tr("Wallpaper & style"),
+                QStringLiteral("music_note"), QStringLiteral("sound-theme"), QStringLiteral("personalization"), tr("Wallpaper & style"),
                 {QStringLiteral("sound theme"), QStringLiteral("notification sound"), QStringLiteral("event sound")},
-                false, QStringLiteral("handoff"), QStringLiteral("system"), QStringLiteral("tertiary")),
+                true, QStringLiteral("control"), QStringLiteral("reversible"), QStringLiteral("tertiary")),
 
         setting(QStringLiteral("notifications"), tr("Notifications"), tr("Do Not Disturb, popups, task notifications, and badges"),
                 QStringLiteral("notifications"), QStringLiteral("notifications"), QStringLiteral("apps"), tr("Apps & notifications"),
