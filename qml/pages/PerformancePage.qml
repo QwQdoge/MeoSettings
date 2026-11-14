@@ -503,6 +503,33 @@ Item {
             }
         }
 
+        MeoText {
+            width: parent.width
+            text: qsTr("System Monitor")
+            typeRole: "title"; typeSize: "small"; emphasized: true
+            color: MeoTheme.contentOnSurface
+        }
+        MeoText {
+            width: parent.width
+            text: qsTr("Processes, startup apps, services and detailed graphs. Open it any time with Ctrl+Shift+Esc.")
+            typeRole: "body"; typeSize: "medium"
+            color: MeoTheme.contentOnSurfaceVariant
+            wrapMode: Text.WordWrap
+        }
+        ConfigSchemaGroups {
+            width: parent.width
+            schemaId: "system-monitor"
+            onApplied: (message) => monitorToast.show(message)
+        }
+        MeoButton {
+            text: qsTr("Open System Monitor")
+            type: "tonal"
+            icon.name: "monitoring"
+            visible: KdeConfigBackend.systemMonitorAvailable
+            onClicked: KdeConfigBackend.openSystemMonitor()
+        }
+        ApplyToast { id: monitorToast }
+
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Related controls")

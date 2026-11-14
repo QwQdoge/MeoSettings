@@ -244,6 +244,37 @@ Item {
             }
         }
 
+        MeoSettingsGroup {
+            id: scheduleGroup
+            width: parent.width
+            visible: UpdateScheduleBackend.available
+            title: qsTr("Automatic checks")
+            subtitle: UpdateScheduleBackend.error !== ""
+                      ? UpdateScheduleBackend.error
+                      : qsTr("OmniStore checks the Meo and OmniStore update sources in the background and notifies you. Nothing is installed automatically.")
+            readonly property var scheduleChoices: UpdateScheduleBackend.choices
+            model: [{
+                "id": "check-frequency",
+                "title": qsTr("Check for updates"),
+                "subtitle": UpdateScheduleBackend.intervalHours === 0
+                            ? qsTr("Automatic checks are off")
+                            : qsTr("The next check is scheduled after the selected time has passed"),
+                "icon": "update",
+                "tone": "primary",
+                "trailingKind": "dropdown",
+                "options": scheduleGroup.scheduleChoices,
+                "currentIndex": (function() {
+                    for (let i = 0; i < scheduleGroup.scheduleChoices.length; ++i)
+                        if (scheduleGroup.scheduleChoices[i].value === UpdateScheduleBackend.intervalHours)
+                            return i
+                    return -1
+                })()
+            }]
+            onRowDropdownSelected: (index, optionIndex, value, row) =>
+                UpdateScheduleBackend.setIntervalHours(scheduleGroup.scheduleChoices[optionIndex].value)
+            Component.onCompleted: UpdateScheduleBackend.refresh()
+        }
+
         MeoEmptyState {
             width: parent.width
             height: 190 * MeoTheme.globalScale

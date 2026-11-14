@@ -304,7 +304,15 @@ void SettingsRegistryTest::exposesNativeAccountAndUpdateRoutes()
     const auto updates = registry.entry(QStringLiteral("updates"));
     QCOMPARE(updates.value(QStringLiteral("route")).toString(), QStringLiteral("updates"));
     QVERIFY(updates.value(QStringLiteral("direct")).toBool());
-    QCOMPARE(updates.value(QStringLiteral("risk")).toString(), QStringLiteral("read-only"));
+    // Package updates are only inspected; the page changes nothing but the
+    // reversible background check interval.
+    QCOMPARE(updates.value(QStringLiteral("risk")).toString(), QStringLiteral("reversible"));
+
+    const auto windowStyle = registry.entry(QStringLiteral("window-appearance"));
+    QCOMPARE(windowStyle.value(QStringLiteral("route")).toString(), QStringLiteral("appearance#window-appearance"));
+    QCOMPARE(windowStyle.value(QStringLiteral("categoryId")).toString(), QStringLiteral("personalization"));
+    QCOMPARE(registry.entry(QStringLiteral("desktop-effects")).value(QStringLiteral("categoryId")).toString(),
+             QStringLiteral("personalization"));
 
     const auto advancedUpdater = registry.entry(QStringLiteral("kcm:kcm_updates"));
     QCOMPARE(advancedUpdater.value(QStringLiteral("id")).toString(), QStringLiteral("system-updates-advanced"));

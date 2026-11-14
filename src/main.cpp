@@ -36,6 +36,7 @@
 #include "backends/systemtransactionbackend.h"
 #include "backends/configbackend.h"
 #include "backends/updatesbackend.h"
+#include "backends/updateschedulebackend.h"
 #include "backends/welcomebackend.h"
 #include "backends/weatherbackend.h"
 #include "core/capabilitymanager.h"
@@ -301,6 +302,7 @@ int main(int argc, char *argv[])
     BackupBackend backupBackend(&omniStoreAppsBackend);
     PackageInventoryBackend packageInventoryBackend;
     UpdatesBackend updatesBackend;
+    UpdateScheduleBackend updateScheduleBackend;
     ControlCenterBackend controlCenterBackend;
     ShellSettingsBackend shellSettingsBackend;
     backupBackend.setPortableSettingsSources(&controlCenterBackend, &shellSettingsBackend);
@@ -365,6 +367,7 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("BackupBackend"), &backupBackend);
     context->setContextProperty(QStringLiteral("PackageInventoryBackend"), &packageInventoryBackend);
     context->setContextProperty(QStringLiteral("UpdatesBackend"), &updatesBackend);
+    context->setContextProperty(QStringLiteral("UpdateScheduleBackend"), &updateScheduleBackend);
     context->setContextProperty(QStringLiteral("ControlCenterBackend"), &controlCenterBackend);
     context->setContextProperty(QStringLiteral("ShellSettingsBackend"), &shellSettingsBackend);
     context->setContextProperty(QStringLiteral("KcmBridge"), &kcmBridge);

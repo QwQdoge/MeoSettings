@@ -1581,6 +1581,86 @@ Total prompt: %7 characters</source>
         <source>All Meo Material roles and the active KDE color scheme; all Meo applications consume the same role table</source>
         <translation>所有 Meo Material 颜色角色和当前 KDE 配色方案；所有 Meo 应用使用同一角色表</translation>
     </message>
+    <message>
+        <source>Shape and transparency</source>
+        <translation>形状与透明度</translation>
+    </message>
+    <message>
+        <source>Corner roundness, translucency and blur of panels, popups and Meo apps</source>
+        <translation>面板、弹出层和 Meo 应用的圆角、半透明与模糊</translation>
+    </message>
+    <message>
+        <source>Windows</source>
+        <translation>窗口</translation>
+    </message>
+    <message>
+        <source>Window corners, title bar, shadows, transparency and animation</source>
+        <translation>窗口圆角、标题栏、阴影、透明度与动画</translation>
+    </message>
+    <message>
+        <source>Violet</source>
+        <translation>紫罗兰</translation>
+    </message>
+    <message>
+        <source>Blue</source>
+        <translation>蓝色</translation>
+    </message>
+    <message>
+        <source>Teal</source>
+        <translation>青色</translation>
+    </message>
+    <message>
+        <source>Green</source>
+        <translation>绿色</translation>
+    </message>
+    <message>
+        <source>Amber</source>
+        <translation>琥珀色</translation>
+    </message>
+    <message>
+        <source>Orange</source>
+        <translation>橙色</translation>
+    </message>
+    <message>
+        <source>Red</source>
+        <translation>红色</translation>
+    </message>
+    <message>
+        <source>Pink</source>
+        <translation>粉色</translation>
+    </message>
+    <message>
+        <source>Slate</source>
+        <translation>石板灰</translation>
+    </message>
+    <message>
+        <source>Color</source>
+        <translation>颜色</translation>
+    </message>
+    <message>
+        <source>Accent color</source>
+        <translation>强调色</translation>
+    </message>
+    <message>
+        <source>From wallpaper</source>
+        <translation>取自壁纸</translation>
+    </message>
+    <message>
+        <source>Custom…</source>
+        <translation>自定义…</translation>
+    </message>
+    <message>
+        <source>Effects and animation</source>
+        <translation>效果与动画</translation>
+    </message>
+    <message>
+        <source>Animation speed, blur, wobbly windows and other desktop effects</source>
+        <translation>动画速度、模糊、果冻窗口等桌面效果</translation>
+    </message>
+    <message>
+        <source>Colors, shapes, transparency and window style. Meo uses one consistent color scheme across its apps.</source>
+        <translation>颜色、形状、透明度和窗口样式。Meo 在所有应用中使用统一的配色方案。</translation>
+    </message>
 </context>
 <context>
     <name>BluetoothPage</name>
@@ -5601,6 +5681,46 @@ Total prompt: %7 characters</source>
         <source>System information</source>
         <translation>系统信息</translation>
     </message>
+    <message>
+        <source>Colors, corner roundness, transparency, window style, icons, startup animation, and sounds</source>
+        <translation>颜色、圆角、透明度、窗口样式、图标、启动动画和声音</translation>
+    </message>
+    <message>
+        <source>Shape and transparency</source>
+        <translation>形状与透明度</translation>
+    </message>
+    <message>
+        <source>Corner roundness, translucency, and blur of panels, popups, and Meo apps</source>
+        <translation>面板、弹出层和 Meo 应用的圆角、半透明与模糊</translation>
+    </message>
+    <message>
+        <source>Window style</source>
+        <translation>窗口样式</translation>
+    </message>
+    <message>
+        <source>Window corners, title bar, shadows, transparency, and open/close animation</source>
+        <translation>窗口圆角、标题栏、阴影、透明度与打开/关闭动画</translation>
+    </message>
+    <message>
+        <source>Effects and animation</source>
+        <translation>效果与动画</translation>
+    </message>
+    <message>
+        <source>Animation speed, blur, minimize and other desktop effects</source>
+        <translation>动画速度、模糊、最小化等桌面效果</translation>
+    </message>
+    <message>
+        <source>Session restore, sign-out, Num Lock and Bluetooth at sign-in</source>
+        <translation>会话恢复、注销、登录时的数字锁定键和蓝牙</translation>
+    </message>
+    <message>
+        <source>Monitor CPU, GPU, memory, network, and storage, choose a performance mode, and set System Monitor's update speed</source>
+        <translation>监控 CPU、GPU、内存、网络和存储，选择性能模式，并设置系统监视器刷新频率</translation>
+    </message>
+    <message>
+        <source>Update candidates and how often OmniStore checks for updates</source>
+        <translation>可用更新以及 OmniStore 检查更新的频率</translation>
+    </message>
 </context>
 <context>
     <name>SoundPage</name>
@@ -6670,6 +6790,26 @@ Total prompt: %7 characters</source>
         <source>Not available from local metadata</source>
         <translation>本地元数据中不可用</translation>
     </message>
+    <message>
+        <source>Automatic checks</source>
+        <translation>自动检查</translation>
+    </message>
+    <message>
+        <source>OmniStore checks the Meo and OmniStore update sources in the background and notifies you. Nothing is installed automatically.</source>
+        <translation>OmniStore 会在后台检查 Meo 和 OmniStore 更新源并通知你，不会自动安装任何内容。</translation>
+    </message>
+    <message>
+        <source>Check for updates</source>
+        <translation>检查更新</translation>
+    </message>
+    <message>
+        <source>Automatic checks are off</source>
+        <translation>自动检查已关闭</translation>
+    </message>
+    <message>
+        <source>The next check is scheduled after the selected time has passed</source>
+        <translation>经过所选时间后进行下一次检查</translation>
+    </message>
 </context>
 <context>
     <name>WifiPage</name>
@@ -7449,6 +7589,206 @@ Total prompt: %7 characters</source>
         <source>The settings could not be reset.</source>
         <translation>无法重置这些设置。</translation>
     </message>
+    <message>
+        <source>Window corner radius</source>
+        <translation>窗口圆角半径</translation>
+    </message>
+    <message>
+        <source>Rounds the title bar and, when the rounded-corner effect is installed, the window content</source>
+        <translation>圆化标题栏；安装圆角效果后也会圆化窗口内容</translation>
+    </message>
+    <message>
+        <source>Corners and title bar</source>
+        <translation>圆角与标题栏</translation>
+    </message>
+    <message>
+        <source>Square corners when maximized</source>
+        <translation>最大化时使用直角</translation>
+    </message>
+    <message>
+        <source>Title bar height</source>
+        <translation>标题栏高度</translation>
+    </message>
+    <message>
+        <source>Center window titles</source>
+        <translation>窗口标题居中</translation>
+    </message>
+    <message>
+        <source>Tint the active title bar with the accent color</source>
+        <translation>用强调色着色活动标题栏</translation>
+    </message>
+    <message>
+        <source>Show title-bar button backgrounds</source>
+        <translation>显示标题栏按钮背景</translation>
+    </message>
+    <message>
+        <source>Shadows</source>
+        <translation>阴影</translation>
+    </message>
+    <message>
+        <source>Shadow size</source>
+        <translation>阴影大小</translation>
+    </message>
+    <message>
+        <source>Shadow strength</source>
+        <translation>阴影强度</translation>
+    </message>
+    <message>
+        <source>Window transparency</source>
+        <translation>窗口透明度</translation>
+    </message>
+    <message>
+        <source>Make windows translucent in the situations below</source>
+        <translation>在以下情况下让窗口半透明</translation>
+    </message>
+    <message>
+        <source>Inactive windows</source>
+        <translation>非活动窗口</translation>
+    </message>
+    <message>
+        <source>While moving or resizing</source>
+        <translation>移动或调整大小时</translation>
+    </message>
+    <message>
+        <source>Dialogs</source>
+        <translation>对话框</translation>
+    </message>
+    <message>
+        <source>Menus</source>
+        <translation>菜单</translation>
+    </message>
+    <message>
+        <source>Focus and animation</source>
+        <translation>焦点与动画</translation>
+    </message>
+    <message>
+        <source>Dim inactive windows</source>
+        <translation>调暗非活动窗口</translation>
+    </message>
+    <message>
+        <source>Dimming strength</source>
+        <translation>调暗程度</translation>
+    </message>
+    <message>
+        <source>Window open and close animation</source>
+        <translation>窗口打开和关闭动画</translation>
+    </message>
+    <message>
+        <source>Scale</source>
+        <translation>缩放</translation>
+    </message>
+    <message>
+        <source>Glide</source>
+        <translation>滑翔</translation>
+    </message>
+    <message>
+        <source>No animation</source>
+        <translation>无动画</translation>
+    </message>
+    <message>
+        <source>Corner roundness</source>
+        <translation>圆角程度</translation>
+    </message>
+    <message>
+        <source>Panels, popups, cards and Meo apps; 100% is the Meo design</source>
+        <translation>面板、弹出层、卡片和 Meo 应用；100% 为 Meo 默认设计</translation>
+    </message>
+    <message>
+        <source>Translucent surfaces</source>
+        <translation>半透明表面</translation>
+    </message>
+    <message>
+        <source>Let panels and popups show a little of what is behind them</source>
+        <translation>让面板和弹出层透出少许背后的内容</translation>
+    </message>
+    <message>
+        <source>Transparency level</source>
+        <translation>透明程度</translation>
+    </message>
+    <message>
+        <source>How see-through translucent surfaces are; 100% is the Meo design</source>
+        <translation>半透明表面的通透程度；100% 为 Meo 默认设计</translation>
+    </message>
+    <message>
+        <source>Blur behind surfaces</source>
+        <translation>表面背景模糊</translation>
+    </message>
+    <message>
+        <source>Frosted-glass look; needs translucent surfaces</source>
+        <translation>毛玻璃效果；需要开启半透明表面</translation>
+    </message>
+    <message>
+        <source>Update speed</source>
+        <translation>刷新频率</translation>
+    </message>
+    <message>
+        <source>How often System Monitor and the performance widget sample the system; slower uses less power</source>
+        <translation>系统监视器和性能小组件采样系统的频率；越慢越省电</translation>
+    </message>
+    <message>
+        <source>Very fast (0.5 s)</source>
+        <translation>很快（0.5 秒）</translation>
+    </message>
+    <message>
+        <source>Fast (1 s)</source>
+        <translation>快（1 秒）</translation>
+    </message>
+    <message>
+        <source>Normal (2 s)</source>
+        <translation>标准（2 秒）</translation>
+    </message>
+    <message>
+        <source>Slow (5 s)</source>
+        <translation>慢（5 秒）</translation>
+    </message>
+    <message>
+        <source>Very slow (10 s)</source>
+        <translation>很慢（10 秒）</translation>
+    </message>
+    <message>
+        <source>At sign-in</source>
+        <translation>登录时</translation>
+    </message>
+    <message>
+        <source>Num Lock</source>
+        <translation>数字锁定键</translation>
+    </message>
+    <message>
+        <source>Applies the next time you sign in</source>
+        <translation>下次登录时生效</translation>
+    </message>
+    <message>
+        <source>Turn on</source>
+        <translation>打开</translation>
+    </message>
+    <message>
+        <source>Turn off</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <source>Leave unchanged</source>
+        <translation>保持不变</translation>
+    </message>
+    <message>
+        <source>Bluetooth</source>
+        <translation>蓝牙</translation>
+    </message>
+    <message>
+        <source>Restore its last state</source>
+        <translation>恢复上次状态</translation>
+    </message>
+    <message>
+        <source>Always turn on</source>
+        <translation>始终打开</translation>
+    </message>
+    <message>
+        <source>Always turn off</source>
+        <translation>始终关闭</translation>
+    </message>
+    <message>
+        <source>System Monitor could not be started.</source>
+        <translation>无法启动系统监视器。</translation>
+    </message>
 </context>
 <context>
     <name>ConfigSchemaPage</name>
@@ -7487,6 +7827,50 @@ Total prompt: %7 characters</source>
     <message>
         <source>Advanced options</source>
         <translation>高级选项</translation>
+    </message>
+    <message>
+        <source>Startup apps</source>
+        <translation>启动应用</translation>
+    </message>
+    <message>
+        <source>Applications and scripts that run when you sign in</source>
+        <translation>登录时运行的应用和脚本</translation>
+    </message>
+    <message>
+        <source>Startup animation</source>
+        <translation>启动动画</translation>
+    </message>
+    <message>
+        <source>Animation shown while the desktop session starts</source>
+        <translation>桌面会话启动时显示的动画</translation>
+    </message>
+    <message>
+        <source>Lock screen &amp; login</source>
+        <translation>锁屏与登录</translation>
+    </message>
+    <message>
+        <source>Lock-screen presentation and sign-in privacy</source>
+        <translation>锁屏外观与登录隐私</translation>
+    </message>
+    <message>
+        <source>Window style</source>
+        <translation>窗口样式</translation>
+    </message>
+    <message>
+        <source>Corner radius, shadows, transparency and open/close animation</source>
+        <translation>圆角半径、阴影、透明度与打开/关闭动画</translation>
+    </message>
+    <message>
+        <source>Shape and transparency</source>
+        <translation>形状与透明度</translation>
+    </message>
+    <message>
+        <source>Roundness and translucency of panels, popups and Meo apps</source>
+        <translation>面板、弹出层和 Meo 应用的圆角与半透明</translation>
+    </message>
+    <message>
+        <source>Related settings</source>
+        <translation>相关设置</translation>
     </message>
 </context>
 <context>
@@ -7561,6 +7945,68 @@ Total prompt: %7 characters</source>
     <message>
         <source>Setting applied</source>
         <translation>设置已应用</translation>
+    </message>
+</context>
+<context>
+    <name>PerformancePage</name>
+    <message>
+        <source>System Monitor</source>
+        <translation>系统监视器</translation>
+    </message>
+    <message>
+        <source>Processes, startup apps, services and detailed graphs. Open it any time with Ctrl+Shift+Esc.</source>
+        <translation>进程、启动应用、服务和详细图表。随时按 Ctrl+Shift+Esc 打开。</translation>
+    </message>
+    <message>
+        <source>Open System Monitor</source>
+        <translation>打开系统监视器</translation>
+    </message>
+</context>
+<context>
+    <name>UpdateScheduleBackend</name>
+    <message>
+        <source>Off – check only when I ask</source>
+        <translation>关闭 – 仅在我要求时检查</translation>
+    </message>
+    <message>
+        <source>Every hour</source>
+        <translation>每小时</translation>
+    </message>
+    <message>
+        <source>Every %1 hours</source>
+        <translation>每 %1 小时</translation>
+    </message>
+    <message>
+        <source>Daily</source>
+        <translation>每天</translation>
+    </message>
+    <message>
+        <source>Weekly</source>
+        <translation>每周</translation>
+    </message>
+    <message>
+        <source>Every %1 days</source>
+        <translation>每 %1 天</translation>
+    </message>
+    <message>
+        <source>OmniStore's background update check is not installed.</source>
+        <translation>未安装 OmniStore 后台更新检查。</translation>
+    </message>
+    <message>
+        <source>That update check interval is not supported.</source>
+        <translation>不支持该更新检查间隔。</translation>
+    </message>
+    <message>
+        <source>Automatic update checks could not be turned off: %1</source>
+        <translation>无法关闭自动更新检查：%1</translation>
+    </message>
+    <message>
+        <source>The update check schedule could not be saved.</source>
+        <translation>无法保存更新检查计划。</translation>
+    </message>
+    <message>
+        <source>The new schedule is saved and applies after you sign in again (%1).</source>
+        <translation>新计划已保存，将在重新登录后生效（%1）。</translation>
     </message>
 </context>
 </TS>

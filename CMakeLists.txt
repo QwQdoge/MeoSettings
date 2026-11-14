@@ -142,6 +142,8 @@ qt_add_executable(meo-settings
     src/backends/packageinventorybackend.h
     src/backends/updatesbackend.cpp
     src/backends/updatesbackend.h
+    src/backends/updateschedulebackend.cpp
+    src/backends/updateschedulebackend.h
     src/backends/controlcenterbackend.cpp
     src/backends/controlcenterbackend.h
     src/backends/shellsettingsbackend.cpp

@@ -14,12 +14,37 @@ Item {
     // the matching section.
     property string focusSection: ""
     readonly property var styleSections: [
+        { "id": "shell-surfaces", "title": qsTr("Shape and transparency"), "subtitle": qsTr("Corner roundness, translucency and blur of panels, popups and Meo apps") },
+        { "id": "window-appearance", "title": qsTr("Windows"), "subtitle": qsTr("Window corners, title bar, shadows, transparency and animation") },
         { "id": "application-style", "title": qsTr("Application style"), "subtitle": qsTr("Toolbar labels and icons in applications") },
         { "id": "icons", "title": qsTr("System icon theme"), "subtitle": qsTr("Icons used by applications and the workspace") },
         { "id": "window-decorations", "title": qsTr("Window decorations"), "subtitle": qsTr("Title-bar buttons and window borders") },
         { "id": "welcome-screen", "title": qsTr("Welcome screen"), "subtitle": qsTr("Animation shown while the session starts") },
         { "id": "sound-theme", "title": qsTr("Sound theme"), "subtitle": qsTr("Notification and desktop event sounds") }
     ]
+    // Preset seeds for the manual dynamic-color source. Meo still derives the
+    // complete Material color scheme from the chosen seed.
+    readonly property var accentPresets: [
+        { "name": qsTr("Violet"), "color": "#6750a4" },
+        { "name": qsTr("Blue"), "color": "#0b57d0" },
+        { "name": qsTr("Teal"), "color": "#006a6a" },
+        { "name": qsTr("Green"), "color": "#386a20" },
+        { "name": qsTr("Amber"), "color": "#8b5000" },
+        { "name": qsTr("Orange"), "color": "#a63b00" },
+        { "name": qsTr("Red"), "color": "#b3261e" },
+        { "name": qsTr("Pink"), "color": "#984061" },
+        { "name": qsTr("Slate"), "color": "#4a5d6e" }
+    ]
+    function presetSelected(color) {
+        return DynamicColorBackend.sourceMode === "manual"
+               && String(DynamicColorBackend.manualColor).toLowerCase() === String(color).toLowerCase()
+    }
+    function applyAccentPreset(color) {
+        if (!DynamicColorBackend.available || DynamicColorBackend.busy || presetSelected(color))
+            return
+        DynamicColorBackend.applySource("manual", color)
+    }
+
     function scrollToSection(item) {
         if (!item) return
         const point = item.mapToItem(page.contentItem, 0, 0)
@@ -205,7 +230,8 @@ Item {
         ({"title": qsTr("Wallpaper"), "subtitle": qsTr("Choose a desktop image and layout"), "icon": "wallpaper", "route": "wallpaper", "enabled": true, "trailingKind": "chevron"}),
         ({"title": qsTr("Plasma style"), "subtitle": qsTr("Panels, widgets, popups and notifications are drawn by Meo Shell and follow the Meo color scheme"), "icon": "dashboard", "tone": "tertiary", "enabled": false, "trailingKind": "none"}),
         ({"title": qsTr("Cursors"), "subtitle": qsTr("Installed pointer themes and sizes"), "icon": "mouse", "route": "cursors", "enabled": true, "trailingKind": "chevron"}),
-        ({"title": qsTr("Fonts"), "subtitle": qsTr("Interface, fixed width, menus and window titles"), "icon": "format_size", "route": "fonts", "enabled": true, "trailingKind": "chevron"})
+        ({"title": qsTr("Fonts"), "subtitle": qsTr("Interface, fixed width, menus and window titles"), "icon": "format_size", "route": "fonts", "enabled": true, "trailingKind": "chevron"}),
+        ({"title": qsTr("Effects and animation"), "subtitle": qsTr("Animation speed, blur, wobbly windows and other desktop effects"), "icon": "blur_on", "route": "desktop-effects", "enabled": true, "trailingKind": "chevron"})
     ]
 
     MeoPageLayout {
@@ -216,7 +242,7 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : qsTr("Appearance")
-        subtitle: qsTr("Choose a wallpaper, system accent, or color. Meo uses one consistent color scheme across its apps.")
+        subtitle: qsTr("Colors, shapes, transparency and window style. Meo uses one consistent color scheme across its apps.")
 
         MeoBanner { width: parent.width; visible: AppearanceBackend.error !== ""; title: qsTr("Appearance needs attention"); text: AppearanceBackend.error; tone: "error" }
         MeoText { width: parent.width; visible: AppearanceBackend.status !== ""; text: AppearanceBackend.status; wrapMode: Text.WordWrap }
@@ -230,22 +256,114 @@ Item {
             visible: AppearanceBackend.recoveryAvailable; enabled: !AppearanceBackend.busy
             onClicked: appearanceRestore.open()
         }
-        MeoExposedDropdown {
-            width: parent.width; label: qsTr("Appearance mode")
-            model: [qsTr("Light"), qsTr("Dark")]
-            text: MeoTheme.isDarkMode ? model[1] : model[0]
-            enabled: AppearanceBackend.available && !AppearanceBackend.busy
-            onSelected: (index, value) => AppearanceBackend.applyMode(index === 1 ? "dark" : "light")
-        }
+        MeoText { width: parent.width; text: qsTr("Color"); typeRole: "title"; typeSize: "small"; emphasized: true; color: MeoTheme.contentOnSurface }
 
-        MeoSettingsGroup {
+        MeoCard {
             width: parent.width
-            title: qsTr("Current appearance")
-            subtitle: qsTr("These are the colors, text, and motion settings active in this session.")
-            model: root.currentRows
-            onRowActivated: (index, row) => {
-                if (row.id === "dynamic-color")
-                    dynamicColorDetails.open()
+            type: "filled"
+
+            Column {
+                width: parent.width
+                spacing: MeoTheme.space16
+
+                MeoExposedDropdown {
+                    width: parent.width; label: qsTr("Appearance mode")
+                    model: [qsTr("Light"), qsTr("Dark")]
+                    text: MeoTheme.isDarkMode ? model[1] : model[0]
+                    enabled: AppearanceBackend.available && !AppearanceBackend.busy
+                    onSelected: (index, value) => AppearanceBackend.applyMode(index === 1 ? "dark" : "light")
+                }
+
+                MeoText {
+                    width: parent.width
+                    text: qsTr("Accent color")
+                    typeRole: "label"; typeSize: "large"
+                    color: MeoTheme.contentOnSurfaceVariant
+                }
+
+                Flow {
+                    id: accentFlow
+                    width: parent.width
+                    spacing: MeoTheme.space12
+                    readonly property real swatchSize: 40 * MeoTheme.globalScale
+
+                    Repeater {
+                        model: root.accentPresets
+                        delegate: Item {
+                            id: swatch
+                            required property var modelData
+                            readonly property bool selected: root.presetSelected(modelData.color)
+                            width: accentFlow.swatchSize
+                            height: accentFlow.swatchSize
+                            activeFocusOnTab: true
+                            Accessible.role: Accessible.RadioButton
+                            Accessible.name: modelData.name
+                            Accessible.checked: selected
+                            Keys.onSpacePressed: root.applyAccentPreset(modelData.color)
+                            Keys.onReturnPressed: root.applyAccentPreset(modelData.color)
+
+                            MeoShape {
+                                anchors.fill: parent
+                                type: "rect"
+                                radius: width / 2
+                                color: "transparent"
+                                strokeColor: swatch.selected || swatch.activeFocus ? MeoTheme.contentOnSurface : "transparent"
+                                strokeWidth: 2 * MeoTheme.globalScale
+                            }
+                            MeoShape {
+                                anchors.centerIn: parent
+                                width: parent.width - 8 * MeoTheme.globalScale
+                                height: width
+                                type: "rect"
+                                radius: width / 2
+                                color: swatch.modelData.color
+                                strokeWidth: 0
+                            }
+                            MeoIcon {
+                                anchors.centerIn: parent
+                                visible: swatch.selected
+                                icon: "check"
+                                size: 18
+                                color: "white"
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                enabled: DynamicColorBackend.available && !DynamicColorBackend.busy
+                                onClicked: root.applyAccentPreset(swatch.modelData.color)
+                            }
+                        }
+                    }
+                }
+
+                Row {
+                    spacing: MeoTheme.space8
+                    MeoButton {
+                        text: qsTr("From wallpaper")
+                        type: DynamicColorBackend.sourceMode === "wallpaper" ? "tonal" : "outlined"
+                        size: "s"
+                        icon.name: "wallpaper"
+                        enabled: DynamicColorBackend.available && !DynamicColorBackend.busy
+                                 && DynamicColorBackend.sourceMode !== "wallpaper"
+                        onClicked: DynamicColorBackend.applySource("wallpaper")
+                    }
+                    MeoButton {
+                        text: qsTr("Custom…")
+                        type: "text"
+                        size: "s"
+                        icon.name: "colorize"
+                        enabled: DynamicColorBackend.available && !DynamicColorBackend.busy
+                        onClicked: root.chooseDynamicColorSource()
+                    }
+                }
+
+                MeoText {
+                    width: parent.width
+                    visible: DynamicColorBackend.busy
+                    text: qsTr("Applying your color scheme…")
+                    typeRole: "body"; typeSize: "small"
+                    color: MeoTheme.contentOnSurfaceVariant
+                }
             }
         }
 
@@ -290,6 +408,17 @@ Item {
             }
         }
         ApplyToast { id: styleToast }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("Current appearance")
+            subtitle: qsTr("These are the colors, text, and motion settings active in this session.")
+            model: root.currentRows
+            onRowActivated: (index, row) => {
+                if (row.id === "dynamic-color")
+                    dynamicColorDetails.open()
+            }
+        }
 
         MeoSettingsGroup {
             width: parent.width

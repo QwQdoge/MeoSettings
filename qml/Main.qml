@@ -52,8 +52,23 @@ ApplicationWindow {
         availableHeight: root.height
     }
 
+    // "page#section" opens a page scrolled to one of its sections (used for
+    // settings that are hosted inside another page, such as the window and
+    // surface styles shown on Appearance).
+    function baseRoute(route) {
+        const text = String(route || "")
+        const hash = text.indexOf("#")
+        return hash > 0 ? text.slice(0, hash) : text
+    }
+
+    function routeSection(route) {
+        const text = String(route || "")
+        const hash = text.indexOf("#")
+        return hash > 0 ? text.slice(hash + 1) : ""
+    }
+
     function entryForRoute(route) {
-        return SettingsRegistry.entry(route)
+        return SettingsRegistry.entry(baseRoute(route))
     }
 
     function categoryIdForRoute(route) {
@@ -251,6 +266,7 @@ ApplicationWindow {
     }
 
     function pageSource(route) {
+        route = baseRoute(route)
         if (route === "category:privacy" || route === "privacy" || route === "app-permissions")
             return Qt.resolvedUrl("pages/PrivacyPage.qml")
         if (route.startsWith("category:"))
@@ -317,6 +333,9 @@ ApplicationWindow {
             "navigateTo": root.navigate,
             "rootMetrics": rootMetrics
         }
+        const section = routeSection(route)
+        route = baseRoute(route)
+        if (section !== "") common.focusSection = section
         if (route === "filetypes") common.fileTypesOnly = true
         if (KdeConfigBackend.hasSchema(route)) common.schemaId = route
         if (route === "mouse") {

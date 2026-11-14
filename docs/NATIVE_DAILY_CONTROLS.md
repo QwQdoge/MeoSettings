@@ -64,6 +64,25 @@ native pages. Native Night Light mode/temperature controls require the installed
 KWin schema with `Constant` / `DarkLight` modes; older numeric enums are not
 interpreted as that schema.
 
+## Appearance, startup, update and monitor preferences
+
+These rows are KdeConfigBackend schemas (one whitelisted key per row, written
+with `KConfig::Notify`) or a dedicated backend. Each names its real owner:
+
+| Setting | Where | Authority / key |
+| --- | --- | --- |
+| Accent color presets | Appearance › Color | DynamicColorBackend manual seed (Meo generates the full scheme) |
+| Corner roundness, translucent surfaces, transparency level, blur | Appearance › Shape and transparency | `meo-shellrc [Appearance]` `CornerScale`, `SurfaceTransparency`, `TransparencyLevel`, `SurfaceBlur`, read by Meo.System `ShellAppearance` and applied to `MeoTheme.cornerScale` / `transparencyLevel` |
+| Window corner radius, title bar, shadows, accent title bar | Appearance › Windows | `kwinrc [org.meo.decoration]`; radius mirrored to `[Round-Corners]` for the rounded-corner effect. Shown only while `org.meo.decoration` is the active decoration; applied with `KWin.reconfigure` |
+| Window transparency, dim inactive, open/close animation | Appearance › Windows | KWin effects `translucency`, `diminactive`, `scale`/`glide` (`kwinrc [Plugins]`, `[Effect-*]`), loaded/reconfigured over `org.kde.kwin.Effects` |
+| Num Lock and Bluetooth at sign-in | Startup & session | `kcminputrc [Keyboard] NumLock`, `bluedevilglobalrc [Global] launchState` |
+| System Monitor update speed | Performance › System Monitor | `meosystemmonitorrc [General] RefreshIntervalMs`, followed live by Meo.System Performance/Tasks |
+| Automatic update checks | Updates › Automatic checks | OmniStore's `omnistore-update.timer`; interval via the user drop-in `~/.config/systemd/user/omnistore-update.timer.d/interval.conf`, off = timer disabled (UpdateScheduleBackend, systemd user manager over D-Bus) |
+
+A route of the form `page#section` (for example `appearance#window-appearance`)
+opens a page scrolled to that section; search entries use it for settings that
+are hosted inside another page. Desktop effects live under Wallpaper & style.
+
 ## Authority references
 
 - [XDG Desktop Application Autostart specification](https://specifications.freedesktop.org/autostart/latest/)

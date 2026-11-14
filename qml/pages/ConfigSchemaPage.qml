@@ -40,6 +40,21 @@ Item {
         "sound-theme": ["Circle", "SoftBurst"]
     })
     readonly property string expertModule: expertModules[schemaId] || ""
+    // Settings that belong to this topic but live on another page.
+    readonly property var relatedRows: ({
+        "startup-session": [
+            { "title": qsTr("Startup apps"), "subtitle": qsTr("Applications and scripts that run when you sign in"), "icon": "rocket_launch", "route": "autostart", "trailingKind": "chevron" },
+            { "title": qsTr("Startup animation"), "subtitle": qsTr("Animation shown while the desktop session starts"), "icon": "animation", "route": "appearance#welcome-screen", "trailingKind": "chevron" },
+            { "title": qsTr("Lock screen & login"), "subtitle": qsTr("Lock-screen presentation and sign-in privacy"), "icon": "lock", "route": "session-entry", "trailingKind": "chevron" }
+        ],
+        "desktop-effects": [
+            { "title": qsTr("Window style"), "subtitle": qsTr("Corner radius, shadows, transparency and open/close animation"), "icon": "web_asset", "route": "appearance#window-appearance", "trailingKind": "chevron" },
+            { "title": qsTr("Shape and transparency"), "subtitle": qsTr("Roundness and translucency of panels, popups and Meo apps"), "icon": "rounded_corner", "route": "appearance#shell-surfaces", "trailingKind": "chevron" }
+        ],
+        "window-behavior": [
+            { "title": qsTr("Window style"), "subtitle": qsTr("Corner radius, shadows, transparency and open/close animation"), "icon": "web_asset", "route": "appearance#window-appearance", "trailingKind": "chevron" }
+        ]
+    })
 
     ApplyToast { id: toast }
 
@@ -85,6 +100,14 @@ Item {
             width: parent.width
             schemaId: root.schemaId
             onApplied: (message) => toast.show(message)
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: (root.relatedRows[root.schemaId] || []).length > 0
+            title: qsTr("Related settings")
+            model: root.relatedRows[root.schemaId] || []
+            onRowActivated: (index, row) => root.navigateTo(row.route)
         }
 
         MeoButton {

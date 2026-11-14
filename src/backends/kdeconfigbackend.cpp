@@ -10,8 +10,10 @@
 #include <QDBusVariant>
 #include <QDir>
 #include <QFile>
+#include <QProcess>
 #include <QStandardPaths>
 #include <algorithm>
+#include <tuple>
 #include <cmath>
 
 namespace {
@@ -102,6 +104,52 @@ QVariantList edgeActions()
 Map edge(const char *id, const char *label, const char *key)
 {
     return choice(id, label, nullptr, "kwinrc", "ElectricBorders", key, "None", edgeActions(), "kwin");
+}
+
+// A number stored in a different unit than it is shown in, for example a
+// 0-1 intensity shown as a percentage (scale 0.01).
+Map scaledNumber(const char *id, const char *label, const char *description, const char *file, const char *group,
+                 const char *key, int def, int min, int max, int step, const char *suffix, double scale,
+                 const char *hook = "")
+{
+    Map row = number(id, label, description, file, group, key, def, min, max, step, suffix, hook);
+    row.insert("scale", scale);
+    return row;
+}
+
+// Write the same value to further keys, so settings that two components
+// read (the decoration radius and the rounded-corner effect) stay in step.
+Map mirrored(Map row, std::initializer_list<std::pair<const char *, const char *>> keys)
+{
+    QVariantList mirrors;
+    for (const auto &item : keys)
+        mirrors.append(Map{{"group", QString::fromLatin1(item.first)}, {"key", QString::fromLatin1(item.second)}});
+    row.insert("mirrors", mirrors);
+    return row;
+}
+
+// One of several mutually exclusive KWin effects (or none). The choice
+// value is the effect id; selecting one enables it and disables the others.
+Map exclusiveEffects(const char *id, const char *label, const char *description,
+                     std::initializer_list<std::tuple<const char *, const char *, bool>> effects)
+{
+    QVariantList choices;
+    QVariantList names;
+    QVariantMap defaults;
+    QString def = QStringLiteral("none");
+    for (const auto &[name, text, enabledByDefault] : effects) {
+        choices.append(Map{{"value", QString::fromLatin1(name)}, {"label", tr(text)}});
+        names.append(QString::fromLatin1(name));
+        defaults.insert(QString::fromLatin1(name), enabledByDefault);
+        if (enabledByDefault && def == QLatin1String("none"))
+            def = QString::fromLatin1(name);
+    }
+    choices.append(Map{{"value", QStringLiteral("none")}, {"label", tr(QT_TRANSLATE_NOOP("KdeConfigBackend", "No animation"))}});
+    Map row = choice(id, label, description, "kwinrc", "Plugins", "", "", choices, "exclusive-effects");
+    row.insert("default", def);
+    row.insert("exclusive", names);
+    row.insert("exclusiveDefaults", defaults);
+    return row;
 }
 
 QVariantList build(const QString &page)
@@ -238,6 +286,19 @@ QVariantList build(const QString &page)
                 toggle("offerShutdown", QT_TRANSLATE_NOOP("KdeConfigBackend", "Offer shut down and restart"), nullptr,
                        "ksmserverrc", "General", "offerShutdown", true),
             }),
+            section(QT_TRANSLATE_NOOP("KdeConfigBackend", "At sign-in"), {
+                choice("numLock", QT_TRANSLATE_NOOP("KdeConfigBackend", "Num Lock"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "Applies the next time you sign in"),
+                       "kcminputrc", "Keyboard", "NumLock", "2",
+                       options({{"0", QT_TRANSLATE_NOOP("KdeConfigBackend", "Turn on")},
+                                {"1", QT_TRANSLATE_NOOP("KdeConfigBackend", "Turn off")},
+                                {"2", QT_TRANSLATE_NOOP("KdeConfigBackend", "Leave unchanged")}})),
+                choice("bluetoothLogin", QT_TRANSLATE_NOOP("KdeConfigBackend", "Bluetooth"), nullptr,
+                       "bluedevilglobalrc", "Global", "launchState", "remember",
+                       options({{"remember", QT_TRANSLATE_NOOP("KdeConfigBackend", "Restore its last state")},
+                                {"enable", QT_TRANSLATE_NOOP("KdeConfigBackend", "Always turn on")},
+                                {"disable", QT_TRANSLATE_NOOP("KdeConfigBackend", "Always turn off")}})),
+            }),
         };
     }
     if (page == QLatin1String("spell-checking")) {
@@ -343,6 +404,91 @@ QVariantList build(const QString &page)
             }),
         };
     }
+    if (page == QLatin1String("window-appearance")) {
+        Map radius = number("cornerRadius", QT_TRANSLATE_NOOP("KdeConfigBackend", "Window corner radius"),
+                            QT_TRANSLATE_NOOP("KdeConfigBackend", "Rounds the title bar and, when the rounded-corner effect is installed, the window content"),
+                            "kwinrc", "org.meo.decoration", "CornerRadius", 16, 0, 32, 1,
+                            QT_TRANSLATE_NOOP("KdeConfigBackend", "px"), "kwin|effectcfg:kwin4_effect_shapecorners");
+        radius = mirrored(radius, {{"Round-Corners", "Size"}, {"Round-Corners", "InactiveCornerRadius"}});
+        // Rows read by org.meo.decoration only appear while it is the active
+        // KWin decoration; they would do nothing for another decoration.
+        auto meo = [](Map row) { row.insert("requires", QStringLiteral("meo-decoration")); return row; };
+        return {
+            section(QT_TRANSLATE_NOOP("KdeConfigBackend", "Corners and title bar"), {
+                meo(radius),
+                meo(toggle("squareMaximized", QT_TRANSLATE_NOOP("KdeConfigBackend", "Square corners when maximized"), nullptr,
+                       "kwinrc", "org.meo.decoration", "SquareMaximized", true, "kwin")),
+                meo(number("titleBarHeight", QT_TRANSLATE_NOOP("KdeConfigBackend", "Title bar height"), nullptr,
+                       "kwinrc", "org.meo.decoration", "TitleBarHeight", 32, 24, 40, 1,
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "px"), "kwin")),
+                meo(toggle("centerTitle", QT_TRANSLATE_NOOP("KdeConfigBackend", "Center window titles"), nullptr,
+                       "kwinrc", "org.meo.decoration", "AlignTitleCenter", true, "kwin")),
+                meo(toggle("accentTitleBar", QT_TRANSLATE_NOOP("KdeConfigBackend", "Tint the active title bar with the accent color"), nullptr,
+                       "kwinrc", "org.meo.decoration", "EnableAccentTint", false, "kwin")),
+                meo(toggle("buttonBackground", QT_TRANSLATE_NOOP("KdeConfigBackend", "Show title-bar button backgrounds"), nullptr,
+                       "kwinrc", "org.meo.decoration", "ShowButtonBackground", true, "kwin")),
+            }),
+            section(QT_TRANSLATE_NOOP("KdeConfigBackend", "Shadows"), {
+                meo(number("shadowSize", QT_TRANSLATE_NOOP("KdeConfigBackend", "Shadow size"), nullptr,
+                       "kwinrc", "org.meo.decoration", "ShadowRadius", 28, 0, 64, 2,
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "px"), "kwin")),
+                meo(scaledNumber("shadowStrength", QT_TRANSLATE_NOOP("KdeConfigBackend", "Shadow strength"), nullptr,
+                             "kwinrc", "org.meo.decoration", "ShadowIntensity", 18, 0, 60, 2, "%", 0.01, "kwin")),
+            }),
+            section(QT_TRANSLATE_NOOP("KdeConfigBackend", "Window transparency"), {
+                effect("translucency", QT_TRANSLATE_NOOP("KdeConfigBackend", "Window transparency"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "Make windows translucent in the situations below"), "translucency", false),
+                number("inactiveOpacity", QT_TRANSLATE_NOOP("KdeConfigBackend", "Inactive windows"), nullptr,
+                       "kwinrc", "Effect-translucency", "Inactive", 100, 40, 100, 5, "%", "effectcfg:translucency"),
+                number("moveOpacity", QT_TRANSLATE_NOOP("KdeConfigBackend", "While moving or resizing"), nullptr,
+                       "kwinrc", "Effect-translucency", "MoveResize", 80, 40, 100, 5, "%", "effectcfg:translucency"),
+                number("dialogOpacity", QT_TRANSLATE_NOOP("KdeConfigBackend", "Dialogs"), nullptr,
+                       "kwinrc", "Effect-translucency", "Dialogs", 100, 40, 100, 5, "%", "effectcfg:translucency"),
+                number("menuOpacity", QT_TRANSLATE_NOOP("KdeConfigBackend", "Menus"), nullptr,
+                       "kwinrc", "Effect-translucency", "Menus", 100, 40, 100, 5, "%", "effectcfg:translucency"),
+            }),
+            section(QT_TRANSLATE_NOOP("KdeConfigBackend", "Focus and animation"), {
+                effect("dimInactive", QT_TRANSLATE_NOOP("KdeConfigBackend", "Dim inactive windows"), nullptr, "diminactive", false),
+                number("dimStrength", QT_TRANSLATE_NOOP("KdeConfigBackend", "Dimming strength"), nullptr,
+                       "kwinrc", "Effect-diminactive", "Strength", 25, 5, 80, 5, "%", "effectcfg:diminactive"),
+                exclusiveEffects("openCloseAnimation", QT_TRANSLATE_NOOP("KdeConfigBackend", "Window open and close animation"), nullptr,
+                                 {{"scale", QT_TRANSLATE_NOOP("KdeConfigBackend", "Scale"), true},
+                                  {"glide", QT_TRANSLATE_NOOP("KdeConfigBackend", "Glide"), false}}),
+            }),
+        };
+    }
+    if (page == QLatin1String("shell-surfaces")) {
+        return {
+            section(nullptr, {
+                number("cornerScale", QT_TRANSLATE_NOOP("KdeConfigBackend", "Corner roundness"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "Panels, popups, cards and Meo apps; 100% is the Meo design"),
+                       "meo-shellrc", "Appearance", "CornerScale", 100, 0, 150, 5, "%"),
+                toggle("surfaceTransparency", QT_TRANSLATE_NOOP("KdeConfigBackend", "Translucent surfaces"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "Let panels and popups show a little of what is behind them"),
+                       "meo-shellrc", "Appearance", "SurfaceTransparency", true),
+                number("transparencyLevel", QT_TRANSLATE_NOOP("KdeConfigBackend", "Transparency level"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "How see-through translucent surfaces are; 100% is the Meo design"),
+                       "meo-shellrc", "Appearance", "TransparencyLevel", 100, 25, 200, 5, "%"),
+                toggle("surfaceBlur", QT_TRANSLATE_NOOP("KdeConfigBackend", "Blur behind surfaces"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "Frosted-glass look; needs translucent surfaces"),
+                       "meo-shellrc", "Appearance", "SurfaceBlur", true),
+            }),
+        };
+    }
+    if (page == QLatin1String("system-monitor")) {
+        return {
+            section(nullptr, {
+                choice("refreshInterval", QT_TRANSLATE_NOOP("KdeConfigBackend", "Update speed"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "How often System Monitor and the performance widget sample the system; slower uses less power"),
+                       "meosystemmonitorrc", "General", "RefreshIntervalMs", "2000",
+                       options({{"500", QT_TRANSLATE_NOOP("KdeConfigBackend", "Very fast (0.5 s)")},
+                                {"1000", QT_TRANSLATE_NOOP("KdeConfigBackend", "Fast (1 s)")},
+                                {"2000", QT_TRANSLATE_NOOP("KdeConfigBackend", "Normal (2 s)")},
+                                {"5000", QT_TRANSLATE_NOOP("KdeConfigBackend", "Slow (5 s)")},
+                                {"10000", QT_TRANSLATE_NOOP("KdeConfigBackend", "Very slow (10 s)")}}), "", true),
+            }),
+        };
+    }
     if (page == QLatin1String("welcome-screen")) {
         Map splash = choice("splash", QT_TRANSLATE_NOOP("KdeConfigBackend", "Startup animation"),
                             QT_TRANSLATE_NOOP("KdeConfigBackend", "Shown while the desktop session starts"),
@@ -438,7 +584,15 @@ QVariantList iconThemes()
 
 bool needsKwin(const QString &hook)
 {
-    return hook == QLatin1String("kwin") || hook.startsWith(QLatin1String("effect:")) || hook.startsWith(QLatin1String("vdesktop:"));
+    return hook == QLatin1String("kwin") || hook.startsWith(QLatin1String("effect:"))
+        || hook.startsWith(QLatin1String("effectcfg:")) || hook.startsWith(QLatin1String("vdesktop:"))
+        || hook == QLatin1String("exclusive-effects");
+}
+
+bool exclusiveEnabled(const KConfigGroup &plugins, const Map &row, const QString &name)
+{
+    return plugins.readEntry(name + QStringLiteral("Enabled"),
+                             row.value("exclusiveDefaults").toMap().value(name).toBool());
 }
 
 QDBusMessage kwinCall(const QString &path, const QString &iface, const QString &method)
@@ -452,7 +606,9 @@ KdeConfigBackend::KdeConfigBackend(QObject *parent) : BackendBase(parent)
     const QStringList files{QStringLiteral("kwinrc"), QStringLiteral("kdeglobals"), QStringLiteral("baloofilerc"),
                             QStringLiteral("ksmserverrc"), QStringLiteral("sonnetrc"), QStringLiteral("plasmarc"),
                             QStringLiteral("device_automounter_kcmrc"), QStringLiteral("kwalletrc"),
-                            QStringLiteral("ksplashrc")};
+                            QStringLiteral("ksplashrc"), QStringLiteral("meo-shellrc"),
+                            QStringLiteral("meosystemmonitorrc"), QStringLiteral("kcminputrc"),
+                            QStringLiteral("bluedevilglobalrc")};
     for (const QString &file : files) {
         auto watcher = KConfigWatcher::create(KSharedConfig::openConfig(file));
         connect(watcher.data(), &KConfigWatcher::configChanged, this, [this] { refresh(); });
@@ -465,6 +621,22 @@ bool KdeConfigBackend::kwinRunning() const
 {
     auto *interface = QDBusConnection::sessionBus().interface();
     return interface && interface->isServiceRegistered(QStringLiteral("org.kde.KWin"));
+}
+
+bool KdeConfigBackend::systemMonitorAvailable() const
+{
+    return !QStandardPaths::findExecutable(QStringLiteral("meo-system-monitor")).isEmpty();
+}
+
+bool KdeConfigBackend::openSystemMonitor()
+{
+    const QString program = QStandardPaths::findExecutable(QStringLiteral("meo-system-monitor"));
+    if (program.isEmpty() || !QProcess::startDetached(program, {})) {
+        setError(tr("System Monitor could not be started."));
+        return false;
+    }
+    clearError();
+    return true;
 }
 
 void KdeConfigBackend::refresh()
@@ -480,22 +652,38 @@ bool KdeConfigBackend::hasSchema(const QString &pageId) const
 
 QVariantList KdeConfigBackend::sectionsFor(const QString &pageId) const
 {
-    QVariantList sections = build(pageId);
-    for (QVariant &sectionValue : sections) {
-        Map sectionMap = sectionValue.toMap();
-        QVariantList rows = sectionMap.value("rows").toList();
-        for (QVariant &rowValue : rows) {
-            Map row = rowValue.toMap();
+    const QVariantList built = build(pageId);
+    QVariantList sections;
+    bool meoDecorationChecked = false;
+    bool meoDecorationActive = false;
+    for (const QVariant &builtSection : built) {
+        Map sectionMap = builtSection.toMap();
+        QVariantList rows;
+        for (const QVariant &builtRow : sectionMap.value("rows").toList()) {
+            Map row = builtRow.toMap();
+            if (row.value("requires").toString() == QLatin1String("meo-decoration")) {
+                if (!meoDecorationChecked) {
+                    auto kwin = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
+                    kwin->reparseConfiguration();
+                    meoDecorationActive = kwin->group(QStringLiteral("org.kde.kdecoration2"))
+                                              .readEntry("library", QString()) == QLatin1String("org.meo.decoration");
+                    meoDecorationChecked = true;
+                }
+                if (!meoDecorationActive)
+                    continue;
+            }
             if (row.value("dynamic").toString() == QLatin1String("sound-themes"))
                 row.insert("choices", soundThemes());
             else if (row.value("dynamic").toString() == QLatin1String("splash-themes"))
                 row.insert("choices", splashThemes());
             else if (row.value("dynamic").toString() == QLatin1String("icon-themes"))
                 row.insert("choices", iconThemes());
-            rowValue = row;
+            rows.append(row);
         }
+        if (rows.isEmpty())
+            continue;
         sectionMap.insert("rows", rows);
-        sectionValue = sectionMap;
+        sections.append(sectionMap);
     }
     return sections;
 }
@@ -518,8 +706,21 @@ QVariantList KdeConfigBackend::schema(const QString &pageId) const
                 if (row.value("invert").toBool())
                     value = !value;
                 row.insert("value", value);
+            } else if (type == QLatin1String("number") && row.contains("scale")) {
+                const double scale = row.value("scale").toDouble();
+                const double stored = group.readEntry(key, row.value("default").toInt() * scale);
+                row.insert("value", static_cast<int>(std::lround(stored / scale)));
             } else if (type == QLatin1String("number")) {
                 row.insert("value", group.readEntry(key, row.value("default").toInt()));
+            } else if (row.contains("exclusive")) {
+                QString value = QStringLiteral("none");
+                for (const QVariant &name : row.value("exclusive").toList()) {
+                    if (exclusiveEnabled(group, row, name.toString())) {
+                        value = name.toString();
+                        break;
+                    }
+                }
+                row.insert("value", value);
             } else {
                 const QString fallback = row.value("default").toString();
                 QString value = group.readEntry(key, fallback);
@@ -573,7 +774,24 @@ void KdeConfigBackend::setValue(const QString &pageId, const QString &rowId, con
         group.writeEntry(key, enabled, KConfig::Notify);
     } else if (type == QLatin1String("number")) {
         const int number = std::clamp(value.toInt(), row.value("min").toInt(), row.value("max").toInt());
-        group.writeEntry(key, number, KConfig::Notify);
+        if (row.contains("scale"))
+            group.writeEntry(key, number * row.value("scale").toDouble(), KConfig::Notify);
+        else
+            group.writeEntry(key, number, KConfig::Notify);
+        for (const QVariant &mirrorValue : row.value("mirrors").toList()) {
+            const Map mirror = mirrorValue.toMap();
+            KConfigGroup mirrorGroup = config->group(mirror.value("group").toString());
+            mirrorGroup.writeEntry(mirror.value("key").toString(), number, KConfig::Notify);
+        }
+    } else if (row.contains("exclusive")) {
+        const QString selected = value.toString();
+        const QVariantList names = row.value("exclusive").toList();
+        if (selected != QLatin1String("none") && !names.contains(selected)) {
+            setError(tr("That option is not supported."));
+            return;
+        }
+        for (const QVariant &name : names)
+            group.writeEntry(name.toString() + QStringLiteral("Enabled"), name.toString() == selected, KConfig::Notify);
     } else {
         const QString text = value.toString();
         bool valid = false;
@@ -596,8 +814,19 @@ void KdeConfigBackend::setValue(const QString &pageId, const QString &rowId, con
         setError(tr("The setting could not be saved."));
         return;
     }
-    runHook(row.value("hook").toString(), type == QLatin1String("number") ? value : QVariant(value));
+    if (row.contains("exclusive"))
+        applyExclusiveEffects(row, value.toString());
+    else
+        runHook(row.value("hook").toString(), type == QLatin1String("number") ? value : QVariant(value));
     refresh();
+}
+
+void KdeConfigBackend::applyExclusiveEffects(const QVariantMap &row, const QString &selected)
+{
+    if (!kwinRunning())
+        return; // Saved; KWin reads it at its next start.
+    for (const QVariant &name : row.value("exclusive").toList())
+        runHook(QStringLiteral("effect:") + name.toString(), name.toString() == selected);
 }
 
 void KdeConfigBackend::resetPage(const QString &pageId)
@@ -608,19 +837,38 @@ void KdeConfigBackend::resetPage(const QString &pageId)
             const Map row = rowValue.toMap();
             auto config = KSharedConfig::openConfig(row.value("file").toString());
             KConfigGroup group = config->group(row.value("group").toString());
-            group.deleteEntry(row.value("key").toString(), KConfig::Notify);
-            if (!group.sync()) {
+            if (row.contains("exclusive")) {
+                for (const QVariant &name : row.value("exclusive").toList())
+                    group.deleteEntry(name.toString() + QStringLiteral("Enabled"), KConfig::Notify);
+            } else {
+                group.deleteEntry(row.value("key").toString(), KConfig::Notify);
+            }
+            for (const QVariant &mirrorValue : row.value("mirrors").toList()) {
+                const Map mirror = mirrorValue.toMap();
+                config->group(mirror.value("group").toString()).deleteEntry(mirror.value("key").toString(), KConfig::Notify);
+            }
+            if (!config->sync()) {
                 setError(tr("The settings could not be reset."));
                 return;
             }
-            runHook(row.value("hook").toString(), row.value("default"));
+            if (row.contains("exclusive"))
+                applyExclusiveEffects(row, row.value("default").toString());
+            else
+                runHook(row.value("hook").toString(), row.value("default"));
         }
     }
     refresh();
 }
 
-void KdeConfigBackend::runHook(const QString &hook, const QVariant &value)
+void KdeConfigBackend::runHook(const QString &hooks, const QVariant &value)
 {
+    // Several hooks may be chained with '|', e.g. "kwin|effectcfg:name".
+    if (hooks.contains(QLatin1Char('|'))) {
+        for (const QString &hook : hooks.split(QLatin1Char('|'), Qt::SkipEmptyParts))
+            runHook(hook, value);
+        return;
+    }
+    const QString &hook = hooks;
     if (hook.isEmpty())
         return;
     if (needsKwin(hook) && !kwinRunning())
@@ -643,6 +891,12 @@ void KdeConfigBackend::runHook(const QString &hook, const QVariant &value)
         auto call = kwinCall(QStringLiteral("/Effects"), QStringLiteral("org.kde.kwin.Effects"),
                              enable ? QStringLiteral("loadEffect") : QStringLiteral("unloadEffect"));
         call << hook.mid(7);
+        bus.asyncCall(call);
+    } else if (hook.startsWith(QLatin1String("effectcfg:"))) {
+        // Re-read the effect's own settings; harmless when it is not loaded.
+        auto call = kwinCall(QStringLiteral("/Effects"), QStringLiteral("org.kde.kwin.Effects"),
+                             QStringLiteral("reconfigureEffect"));
+        call << hook.mid(10);
         bus.asyncCall(call);
     } else if (hook.startsWith(QLatin1String("vdesktop:"))) {
         // Apply to the running compositor too; config alone only applies at

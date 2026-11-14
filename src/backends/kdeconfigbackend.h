@@ -16,10 +16,12 @@ class KdeConfigBackend final : public BackendBase
     Q_OBJECT
     Q_PROPERTY(int revision READ revision NOTIFY changed)
     Q_PROPERTY(bool kwinRunning READ kwinRunning NOTIFY changed)
+    Q_PROPERTY(bool systemMonitorAvailable READ systemMonitorAvailable NOTIFY changed)
 public:
     explicit KdeConfigBackend(QObject *parent = nullptr);
     int revision() const { return m_revision; }
     bool kwinRunning() const;
+    bool systemMonitorAvailable() const;
 
     Q_INVOKABLE bool hasSchema(const QString &pageId) const;
     // [{title, rows:[{id,label,description,type,value,choices,min,max,step,suffix}]}]
@@ -27,6 +29,8 @@ public:
     Q_INVOKABLE void setValue(const QString &pageId, const QString &rowId, const QVariant &value);
     Q_INVOKABLE void resetPage(const QString &pageId);
     Q_INVOKABLE void refresh();
+    // Opens Meo System Monitor (single instance; it raises an open window).
+    Q_INVOKABLE bool openSystemMonitor();
 
 Q_SIGNALS:
     void changed();
@@ -34,7 +38,8 @@ Q_SIGNALS:
 private:
     QVariantList sectionsFor(const QString &pageId) const;
     QVariantMap findRow(const QString &pageId, const QString &rowId) const;
-    void runHook(const QString &hook, const QVariant &value);
+    void runHook(const QString &hooks, const QVariant &value);
+    void applyExclusiveEffects(const QVariantMap &row, const QString &selected);
 
     QList<KConfigWatcher::Ptr> m_watchers;
     int m_revision = 0;
