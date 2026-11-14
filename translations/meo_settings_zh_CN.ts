@@ -6417,6 +6417,92 @@ Total prompt: %7 characters</source>
         <source>Volume information</source>
         <translation>卷信息</translation>
     </message>
+    <message>
+        <source>%1 of %2 used</source>
+        <translation>已使用 %1，共 %2</translation>
+    </message>
+    <message>
+        <source>%1 free on the system disk</source>
+        <translation>系统盘剩余 %1</translation>
+    </message>
+    <message>
+        <source>Free up space</source>
+        <translation>释放空间</translation>
+    </message>
+    <message>
+        <source>Devices</source>
+        <translation>设备</translation>
+    </message>
+    <message>
+        <source>What is using space</source>
+        <translation>空间占用</translation>
+    </message>
+    <message>
+        <source>Backup and restore</source>
+        <translation>备份与恢复</translation>
+    </message>
+    <message>
+        <source>Apps</source>
+        <translation>应用</translation>
+    </message>
+    <message>
+        <source>Personal files</source>
+        <translation>个人文件</translation>
+    </message>
+    <message>
+        <source>Trash</source>
+        <translation>回收站</translation>
+    </message>
+    <message>
+        <source>Checking…</source>
+        <translation>正在检查…</translation>
+    </message>
+    <message>
+        <source>The trash is empty</source>
+        <translation>回收站是空的</translation>
+    </message>
+    <message>
+        <source>Empty</source>
+        <translation>清空</translation>
+    </message>
+    <message>
+        <source>App caches</source>
+        <translation>应用缓存</translation>
+    </message>
+    <message>
+        <source>%1 · clean them per app or set an automatic limit</source>
+        <translation>%1 · 可按应用清理或设置自动上限</translation>
+    </message>
+    <message>
+        <source>Scanning…</source>
+        <translation>正在扫描…</translation>
+    </message>
+    <message>
+        <source>%1 in images, videos, documents and other folders</source>
+        <translation>图片、视频、文档等文件夹共 %1</translation>
+    </message>
+    <message>
+        <source>Find out how much space your folders use</source>
+        <translation>查看各文件夹占用多少空间</translation>
+    </message>
+    <message>
+        <source>Rescan</source>
+        <translation>重新扫描</translation>
+    </message>
+    <message>
+        <source>Scan</source>
+        <translation>扫描</translation>
+    </message>
+    <message>
+        <source>See what uses your disk, free up space, manage drives and back up your settings.</source>
+        <translation>查看磁盘占用、释放空间、管理驱动器并备份设置。</translation>
+    </message>
+    <message numerus="yes">
+        <source>%1 in %n item(s)</source>
+        <translation>
+            <numerusform>%n 个项目，共 %1</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>SystemCenterPage</name>
@@ -7789,6 +7875,26 @@ Total prompt: %7 characters</source>
         <source>System Monitor could not be started.</source>
         <translation>无法启动系统监视器。</translation>
     </message>
+    <message>
+        <source>Apps with their own title bar</source>
+        <translation>自带标题栏的应用</translation>
+    </message>
+    <message>
+        <source>Force rounded corners on all apps</source>
+        <translation>强制所有应用使用圆角</translation>
+    </message>
+    <message>
+        <source>Off follows KDE and is the most stable. On clips every window to the corner radius above; a few apps may show small glitches</source>
+        <translation>关闭时遵循 KDE，最稳定。开启后所有窗口都按上方圆角半径裁切，少数应用可能出现小瑕疵</translation>
+    </message>
+    <message>
+        <source>Force matching shadows on all apps</source>
+        <translation>强制所有应用使用统一阴影</translation>
+    </message>
+    <message>
+        <source>Draw the shadow above for every window instead of each app's own; needs forced rounded corners</source>
+        <translation>为所有窗口绘制上方设置的阴影，取代应用自带阴影；需要开启强制圆角</translation>
+    </message>
 </context>
 <context>
     <name>ConfigSchemaPage</name>
@@ -8007,6 +8113,175 @@ Total prompt: %7 characters</source>
     <message>
         <source>The new schedule is saved and applies after you sign in again (%1).</source>
         <translation>新计划已保存，将在重新登录后生效（%1）。</translation>
+    </message>
+</context>
+<context>
+    <name>ApplicationsPage</name>
+    <message>
+        <source>Off</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <source>Above %1 GB</source>
+        <translation>超过 %1 GB 时</translation>
+    </message>
+    <message>
+        <source>Above %1 MB</source>
+        <translation>超过 %1 MB 时</translation>
+    </message>
+    <message>
+        <source>App settings</source>
+        <translation>应用设置</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>名称</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>大小</translation>
+    </message>
+    <message>
+        <source>Source</source>
+        <translation>来源</translation>
+    </message>
+    <message>
+        <source>Choose an app to see its storage, clear its cache or remove it. The gear opens update and cache settings for all apps.</source>
+        <translation>选择应用可查看存储、清除缓存或卸载。齿轮按钮可设置所有应用的更新和缓存。</translation>
+    </message>
+    <message>
+        <source>Updates and storage for every app managed by OmniStore</source>
+        <translation>由 OmniStore 管理的所有应用的更新和存储</translation>
+    </message>
+    <message>
+        <source>Update OmniStore to change automatic updates and cache cleanup here.</source>
+        <translation>请更新 OmniStore 后在此更改自动更新和缓存清理。</translation>
+    </message>
+    <message>
+        <source>Updates</source>
+        <translation>更新</translation>
+    </message>
+    <message>
+        <source>Check for updates</source>
+        <translation>检查更新</translation>
+    </message>
+    <message>
+        <source>How often OmniStore looks for new versions in the background</source>
+        <translation>OmniStore 在后台检查新版本的频率</translation>
+    </message>
+    <message>
+        <source>Update apps automatically</source>
+        <translation>自动更新应用</translation>
+    </message>
+    <message>
+        <source>Flatpak apps update in the background. System packages always wait for you in OmniStore.</source>
+        <translation>Flatpak 应用会在后台更新；系统软件包始终在 OmniStore 中等待你确认。</translation>
+    </message>
+    <message>
+        <source>Notify me about updates</source>
+        <translation>有更新时通知我</translation>
+    </message>
+    <message>
+        <source>Storage</source>
+        <translation>存储</translation>
+    </message>
+    <message>
+        <source>App caches currently use %1</source>
+        <translation>应用缓存当前占用 %1</translation>
+    </message>
+    <message>
+        <source>Clean app caches automatically</source>
+        <translation>自动清理应用缓存</translation>
+    </message>
+    <message>
+        <source>When app caches together grow past the limit, the largest are cleared first. Settings and data are never removed.</source>
+        <translation>应用缓存总量超过上限时，优先清理最大的缓存。设置和数据不会被删除。</translation>
+    </message>
+    <message>
+        <source>Clean up now</source>
+        <translation>立即清理</translation>
+    </message>
+    <message>
+        <source>Bring app caches under the limit right away</source>
+        <translation>立即把应用缓存降到上限以下</translation>
+    </message>
+    <message>
+        <source>Cleaning…</source>
+        <translation>正在清理…</translation>
+    </message>
+    <message>
+        <source>Clean</source>
+        <translation>清理</translation>
+    </message>
+    <message>
+        <source>OmniStore</source>
+        <translation>OmniStore</translation>
+    </message>
+    <message>
+        <source>Open OmniStore</source>
+        <translation>打开 OmniStore</translation>
+    </message>
+    <message>
+        <source>Install apps, review updates and manage sources</source>
+        <translation>安装应用、查看更新和管理软件源</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
+        <source>Search installed apps</source>
+        <translation>搜索已安装的应用</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <source>Loading installed applications in the background…</source>
+        <translation>正在后台加载已安装的应用…</translation>
+    </message>
+</context>
+<context>
+    <name>OmniStorePreferencesBackend</name>
+    <message>
+        <source>OmniStore could not be started.</source>
+        <translation>无法启动 OmniStore。</translation>
+    </message>
+    <message>
+        <source>OmniStore did not answer in time.</source>
+        <translation>OmniStore 未及时响应。</translation>
+    </message>
+    <message>
+        <source>That cache limit is not supported.</source>
+        <translation>不支持该缓存上限。</translation>
+    </message>
+    <message>
+        <source>Freed %1 of app caches.</source>
+        <translation>已释放 %1 应用缓存。</translation>
+    </message>
+    <message>
+        <source>App caches are already within the limit.</source>
+        <translation>应用缓存已在上限以内。</translation>
+    </message>
+    <message>
+        <source>App caches could not be cleaned.</source>
+        <translation>无法清理应用缓存。</translation>
+    </message>
+    <message>
+        <source>The app setting could not be saved.</source>
+        <translation>无法保存应用设置。</translation>
+    </message>
+</context>
+<context>
+    <name>TrashBackend</name>
+    <message>
+        <source>No trash tool is installed.</source>
+        <translation>未安装回收站工具。</translation>
+    </message>
+    <message>
+        <source>The trash could not be emptied.</source>
+        <translation>无法清空回收站。</translation>
     </message>
 </context>
 </TS>

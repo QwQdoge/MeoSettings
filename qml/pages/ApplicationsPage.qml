@@ -20,6 +20,34 @@ Item {
     readonly property bool isCompact: rootMetrics && rootMetrics.isCompactWidth
     readonly property var selectedCapabilities: selectedApp.capabilities || ({})
     readonly property var selectedSettings: selectedApp.settings || ({})
+    // "name", "size" or "source"
+    property string sortMode: "name"
+    readonly property real totalCacheBytes: {
+        let total = 0
+        const apps = OmniStoreAppsBackend.applications || []
+        for (let index = 0; index < apps.length; ++index) {
+            const storage = apps[index].storage || []
+            for (let row = 0; row < storage.length; ++row)
+                if (storage[row].id === "cache")
+                    total += Number(storage[row].bytes) || 0
+        }
+        return total
+    }
+    function appTotalBytes(app) {
+        return (Number(app.packageSizeBytes) || 0) + (Number(app.storageBytes) || 0)
+    }
+    function cacheLimitLabel(megabytes) {
+        if (megabytes <= 0)
+            return qsTr("Off")
+        return megabytes >= 1024
+               ? qsTr("Above %1 GB").arg(megabytes / 1024)
+               : qsTr("Above %1 MB").arg(megabytes)
+    }
+    function openAppSettings() {
+        OmniStorePreferences.refresh()
+        UpdateScheduleBackend.refresh()
+        appSettings.open()
+    }
 
     function formatBytes(value) {
         const bytes = Math.max(0, Number(value) || 0)
@@ -96,7 +124,15 @@ Item {
         }
 
         const query = searchBar.text.trim().toLowerCase()
-        const apps = OmniStoreAppsBackend.applications || []
+        let apps = OmniStoreAppsBackend.applications || []
+        if (root.sortMode === "size") {
+            apps = apps.slice(0).sort(function(a, b) { return root.appTotalBytes(b) - root.appTotalBytes(a) })
+        } else if (root.sortMode === "source") {
+            apps = apps.slice(0).sort(function(a, b) {
+                const bySource = String(a.sourceName || "").localeCompare(String(b.sourceName || ""))
+                return bySource !== 0 ? bySource : String(a.name || "").localeCompare(String(b.name || ""))
+            })
+        }
         const rows = []
         let more = false
         for (let index = 0; index < apps.length; ++index) {
@@ -115,7 +151,8 @@ Item {
                 "subtitle": root.appSubtitle(app),
                 "icon": root.sourceIcon(app.sourceId),
                 "tone": root.sourceTone(app.sourceId),
-                "trailingKind": "navigation",
+                "trailingKind": root.sortMode === "size" && root.appTotalBytes(app) > 0 ? "status" : "navigation",
+                "trailingText": root.formatBytes(root.appTotalBytes(app)),
                 "app": app
             })
         }
@@ -347,96 +384,89 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: MeoTheme.settingsContentMaxWidth
         title: root.isCompact ? "" : qsTr("Applications")
-        subtitle: qsTr("Installed apps, configuration, storage, cache, and removal are managed through OmniStore.")
+        subtitle: qsTr("Choose an app to see its storage, clear its cache or remove it. The gear opens update and cache settings for all apps.")
         onContentYChanged: root.maybeExtendWindow()
         onHeightChanged: root.maybeExtendWindow()
 
-        MeoCard {
+        // List first: search, sort and the app-wide settings sit in one row
+        // above the list; maintenance details live behind the gear button.
+        Item {
             width: parent.width
-            type: "filled"
+            height: searchBar.implicitHeight
 
-            Column {
-                width: parent.width
-                spacing: 10 * MeoTheme.globalScale
+            MeoSearchBar {
+                id: searchBar
+                anchors.left: parent.left
+                anchors.right: toolbarButtons.left
+                anchors.rightMargin: MeoTheme.space8
+                anchors.verticalCenter: parent.verticalCenter
+                placeholder: qsTr("Search installed apps")
+                trailingIcon: ""
+                visualStyle: "settings"
+                Accessible.name: qsTr("Search installed apps")
+                onTextChanged: root.visibleLimit = root.pageStep
+            }
 
-                Row {
-                    width: parent.width
-                    spacing: 12 * MeoTheme.globalScale
-                    MeoIcon {
-                        icon: OmniStoreAppsBackend.managerAvailable ? "apps" : "info"
-                        size: 26
-                        color: MeoTheme.primary
-                    }
-                    Column {
-                        width: parent.width - 38 * MeoTheme.globalScale
-                        spacing: 2 * MeoTheme.globalScale
-                        MeoText {
-                            width: parent.width
-                            text: OmniStoreAppsBackend.managerAvailable
-                                  ? qsTr("Managed by OmniStore")
-                                  : qsTr("Application overview")
-                            typeRole: "title"
-                            typeSize: "small"
-                            emphasized: true
-                            color: MeoTheme.contentOnSurface
-                        }
-                        MeoText {
-                            width: parent.width
-                            text: OmniStoreAppsBackend.busy
-                                  ? qsTr("Loading installed applications in the background…")
-                                  : OmniStoreAppsBackend.summary
-                            typeRole: "body"
-                            typeSize: "medium"
-                            color: MeoTheme.contentOnSurfaceVariant
-                            wrapMode: Text.WordWrap
-                        }
-                    }
+            Row {
+                id: toolbarButtons
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: MeoTheme.space4
+
+                MeoIconButton {
+                    icon.name: "refresh"
+                    type: "standard"
+                    toolTipText: qsTr("Refresh")
+                    enabled: !OmniStoreAppsBackend.busy
+                    onClicked: OmniStoreAppsBackend.refresh()
                 }
-
-                MeoProgressBar {
-                    width: parent.width
-                    visible: OmniStoreAppsBackend.busy
-                    type: "linear"
-                    indeterminate: true
-                }
-
-                MeoText {
-                    width: parent.width
-                    visible: OmniStoreAppsBackend.error !== ""
-                    text: OmniStoreAppsBackend.error
-                    typeRole: "body"
-                    typeSize: "small"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
-
-                Flow {
-                    width: parent.width
-                    spacing: 8 * MeoTheme.globalScale
-                    MeoButton {
-                        text: qsTr("Refresh")
-                        type: "tonal"
-                        enabled: !OmniStoreAppsBackend.busy
-                        onClicked: OmniStoreAppsBackend.refresh()
-                    }
-                    MeoButton {
-                        text: qsTr("Open OmniStore")
-                        type: "outlined"
-                        enabled: OmniStoreAppsBackend.launcherAvailable
-                        onClicked: OmniStoreAppsBackend.openOmniStore()
-                    }
+                MeoIconButton {
+                    icon.name: "settings"
+                    type: "tonal"
+                    toolTipText: qsTr("App settings")
+                    onClicked: root.openAppSettings()
                 }
             }
         }
 
-        MeoSearchBar {
-            id: searchBar
+        Flow {
             width: parent.width
-            placeholder: qsTr("Search installed apps")
-            trailingIcon: ""
-            visualStyle: "settings"
-            Accessible.name: qsTr("Search installed apps")
-            onTextChanged: root.visibleLimit = root.pageStep
+            spacing: MeoTheme.space8
+
+            Repeater {
+                model: [
+                    { "id": "name", "label": qsTr("Name") },
+                    { "id": "size", "label": qsTr("Size") },
+                    { "id": "source", "label": qsTr("Source") }
+                ]
+                delegate: MeoChip {
+                    required property var modelData
+                    type: "filter"
+                    label: modelData.label
+                    selected: root.sortMode === modelData.id
+                    onClicked: root.sortMode = modelData.id
+                }
+            }
+        }
+
+        MeoProgressBar {
+            width: parent.width
+            visible: OmniStoreAppsBackend.busy
+            type: "linear"
+            indeterminate: true
+        }
+
+        MeoText {
+            width: parent.width
+            text: OmniStoreAppsBackend.error !== ""
+                  ? OmniStoreAppsBackend.error
+                  : (OmniStoreAppsBackend.busy
+                     ? qsTr("Loading installed applications in the background…")
+                     : OmniStoreAppsBackend.summary)
+            typeRole: "body"
+            typeSize: "small"
+            color: OmniStoreAppsBackend.error !== "" ? MeoTheme.error : MeoTheme.contentOnSurfaceVariant
+            wrapMode: Text.WordWrap
         }
 
         MeoSettingsGroup {
@@ -575,6 +605,151 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    MeoSettingsTaskSheet {
+        id: appSettings
+        popupParent: Overlay.overlay
+        title: qsTr("App settings")
+        subtitle: qsTr("Updates and storage for every app managed by OmniStore")
+        rejectText: qsTr("Close")
+        readonly property var scheduleChoices: UpdateScheduleBackend.choices
+        readonly property var cacheChoices: (OmniStorePreferences.cacheLimitChoicesMb || []).map(function(value) {
+            return { "label": root.cacheLimitLabel(value), "value": value }
+        })
+        function indexOf(options, value) {
+            for (let index = 0; index < options.length; ++index)
+                if (options[index].value === value)
+                    return index
+            return -1
+        }
+        content: Component {
+            Column {
+                width: parent.width
+                spacing: 16 * MeoTheme.globalScale
+
+                MeoText {
+                    width: parent.width
+                    visible: OmniStorePreferences.available && !OmniStorePreferences.supported
+                             && !OmniStorePreferences.busy
+                    text: qsTr("Update OmniStore to change automatic updates and cache cleanup here.")
+                    typeRole: "body"; typeSize: "medium"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+                MeoText {
+                    width: parent.width
+                    visible: OmniStorePreferences.error !== "" || UpdateScheduleBackend.error !== ""
+                    text: OmniStorePreferences.error !== "" ? OmniStorePreferences.error : UpdateScheduleBackend.error
+                    typeRole: "body"; typeSize: "small"
+                    color: MeoTheme.error
+                    wrapMode: Text.WordWrap
+                }
+
+                MeoSettingsGroup {
+                    width: parent.width
+                    title: qsTr("Updates")
+                    model: {
+                        const rows = []
+                        if (UpdateScheduleBackend.available)
+                            rows.push({
+                                "id": "frequency",
+                                "title": qsTr("Check for updates"),
+                                "subtitle": qsTr("How often OmniStore looks for new versions in the background"),
+                                "icon": "update", "tone": "primary",
+                                "trailingKind": "dropdown",
+                                "options": appSettings.scheduleChoices,
+                                "currentIndex": appSettings.indexOf(appSettings.scheduleChoices, UpdateScheduleBackend.intervalHours)
+                            })
+                        if (OmniStorePreferences.supported) {
+                            rows.push({
+                                "id": "autoUpdate",
+                                "title": qsTr("Update apps automatically"),
+                                "subtitle": qsTr("Flatpak apps update in the background. System packages always wait for you in OmniStore."),
+                                "icon": "system_update_alt", "tone": "primary",
+                                "trailingKind": "toggle",
+                                "checked": OmniStorePreferences.autoUpdate,
+                                "enabled": UpdateScheduleBackend.intervalHours !== 0
+                            })
+                            rows.push({
+                                "id": "notify",
+                                "title": qsTr("Notify me about updates"),
+                                "icon": "notifications", "tone": "secondary",
+                                "trailingKind": "toggle",
+                                "checked": OmniStorePreferences.notifyUpdates,
+                                "enabled": UpdateScheduleBackend.intervalHours !== 0
+                            })
+                        }
+                        return rows
+                    }
+                    onRowDropdownSelected: (index, optionIndex, value, row) =>
+                        UpdateScheduleBackend.setIntervalHours(appSettings.scheduleChoices[optionIndex].value)
+                    onRowToggled: (index, checked, row) => {
+                        if (row.id === "autoUpdate")
+                            OmniStorePreferences.setAutoUpdate(checked)
+                        else if (row.id === "notify")
+                            OmniStorePreferences.setNotifyUpdates(checked)
+                    }
+                }
+
+                MeoSettingsGroup {
+                    width: parent.width
+                    visible: OmniStorePreferences.supported
+                    title: qsTr("Storage")
+                    subtitle: qsTr("App caches currently use %1").arg(root.formatBytes(root.totalCacheBytes))
+                    model: [
+                        {
+                            "id": "cacheLimit",
+                            "title": qsTr("Clean app caches automatically"),
+                            "subtitle": qsTr("When app caches together grow past the limit, the largest are cleared first. Settings and data are never removed."),
+                            "icon": "cleaning_services", "tone": "tertiary",
+                            "trailingKind": "dropdown",
+                            "options": appSettings.cacheChoices,
+                            "currentIndex": appSettings.indexOf(appSettings.cacheChoices, OmniStorePreferences.cacheLimitMb)
+                        },
+                        {
+                            "id": "trimNow",
+                            "title": qsTr("Clean up now"),
+                            "subtitle": OmniStorePreferences.lastResult !== ""
+                                        ? OmniStorePreferences.lastResult
+                                        : qsTr("Bring app caches under the limit right away"),
+                            "icon": "delete_sweep", "tone": "tertiary",
+                            "trailingKind": "action",
+                            "actionText": OmniStorePreferences.busy ? qsTr("Cleaning…") : qsTr("Clean"),
+                            "enabled": OmniStorePreferences.cacheLimitMb > 0 && !OmniStorePreferences.busy
+                        }
+                    ]
+                    onRowDropdownSelected: (index, optionIndex, value, row) =>
+                        OmniStorePreferences.setCacheLimitMb(appSettings.cacheChoices[optionIndex].value)
+                    onRowActionTriggered: (index, row) => {
+                        if (row.id === "trimNow")
+                            OmniStorePreferences.trimCachesNow()
+                    }
+                }
+
+                MeoSettingsGroup {
+                    width: parent.width
+                    title: qsTr("OmniStore")
+                    model: [{
+                        "id": "open",
+                        "title": qsTr("Open OmniStore"),
+                        "subtitle": qsTr("Install apps, review updates and manage sources"),
+                        "icon": "storefront", "tone": "primary",
+                        "trailingKind": "chevron",
+                        "enabled": OmniStoreAppsBackend.launcherAvailable
+                    }]
+                    onRowActivated: (index, row) => OmniStoreAppsBackend.openOmniStore()
+                }
+            }
+        }
+    }
+
+    Connections {
+        target: OmniStorePreferences
+        function onCachesTrimmed(bytesFreed) {
+            if (bytesFreed > 0)
+                OmniStoreAppsBackend.refresh()
         }
     }
 

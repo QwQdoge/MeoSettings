@@ -277,6 +277,71 @@ Item {
         return ({})
     }
 
+    readonly property real appCacheBytes: {
+        let total = 0
+        const apps = OmniStoreAppsBackend.applications || []
+        for (let index = 0; index < apps.length; ++index) {
+            const storage = apps[index].storage || []
+            for (let row = 0; row < storage.length; ++row)
+                if (storage[row].id === "cache")
+                    total += Number(storage[row].bytes) || 0
+        }
+        return total
+    }
+    readonly property real personalBytes: {
+        let total = 0
+        const categories = StorageBackend.categoryUsage || []
+        for (let index = 0; index < categories.length; ++index)
+            if (categories[index].state === "complete" || categories[index].state === "partial")
+                total += Number(categories[index].bytes) || 0
+        return total
+    }
+    readonly property var overviewLegend: {
+        const rows = []
+        if (OmniStoreAppsBackend.knownSizeBytes > 0)
+            rows.push({ "icon": "apps", "label": qsTr("Apps"), "value": root.formatBytes(OmniStoreAppsBackend.knownSizeBytes) })
+        if (root.personalBytes > 0)
+            rows.push({ "icon": "folder", "label": qsTr("Personal files"), "value": root.formatBytes(root.personalBytes) })
+        if (TrashBackend.bytes > 0)
+            rows.push({ "icon": "delete", "label": qsTr("Trash"), "value": root.formatBytes(TrashBackend.bytes) })
+        return rows
+    }
+    readonly property var cleanupRows: {
+        const rows = [{
+            "id": "trash",
+            "title": qsTr("Trash"),
+            "subtitle": TrashBackend.busy ? qsTr("Checking…")
+                        : (TrashBackend.itemCount > 0
+                           ? qsTr("%1 in %n item(s)", "", TrashBackend.itemCount).arg(root.formatBytes(TrashBackend.bytes))
+                           : qsTr("The trash is empty")),
+            "icon": "delete", "tone": "error",
+            "trailingKind": "action",
+            "actionText": qsTr("Empty"),
+            "enabled": TrashBackend.canEmpty && !TrashBackend.busy
+        }]
+        if (OmniStoreAppsBackend.available)
+            rows.push({
+                "id": "caches",
+                "title": qsTr("App caches"),
+                "subtitle": qsTr("%1 · clean them per app or set an automatic limit").arg(root.formatBytes(root.appCacheBytes)),
+                "icon": "cleaning_services", "tone": "tertiary",
+                "trailingKind": "chevron",
+                "route": "applications"
+            })
+        rows.push({
+            "id": "scan",
+            "title": qsTr("Personal files"),
+            "subtitle": StorageBackend.usageScanActive ? qsTr("Scanning…")
+                        : (root.personalBytes > 0 ? qsTr("%1 in images, videos, documents and other folders").arg(root.formatBytes(root.personalBytes))
+                                                  : qsTr("Find out how much space your folders use")),
+            "icon": "folder_open", "tone": "primary",
+            "trailingKind": "action",
+            "actionText": root.personalBytes > 0 ? qsTr("Rescan") : qsTr("Scan"),
+            "enabled": !StorageBackend.usageScanActive
+        })
+        return rows
+    }
+
     readonly property var categoryUsageRows: {
         const rows = []
         const categories = StorageBackend.categoryUsage
@@ -427,9 +492,451 @@ Item {
         mediumWidth: 760 * MeoTheme.globalScale
         expandedWidth: 760 * MeoTheme.globalScale
         title: root.isCompact ? "" : qsTr("Storage & backup")
-        subtitle: qsTr("Inspect storage, create safe portable backups, and keep system recovery as a separate verified workflow.")
+        subtitle: qsTr("See what uses your disk, free up space, manage drives and back up your settings.")
 
         MeoBanner { width: parent.width; visible: StorageBackend.error !== ""; title: qsTr("Storage operation needs attention"); text: StorageBackend.error; tone: "error" }
+
+        // Overview first: how full the system disk is and what is known to
+        // use it. Only values the owning services report are shown.
+        MeoCard {
+            width: parent.width
+            type: "filled"
+            visible: root.systemVolume.mountPoint === "/"
+            Component.onCompleted: TrashBackend.refresh()
+
+            Column {
+                width: parent.width
+                spacing: MeoTheme.space12
+
+                MeoText {
+                    width: parent.width
+                    text: qsTr("%1 of %2 used").arg(root.formatBytes(root.systemVolume.usedBytes))
+                                               .arg(root.formatBytes(root.systemVolume.totalBytes))
+                    typeRole: "headline"; typeSize: "small"
+                    color: MeoTheme.contentOnSurface
+                }
+                MeoProgressBar {
+                    width: parent.width
+                    type: "linear"
+                    value: root.systemVolume.totalBytes > 0
+                           ? Math.min(1, root.systemVolume.usedBytes / root.systemVolume.totalBytes) : 0
+                }
+                MeoText {
+                    width: parent.width
+                    text: qsTr("%1 free on the system disk").arg(root.formatBytes(root.systemVolume.freeBytes))
+                    typeRole: "body"; typeSize: "medium"
+                    color: root.systemVolume.totalBytes > 0
+                           && root.systemVolume.freeBytes / root.systemVolume.totalBytes < 0.1
+                           ? MeoTheme.error : MeoTheme.contentOnSurfaceVariant
+                }
+                Flow {
+                    width: parent.width
+                    spacing: MeoTheme.space16
+                    Repeater {
+                        model: root.overviewLegend
+                        delegate: Row {
+                            required property var modelData
+                            spacing: MeoTheme.space4
+                            MeoIcon { icon: modelData.icon; size: 18; color: MeoTheme.primary }
+                            MeoText {
+                                text: modelData.label + " · " + modelData.value
+                                typeRole: "label"; typeSize: "large"
+                                color: MeoTheme.contentOnSurfaceVariant
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("Free up space")
+            subtitle: TrashBackend.error !== "" ? TrashBackend.error : ""
+            model: root.cleanupRows
+            onRowActivated: (index, row) => {
+                if (row.route)
+                    root.navigateTo(row.route)
+            }
+            onRowActionTriggered: (index, row) => {
+                if (row.id === "trash")
+                    TrashBackend.empty()
+                else if (row.id === "scan")
+                    StorageBackend.startUsageScan()
+                else if (row.route)
+                    root.navigateTo(row.route)
+            }
+        }
+
+        MeoText {
+            width: parent.width
+            topPadding: MeoTheme.space8
+            text: qsTr("Devices")
+            typeRole: "title"; typeSize: "medium"; emphasized: true
+            color: MeoTheme.contentOnSurface
+        }
+
+        MeoSettingsGroup {
+            width: parent.width; title: qsTr("Removable storage")
+            visible: StorageBackend.removableVolumes.length > 0
+            model: StorageBackend.removableVolumes.map(volume => ({"id": volume.udi, "title": volume.name, "subtitle": volume.path || volume.filesystem, "mounted": volume.mounted, "trailingKind": "action", "actionText": volume.mounted ? qsTr("Unmount") : qsTr("Mount"), "enabled": !StorageBackend.busy}))
+            onRowActionTriggered: (index, row) => StorageBackend.setMounted(row.id, !row.mounted)
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            title: qsTr("Mounted volumes")
+            subtitle: StorageBackend.summary
+            visible: root.volumeRows.length > 0
+            model: root.volumeRows
+            onRowActivated: (index, row) => {
+                root.selectedVolume = row.volume || ({})
+                volumeDetails.open()
+            }
+        }
+
+        MeoEmptyState {
+            width: parent.width
+            height: 220 * MeoTheme.globalScale
+            visible: root.volumeRows.length === 0
+            icon: "storage"
+            title: qsTr("No mounted user storage is visible")
+            description: qsTr("Pseudo and memory-backed filesystems are intentionally excluded from this overview.")
+        }
+
+        MeoText {
+            width: parent.width
+            topPadding: MeoTheme.space8
+            text: qsTr("What is using space")
+            typeRole: "title"; typeSize: "medium"; emphasized: true
+            color: MeoTheme.contentOnSurface
+        }
+
+        MeoCard {
+            width: parent.width
+            type: "filled"
+            Accessible.role: Accessible.StatusBar
+            Accessible.name: qsTr("Personal storage scan")
+            Accessible.description: StorageBackend.usageScanSummary
+
+            Column {
+                width: parent.width
+                spacing: 12 * MeoTheme.globalScale
+
+                Row {
+                    width: parent.width
+                    spacing: 12 * MeoTheme.globalScale
+
+                    MeoIcon {
+                        icon: "folder_open"
+                        size: 24
+                        color: MeoTheme.primary
+                    }
+
+                    Column {
+                        width: parent.width - 36 * MeoTheme.globalScale
+                        spacing: 2 * MeoTheme.globalScale
+
+                        MeoText {
+                            width: parent.width
+                            text: qsTr("Personal storage categories")
+                            typeRole: "title"
+                            typeSize: "small"
+                            emphasized: true
+                            color: MeoTheme.contentOnSurface
+                        }
+
+                        MeoText {
+                            width: parent.width
+                            text: qsTr("Images, videos, documents, audio, and known local AI model/cache folders are scanned only when you ask. The scan stays inside selected Home folders, skips symlinks, and stops at a fixed safety limit.")
+                            typeRole: "body"
+                            typeSize: "medium"
+                            color: MeoTheme.contentOnSurfaceVariant
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+
+                MeoProgressBar {
+                    width: parent.width
+                    visible: StorageBackend.usageScanActive
+                    type: "linear"
+                    indeterminate: true
+                }
+
+                MeoText {
+                    width: parent.width
+                    text: StorageBackend.usageScanSummary
+                    typeRole: "body"
+                    typeSize: "small"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+
+                MeoText {
+                    width: parent.width
+                    visible: StorageBackend.usageScanError !== ""
+                    text: StorageBackend.usageScanError
+                    Accessible.role: Accessible.AlertMessage
+                    Accessible.name: qsTr("Storage scan error")
+                    Accessible.description: StorageBackend.usageScanError
+                    typeRole: "body"
+                    typeSize: "small"
+                    color: MeoTheme.error
+                    wrapMode: Text.WordWrap
+                }
+
+                Row {
+                    spacing: 8 * MeoTheme.globalScale
+
+                    MeoButton {
+                        text: qsTr("Scan selected folders")
+                        type: "tonal"
+                        visible: !StorageBackend.usageScanActive
+                        onClicked: StorageBackend.startUsageScan()
+                    }
+
+                    MeoButton {
+                        text: qsTr("Cancel scan")
+                        type: "outlined"
+                        visible: StorageBackend.usageScanActive
+                        onClicked: StorageBackend.cancelUsageScan()
+                    }
+                }
+            }
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: root.categoryUsageRows.length > 0
+            title: qsTr("Personal data by category")
+            subtitle: qsTr("Only recognised files in the explicitly selected folders are listed. Category values are not added to mounted-volume usage, because they already live on those volumes.")
+            model: root.categoryUsageRows
+        }
+
+        MeoCard {
+            width: parent.width
+            type: "outlined"
+            visible: root.systemVolume.mountPoint === "/"
+
+            Row {
+                width: parent.width
+                spacing: 12 * MeoTheme.globalScale
+
+                MeoIcon {
+                    icon: "memory"
+                    size: 24
+                    color: MeoTheme.contentOnSurfaceVariant
+                }
+
+                Column {
+                    width: parent.width - 36 * MeoTheme.globalScale
+                    spacing: 2 * MeoTheme.globalScale
+
+                    MeoText {
+                        width: parent.width
+                        text: qsTr("System & other data")
+                        typeRole: "title"
+                        typeSize: "small"
+                        emphasized: true
+                        color: MeoTheme.contentOnSurface
+                    }
+
+                    MeoText {
+                        width: parent.width
+                        text: qsTr("%1 is used on the system volume. It includes system files, apps, settings, logs, and anything outside the personal folders listed above.")
+                              .arg(root.formatBytes(root.systemVolume.usedBytes))
+                        typeRole: "body"
+                        typeSize: "medium"
+                        color: MeoTheme.contentOnSurfaceVariant
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+        }
+
+        MeoCard {
+            width: parent.width
+            type: "filled"
+            visible: OmniStoreAppsBackend.exporterAvailable
+
+            Column {
+                width: parent.width
+                spacing: 12 * MeoTheme.globalScale
+
+                Row {
+                    width: parent.width
+                    spacing: 12 * MeoTheme.globalScale
+
+                    MeoIcon {
+                        icon: "apps"
+                        size: 24
+                        color: MeoTheme.primary
+                    }
+
+                    Column {
+                        width: parent.width - 36 * MeoTheme.globalScale
+                        spacing: 2 * MeoTheme.globalScale
+
+                        MeoText {
+                            width: parent.width
+                            text: qsTr("Applications managed by OmniStore")
+                            typeRole: "title"
+                            typeSize: "small"
+                            emphasized: true
+                            color: MeoTheme.contentOnSurface
+                        }
+
+                        MeoText {
+                            width: parent.width
+                            text: OmniStoreAppsBackend.summary
+                            typeRole: "body"
+                            typeSize: "medium"
+                            color: MeoTheme.contentOnSurfaceVariant
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+
+                MeoProgressBar {
+                    width: parent.width
+                    visible: OmniStoreAppsBackend.busy
+                    type: "linear"
+                    indeterminate: true
+                }
+
+                MeoText {
+                    width: parent.width
+                    visible: OmniStoreAppsBackend.available && !OmniStoreAppsBackend.busy
+                    text: qsTr("%1 known app size · %2 exact, %3 reported · %4")
+                              .arg(root.formatBytes(OmniStoreAppsBackend.knownSizeBytes))
+                              .arg(OmniStoreAppsBackend.exactSizeCount)
+                              .arg(OmniStoreAppsBackend.reportedSizeCount)
+                              .arg(qsTr("%n app(s) without size metadata", "", OmniStoreAppsBackend.unknownSizeCount))
+                    typeRole: "body"
+                    typeSize: "medium"
+                    color: MeoTheme.contentOnSurfaceVariant
+                    wrapMode: Text.WordWrap
+                }
+
+                Row {
+                    spacing: 8 * MeoTheme.globalScale
+
+                    MeoButton {
+                        text: qsTr("Refresh apps")
+                        type: "tonal"
+                        enabled: !OmniStoreAppsBackend.busy
+                        loading: OmniStoreAppsBackend.busy
+                        onClicked: OmniStoreAppsBackend.refresh()
+                    }
+
+                    MeoButton {
+                        text: qsTr("Open OmniStore")
+                        type: "outlined"
+                        visible: OmniStoreAppsBackend.launcherAvailable
+                        onClicked: OmniStoreAppsBackend.openOmniStore()
+                    }
+                }
+            }
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: OmniStoreAppsBackend.available
+            title: qsTr("Pacman & AUR application inventory")
+            subtitle: qsTr("These are only the source-tagged application records OmniStore reports. A missing AUR row is not treated as zero installed packages, and local/foreign packages are never guessed to be AUR.")
+            model: root.packageInventoryRows
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: OmniStoreAppsBackend.available && root.omniStoreSourceRows.length > 0
+            title: qsTr("Other application sources")
+            subtitle: qsTr("Each percentage is that source's share of known OmniStore application-size metadata. It does not include dependencies, caches, or personal data.")
+            model: root.omniStoreSourceRows
+        }
+
+        MeoSettingsGroup {
+            width: parent.width
+            visible: OmniStoreAppsBackend.available && root.omniStoreApplicationRows.length > 0
+            title: qsTr("Largest reported applications")
+            subtitle: qsTr("The list is limited to the largest application records OmniStore can describe; reported values are not a filesystem scan.")
+            model: root.omniStoreApplicationRows
+        }
+
+        MeoEmptyState {
+            width: parent.width
+            height: 180 * MeoTheme.globalScale
+            visible: OmniStoreAppsBackend.available
+                     && !OmniStoreAppsBackend.busy
+                     && OmniStoreAppsBackend.applicationCount === 0
+            icon: "apps"
+            title: qsTr("No OmniStore applications are reported")
+            description: qsTr("This result reflects the enabled local sources in OmniStore. It does not claim that the system has no software installed.")
+        }
+
+        MeoCard {
+            width: parent.width
+            type: "outlined"
+            visible: !OmniStoreAppsBackend.exporterAvailable
+
+            Column {
+                width: parent.width
+                spacing: 12 * MeoTheme.globalScale
+
+                Row {
+                    width: parent.width
+                    spacing: 12 * MeoTheme.globalScale
+                    MeoIcon { icon: "apps"; size: 24; color: MeoTheme.contentOnSurfaceVariant }
+                    MeoText {
+                        width: parent.width - 36 * MeoTheme.globalScale
+                        text: qsTr("Install OmniStore's app overview exporter to see its managed-application size mix here. Meo Settings will continue to show mounted volumes without it.")
+                        typeRole: "body"
+                        typeSize: "medium"
+                        color: MeoTheme.contentOnSurfaceVariant
+                        wrapMode: Text.WordWrap
+                    }
+                }
+
+                MeoButton {
+                    text: qsTr("Open OmniStore")
+                    type: "outlined"
+                    visible: OmniStoreAppsBackend.launcherAvailable
+                    onClicked: OmniStoreAppsBackend.openOmniStore()
+                }
+            }
+        }
+
+        Column {
+            width: parent.width
+            visible: OmniStoreAppsBackend.error !== "" && OmniStoreAppsBackend.exporterAvailable
+            spacing: MeoTheme.space4
+
+            MeoBanner {
+                width: parent.width
+                title: qsTr("Application information is unavailable")
+                text: qsTr("Check that the application service is available, then refresh the list.")
+                icon: "error"
+                tone: "error"
+            }
+            MeoText {
+                width: parent.width
+                text: qsTr("Technical details: %1").arg(OmniStoreAppsBackend.error)
+                Accessible.name: text
+                typeRole: "label"
+                typeSize: "small"
+                color: MeoTheme.contentOnSurfaceVariant
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        MeoText {
+            width: parent.width
+            topPadding: MeoTheme.space8
+            text: qsTr("Backup and restore")
+            typeRole: "title"; typeSize: "medium"; emphasized: true
+            color: MeoTheme.contentOnSurface
+        }
 
         MeoSettingsGroup {
             width: parent.width
@@ -661,175 +1168,12 @@ Item {
             }
         }
 
-        MeoSettingsGroup {
-            width: parent.width; title: qsTr("Removable storage")
-            visible: StorageBackend.removableVolumes.length > 0
-            model: StorageBackend.removableVolumes.map(volume => ({"id": volume.udi, "title": volume.name, "subtitle": volume.path || volume.filesystem, "mounted": volume.mounted, "trailingKind": "action", "actionText": volume.mounted ? qsTr("Unmount") : qsTr("Mount"), "enabled": !StorageBackend.busy}))
-            onRowActionTriggered: (index, row) => StorageBackend.setMounted(row.id, !row.mounted)
-        }
-
-        MeoSettingsGroup {
+        MeoText {
             width: parent.width
-            title: qsTr("Mounted volumes")
-            subtitle: StorageBackend.summary
-            visible: root.volumeRows.length > 0
-            model: root.volumeRows
-            onRowActivated: (index, row) => {
-                root.selectedVolume = row.volume || ({})
-                volumeDetails.open()
-            }
-        }
-
-        MeoEmptyState {
-            width: parent.width
-            height: 220 * MeoTheme.globalScale
-            visible: root.volumeRows.length === 0
-            icon: "storage"
-            title: qsTr("No mounted user storage is visible")
-            description: qsTr("Pseudo and memory-backed filesystems are intentionally excluded from this overview.")
-        }
-
-        MeoCard {
-            width: parent.width
-            type: "filled"
-            Accessible.role: Accessible.StatusBar
-            Accessible.name: qsTr("Personal storage scan")
-            Accessible.description: StorageBackend.usageScanSummary
-
-            Column {
-                width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-
-                Row {
-                    width: parent.width
-                    spacing: 12 * MeoTheme.globalScale
-
-                    MeoIcon {
-                        icon: "folder_open"
-                        size: 24
-                        color: MeoTheme.primary
-                    }
-
-                    Column {
-                        width: parent.width - 36 * MeoTheme.globalScale
-                        spacing: 2 * MeoTheme.globalScale
-
-                        MeoText {
-                            width: parent.width
-                            text: qsTr("Personal storage categories")
-                            typeRole: "title"
-                            typeSize: "small"
-                            emphasized: true
-                            color: MeoTheme.contentOnSurface
-                        }
-
-                        MeoText {
-                            width: parent.width
-                            text: qsTr("Images, videos, documents, audio, and known local AI model/cache folders are scanned only when you ask. The scan stays inside selected Home folders, skips symlinks, and stops at a fixed safety limit.")
-                            typeRole: "body"
-                            typeSize: "medium"
-                            color: MeoTheme.contentOnSurfaceVariant
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-                }
-
-                MeoProgressBar {
-                    width: parent.width
-                    visible: StorageBackend.usageScanActive
-                    type: "linear"
-                    indeterminate: true
-                }
-
-                MeoText {
-                    width: parent.width
-                    text: StorageBackend.usageScanSummary
-                    typeRole: "body"
-                    typeSize: "small"
-                    color: MeoTheme.contentOnSurfaceVariant
-                    wrapMode: Text.WordWrap
-                }
-
-                MeoText {
-                    width: parent.width
-                    visible: StorageBackend.usageScanError !== ""
-                    text: StorageBackend.usageScanError
-                    Accessible.role: Accessible.AlertMessage
-                    Accessible.name: qsTr("Storage scan error")
-                    Accessible.description: StorageBackend.usageScanError
-                    typeRole: "body"
-                    typeSize: "small"
-                    color: MeoTheme.error
-                    wrapMode: Text.WordWrap
-                }
-
-                Row {
-                    spacing: 8 * MeoTheme.globalScale
-
-                    MeoButton {
-                        text: qsTr("Scan selected folders")
-                        type: "tonal"
-                        visible: !StorageBackend.usageScanActive
-                        onClicked: StorageBackend.startUsageScan()
-                    }
-
-                    MeoButton {
-                        text: qsTr("Cancel scan")
-                        type: "outlined"
-                        visible: StorageBackend.usageScanActive
-                        onClicked: StorageBackend.cancelUsageScan()
-                    }
-                }
-            }
-        }
-
-        MeoSettingsGroup {
-            width: parent.width
-            visible: root.categoryUsageRows.length > 0
-            title: qsTr("Personal data by category")
-            subtitle: qsTr("Only recognised files in the explicitly selected folders are listed. Category values are not added to mounted-volume usage, because they already live on those volumes.")
-            model: root.categoryUsageRows
-        }
-
-        MeoCard {
-            width: parent.width
-            type: "outlined"
-            visible: root.systemVolume.mountPoint === "/"
-
-            Row {
-                width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-
-                MeoIcon {
-                    icon: "memory"
-                    size: 24
-                    color: MeoTheme.contentOnSurfaceVariant
-                }
-
-                Column {
-                    width: parent.width - 36 * MeoTheme.globalScale
-                    spacing: 2 * MeoTheme.globalScale
-
-                    MeoText {
-                        width: parent.width
-                        text: qsTr("System & other data")
-                        typeRole: "title"
-                        typeSize: "small"
-                        emphasized: true
-                        color: MeoTheme.contentOnSurface
-                    }
-
-                    MeoText {
-                        width: parent.width
-                        text: qsTr("%1 is used on the system volume. It includes system files, apps, settings, logs, and anything outside the personal folders listed above.")
-                              .arg(root.formatBytes(root.systemVolume.usedBytes))
-                        typeRole: "body"
-                        typeSize: "medium"
-                        color: MeoTheme.contentOnSurfaceVariant
-                        wrapMode: Text.WordWrap
-                    }
-                }
-            }
+            topPadding: MeoTheme.space8
+            text: qsTr("Advanced")
+            typeRole: "title"; typeSize: "medium"; emphasized: true
+            color: MeoTheme.contentOnSurface
         }
 
         MeoCard {
@@ -926,181 +1270,6 @@ Item {
             title: qsTr("Pacman package storage")
             subtitle: qsTr("Installed package file sizes come directly from the local Pacman database. They are separate from OmniStore's managed-application size mix and are not added to the system-volume total.")
             model: root.packageDatabaseRows
-        }
-
-        MeoCard {
-            width: parent.width
-            type: "filled"
-            visible: OmniStoreAppsBackend.exporterAvailable
-
-            Column {
-                width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-
-                Row {
-                    width: parent.width
-                    spacing: 12 * MeoTheme.globalScale
-
-                    MeoIcon {
-                        icon: "apps"
-                        size: 24
-                        color: MeoTheme.primary
-                    }
-
-                    Column {
-                        width: parent.width - 36 * MeoTheme.globalScale
-                        spacing: 2 * MeoTheme.globalScale
-
-                        MeoText {
-                            width: parent.width
-                            text: qsTr("Applications managed by OmniStore")
-                            typeRole: "title"
-                            typeSize: "small"
-                            emphasized: true
-                            color: MeoTheme.contentOnSurface
-                        }
-
-                        MeoText {
-                            width: parent.width
-                            text: OmniStoreAppsBackend.summary
-                            typeRole: "body"
-                            typeSize: "medium"
-                            color: MeoTheme.contentOnSurfaceVariant
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-                }
-
-                MeoProgressBar {
-                    width: parent.width
-                    visible: OmniStoreAppsBackend.busy
-                    type: "linear"
-                    indeterminate: true
-                }
-
-                MeoText {
-                    width: parent.width
-                    visible: OmniStoreAppsBackend.available && !OmniStoreAppsBackend.busy
-                    text: qsTr("%1 known app size · %2 exact, %3 reported · %4")
-                              .arg(root.formatBytes(OmniStoreAppsBackend.knownSizeBytes))
-                              .arg(OmniStoreAppsBackend.exactSizeCount)
-                              .arg(OmniStoreAppsBackend.reportedSizeCount)
-                              .arg(qsTr("%n app(s) without size metadata", "", OmniStoreAppsBackend.unknownSizeCount))
-                    typeRole: "body"
-                    typeSize: "medium"
-                    color: MeoTheme.contentOnSurfaceVariant
-                    wrapMode: Text.WordWrap
-                }
-
-                Row {
-                    spacing: 8 * MeoTheme.globalScale
-
-                    MeoButton {
-                        text: qsTr("Refresh apps")
-                        type: "tonal"
-                        enabled: !OmniStoreAppsBackend.busy
-                        loading: OmniStoreAppsBackend.busy
-                        onClicked: OmniStoreAppsBackend.refresh()
-                    }
-
-                    MeoButton {
-                        text: qsTr("Open OmniStore")
-                        type: "outlined"
-                        visible: OmniStoreAppsBackend.launcherAvailable
-                        onClicked: OmniStoreAppsBackend.openOmniStore()
-                    }
-                }
-            }
-        }
-
-        MeoSettingsGroup {
-            width: parent.width
-            visible: OmniStoreAppsBackend.available
-            title: qsTr("Pacman & AUR application inventory")
-            subtitle: qsTr("These are only the source-tagged application records OmniStore reports. A missing AUR row is not treated as zero installed packages, and local/foreign packages are never guessed to be AUR.")
-            model: root.packageInventoryRows
-        }
-
-        MeoSettingsGroup {
-            width: parent.width
-            visible: OmniStoreAppsBackend.available && root.omniStoreSourceRows.length > 0
-            title: qsTr("Other application sources")
-            subtitle: qsTr("Each percentage is that source's share of known OmniStore application-size metadata. It does not include dependencies, caches, or personal data.")
-            model: root.omniStoreSourceRows
-        }
-
-        MeoSettingsGroup {
-            width: parent.width
-            visible: OmniStoreAppsBackend.available && root.omniStoreApplicationRows.length > 0
-            title: qsTr("Largest reported applications")
-            subtitle: qsTr("The list is limited to the largest application records OmniStore can describe; reported values are not a filesystem scan.")
-            model: root.omniStoreApplicationRows
-        }
-
-        MeoEmptyState {
-            width: parent.width
-            height: 180 * MeoTheme.globalScale
-            visible: OmniStoreAppsBackend.available
-                     && !OmniStoreAppsBackend.busy
-                     && OmniStoreAppsBackend.applicationCount === 0
-            icon: "apps"
-            title: qsTr("No OmniStore applications are reported")
-            description: qsTr("This result reflects the enabled local sources in OmniStore. It does not claim that the system has no software installed.")
-        }
-
-        MeoCard {
-            width: parent.width
-            type: "outlined"
-            visible: !OmniStoreAppsBackend.exporterAvailable
-
-            Column {
-                width: parent.width
-                spacing: 12 * MeoTheme.globalScale
-
-                Row {
-                    width: parent.width
-                    spacing: 12 * MeoTheme.globalScale
-                    MeoIcon { icon: "apps"; size: 24; color: MeoTheme.contentOnSurfaceVariant }
-                    MeoText {
-                        width: parent.width - 36 * MeoTheme.globalScale
-                        text: qsTr("Install OmniStore's app overview exporter to see its managed-application size mix here. Meo Settings will continue to show mounted volumes without it.")
-                        typeRole: "body"
-                        typeSize: "medium"
-                        color: MeoTheme.contentOnSurfaceVariant
-                        wrapMode: Text.WordWrap
-                    }
-                }
-
-                MeoButton {
-                    text: qsTr("Open OmniStore")
-                    type: "outlined"
-                    visible: OmniStoreAppsBackend.launcherAvailable
-                    onClicked: OmniStoreAppsBackend.openOmniStore()
-                }
-            }
-        }
-
-        Column {
-            width: parent.width
-            visible: OmniStoreAppsBackend.error !== "" && OmniStoreAppsBackend.exporterAvailable
-            spacing: MeoTheme.space4
-
-            MeoBanner {
-                width: parent.width
-                title: qsTr("Application information is unavailable")
-                text: qsTr("Check that the application service is available, then refresh the list.")
-                icon: "error"
-                tone: "error"
-            }
-            MeoText {
-                width: parent.width
-                text: qsTr("Technical details: %1").arg(OmniStoreAppsBackend.error)
-                Accessible.name: text
-                typeRole: "label"
-                typeSize: "small"
-                color: MeoTheme.contentOnSurfaceVariant
-                wrapMode: Text.WordWrap
-            }
         }
 
         MeoButton {

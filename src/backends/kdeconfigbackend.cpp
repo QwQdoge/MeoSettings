@@ -10,6 +10,7 @@
 #include <QDBusVariant>
 #include <QDir>
 #include <QFile>
+#include <QLibraryInfo>
 #include <QProcess>
 #include <QStandardPaths>
 #include <algorithm>
@@ -125,6 +126,22 @@ Map mirrored(Map row, std::initializer_list<std::pair<const char *, const char *
     for (const auto &item : keys)
         mirrors.append(Map{{"group", QString::fromLatin1(item.first)}, {"key", QString::fromLatin1(item.second)}});
     row.insert("mirrors", mirrors);
+    return row;
+}
+
+// Mirrors whose stored value is the shown value times `factor` (for example
+// a 0-60 % strength mirrored as a 0-255 alpha).
+Map scaledMirrors(Map row, std::initializer_list<std::pair<const char *, const char *>> keys, double factor)
+{
+    row = mirrored(row, keys);
+    row.insert("mirrorScale", factor);
+    return row;
+}
+
+// Shown only when the rounded-corner KWin effect is installed.
+Map needsShapeCorners(Map row)
+{
+    row.insert("requires", QStringLiteral("shapecorners"));
     return row;
 }
 
@@ -429,11 +446,28 @@ QVariantList build(const QString &page)
                        "kwinrc", "org.meo.decoration", "ShowButtonBackground", true, "kwin")),
             }),
             section(QT_TRANSLATE_NOOP("KdeConfigBackend", "Shadows"), {
-                meo(number("shadowSize", QT_TRANSLATE_NOOP("KdeConfigBackend", "Shadow size"), nullptr,
+                meo(mirrored(number("shadowSize", QT_TRANSLATE_NOOP("KdeConfigBackend", "Shadow size"), nullptr,
                        "kwinrc", "org.meo.decoration", "ShadowRadius", 28, 0, 64, 2,
-                       QT_TRANSLATE_NOOP("KdeConfigBackend", "px"), "kwin")),
-                meo(scaledNumber("shadowStrength", QT_TRANSLATE_NOOP("KdeConfigBackend", "Shadow strength"), nullptr,
-                             "kwinrc", "org.meo.decoration", "ShadowIntensity", 18, 0, 60, 2, "%", 0.01, "kwin")),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "px"), "kwin|effectcfg:kwin4_effect_shapecorners"),
+                       {{"Round-Corners", "ShadowSize"}, {"Round-Corners", "InactiveShadowSize"}})),
+                meo(scaledMirrors(scaledNumber("shadowStrength", QT_TRANSLATE_NOOP("KdeConfigBackend", "Shadow strength"), nullptr,
+                             "kwinrc", "org.meo.decoration", "ShadowIntensity", 18, 0, 60, 2, "%", 0.01,
+                             "kwin|effectcfg:kwin4_effect_shapecorners"),
+                             {{"Round-Corners", "ActiveShadowAlpha"}, {"Round-Corners", "InactiveShadowAlpha"}}, 2.55)),
+            }),
+            // Default: KDE decides. Apps with the Meo title bar are rounded and
+            // shadowed by the decoration; apps that draw their own title bar
+            // (GTK, Electron, games) keep their own look. Forcing uses the
+            // rounded-corner KWin effect for every window, with the same
+            // radius and shadow as above.
+            section(QT_TRANSLATE_NOOP("KdeConfigBackend", "Apps with their own title bar"), {
+                needsShapeCorners(effect("forceRoundedCorners", QT_TRANSLATE_NOOP("KdeConfigBackend", "Force rounded corners on all apps"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "Off follows KDE and is the most stable. On clips every window to the corner radius above; a few apps may show small glitches"),
+                       "kwin4_effect_shapecorners", false)),
+                needsShapeCorners(toggle("forceShadows", QT_TRANSLATE_NOOP("KdeConfigBackend", "Force matching shadows on all apps"),
+                       QT_TRANSLATE_NOOP("KdeConfigBackend", "Draw the shadow above for every window instead of each app's own; needs forced rounded corners"),
+                       "kwinrc", "Round-Corners", "UseNativeDecorationShadows", true,
+                       "effectcfg:kwin4_effect_shapecorners", true)),
             }),
             section(QT_TRANSLATE_NOOP("KdeConfigBackend", "Window transparency"), {
                 effect("translucency", QT_TRANSLATE_NOOP("KdeConfigBackend", "Window transparency"),
@@ -582,6 +616,19 @@ QVariantList iconThemes()
     return out;
 }
 
+// The third-party rounded-corner effect (kwin-effect-rounded-corners).
+bool shapeCornersInstalled()
+{
+    QStringList roots{QLibraryInfo::path(QLibraryInfo::PluginsPath)};
+    roots += QCoreApplication::libraryPaths();
+    roots.append(QDir::homePath() + QStringLiteral("/.local/lib/qt6/plugins"));
+    for (const QString &root : std::as_const(roots)) {
+        if (QFile::exists(root + QStringLiteral("/kwin/effects/plugins/kwin4_effect_shapecorners.so")))
+            return true;
+    }
+    return false;
+}
+
 bool needsKwin(const QString &hook)
 {
     return hook == QLatin1String("kwin") || hook.startsWith(QLatin1String("effect:"))
@@ -661,6 +708,8 @@ QVariantList KdeConfigBackend::sectionsFor(const QString &pageId) const
         QVariantList rows;
         for (const QVariant &builtRow : sectionMap.value("rows").toList()) {
             Map row = builtRow.toMap();
+            if (row.value("requires").toString() == QLatin1String("shapecorners") && !shapeCornersInstalled())
+                continue;
             if (row.value("requires").toString() == QLatin1String("meo-decoration")) {
                 if (!meoDecorationChecked) {
                     auto kwin = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
@@ -778,10 +827,12 @@ void KdeConfigBackend::setValue(const QString &pageId, const QString &rowId, con
             group.writeEntry(key, number * row.value("scale").toDouble(), KConfig::Notify);
         else
             group.writeEntry(key, number, KConfig::Notify);
+        const double mirrorScale = row.value("mirrorScale", 1.0).toDouble();
         for (const QVariant &mirrorValue : row.value("mirrors").toList()) {
             const Map mirror = mirrorValue.toMap();
             KConfigGroup mirrorGroup = config->group(mirror.value("group").toString());
-            mirrorGroup.writeEntry(mirror.value("key").toString(), number, KConfig::Notify);
+            mirrorGroup.writeEntry(mirror.value("key").toString(), static_cast<int>(std::lround(number * mirrorScale)),
+                                   KConfig::Notify);
         }
     } else if (row.contains("exclusive")) {
         const QString selected = value.toString();
