@@ -90,8 +90,8 @@ Item {
                 MeoText {
                     width: parent.width
                     text: SystemInfoBackend.operatingSystemName || qsTr("MeoArch")
-                    typeRole: "headline"
-                    typeSize: "medium"
+                    typeRole: "title"
+                    typeSize: "big"
                     emphasized: true
                     horizontalAlignment: Text.AlignHCenter
                     color: MeoTheme.contentOnSurface

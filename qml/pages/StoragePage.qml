@@ -512,7 +512,7 @@ Item {
                     width: parent.width
                     text: qsTr("%1 of %2 used").arg(root.formatBytes(root.systemVolume.usedBytes))
                                                .arg(root.formatBytes(root.systemVolume.totalBytes))
-                    typeRole: "headline"; typeSize: "small"
+                    typeRole: "title"; typeSize: "big"
                     color: MeoTheme.contentOnSurface
                 }
                 MeoProgressBar {
