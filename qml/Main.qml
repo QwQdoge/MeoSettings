@@ -12,7 +12,11 @@ ApplicationWindow {
     minimumHeight: 560 * MeoTheme.globalScale
     visible: true
     title: qsTr("Meo Settings")
-    color: MeoTheme.surface
+    // Solid by default; a thin tint over KWin's blur when the user enables
+    // Frosted blur (Appearance settings / SurfaceBlur in meo-shellrc).
+    color: MeoTheme.windowBackground
+
+    AppWindowBlur { window: root }
 
     // Standard App Shell shortcuts (MeoUI APP_SHELL.md).
     Shortcut { sequences: [StandardKey.Quit]; onActivated: Qt.quit() }
@@ -431,7 +435,7 @@ ApplicationWindow {
         id: settingsPageLoadingPlaceholder
 
         Rectangle {
-            color: MeoTheme.surface
+            color: "transparent"
 
             Column {
                 anchors.left: parent.left

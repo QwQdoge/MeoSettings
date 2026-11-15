@@ -88,6 +88,8 @@ qt_add_executable(meo-settings
     src/backends/accessibilitybackend.h
     src/backends/kdeconfigbackend.cpp
     src/backends/kdeconfigbackend.h
+    src/backends/surfaceeffectsbackend.cpp
+    src/backends/surfaceeffectsbackend.h
     src/backends/portalpermissionsbackend.cpp
     src/backends/portalpermissionsbackend.h
     src/backends/appearancebackend.cpp
@@ -481,6 +483,16 @@ add_executable(meo-settings-shellsettingsbackend-test
 )
 target_link_libraries(meo-settings-shellsettingsbackend-test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
 add_test(NAME meo-settings-shellsettingsbackend COMMAND meo-settings-shellsettingsbackend-test)
+
+add_executable(meo-settings-surfaceeffectsbackend-test
+    tests/tst_surfaceeffectsbackend.cpp
+    src/core/backendbase.cpp
+    src/core/backendbase.h
+    src/backends/surfaceeffectsbackend.cpp
+    src/backends/surfaceeffectsbackend.h
+)
+target_link_libraries(meo-settings-surfaceeffectsbackend-test PRIVATE Qt6::Core Qt6::DBus Qt6::Test KF6::ConfigCore)
+add_test(NAME meo-settings-surfaceeffectsbackend COMMAND meo-settings-surfaceeffectsbackend-test)
 
 add_executable(meo-settings-bluetoothbackend-test
     tests/tst_bluetoothbackend.cpp

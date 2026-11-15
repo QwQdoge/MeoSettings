@@ -17,6 +17,7 @@
 #include "backends/portalpermissionsbackend.h"
 #include "backends/accessibilitybackend.h"
 #include "backends/kdeconfigbackend.h"
+#include "backends/surfaceeffectsbackend.h"
 #include "backends/proxybackend.h"
 #include "backends/documentationprovider.h"
 #include "backends/fingerprintbackend.h"
@@ -54,6 +55,7 @@
 #include <QLocale>
 #include <QRegularExpression>
 #include <QQuickWindow>
+#include <QSurfaceFormat>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QSize>
@@ -114,6 +116,13 @@ bool installCatalog(QGuiApplication &app,
 
 int main(int argc, char *argv[])
 {
+    // The window background becomes a thin tint when the optional frosted blur
+    // is enabled at runtime, so the surface needs an alpha channel from the
+    // start (it cannot be added after the window is created).
+    QSurfaceFormat format = QSurfaceFormat::defaultFormat();
+    format.setAlphaBufferSize(8);
+    QSurfaceFormat::setDefaultFormat(format);
+
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Meo Settings"));
     app.setApplicationDisplayName(QStringLiteral("Meo Settings"));
@@ -273,6 +282,7 @@ int main(int argc, char *argv[])
     ProxyBackend proxyBackend;
     AccessibilityBackend accessibilityBackend;
     KdeConfigBackend kdeConfigBackend;
+    SurfaceEffectsBackend surfaceEffectsBackend;
     PortalPermissionsBackend portalPermissionsBackend;
     WallpaperBackend wallpaperBackend;
     AppearanceBackend appearanceBackend;
@@ -343,6 +353,7 @@ int main(int argc, char *argv[])
     context->setContextProperty(QStringLiteral("ProxyBackend"), &proxyBackend);
     context->setContextProperty(QStringLiteral("AccessibilityBackend"), &accessibilityBackend);
     context->setContextProperty(QStringLiteral("KdeConfigBackend"), &kdeConfigBackend);
+    context->setContextProperty(QStringLiteral("SurfaceEffectsBackend"), &surfaceEffectsBackend);
     context->setContextProperty(QStringLiteral("PortalPermissionsBackend"), &portalPermissionsBackend);
     context->setContextProperty(QStringLiteral("WallpaperBackend"), &wallpaperBackend);
     context->setContextProperty(QStringLiteral("AppearanceBackend"), &appearanceBackend);

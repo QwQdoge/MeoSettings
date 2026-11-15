@@ -203,6 +203,18 @@ Item {
             "actionText": DynamicColorBackend.busy ? qsTr("Applying…") : qsTr("Apply")
         },
         {
+            "id": "surface-blur",
+            "title": qsTr("Frosted blur"),
+            "subtitle": SurfaceEffectsBackend.error !== ""
+                        ? SurfaceEffectsBackend.error
+                        : qsTr("Blur what is behind Meo popups and the Shelf. Off by default; it also turns on surface transparency."),
+            "icon": "blur_on",
+            "tone": "tertiary",
+            "enabled": SurfaceEffectsBackend.available,
+            "trailingKind": "toggle",
+            "checked": SurfaceEffectsBackend.blur
+        },
+        {
             "id": "application-icons",
             "title": qsTr("Application icon style"),
             "subtitle": ApplicationIconBackend.busy
@@ -381,6 +393,10 @@ Item {
                     root.configureApplicationIcons()
                 else if (row.enabled && row.route)
                     root.navigateTo(row.route)
+            }
+            onRowToggled: (index, checked, row) => {
+                if (row.id === "surface-blur")
+                    SurfaceEffectsBackend.setBlur(checked)
             }
             onRowActionTriggered: (index, row) => {
                 if (row.id === "apply-dynamic-color")
