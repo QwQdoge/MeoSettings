@@ -215,28 +215,6 @@ Item {
             "checked": SurfaceEffectsBackend.blur
         },
         {
-            // One roundness for every Meo surface: MeoUI apps and the shell
-            // (MeoTheme.cornerScale), KDE application controls and window
-            // corners all read CornerScale from meo-shellrc.
-            "id": "corner-scale",
-            "title": qsTr("Corner roundness"),
-            "subtitle": SurfaceEffectsBackend.error !== ""
-                        ? SurfaceEffectsBackend.error
-                        : (SurfaceEffectsBackend.cornerScale === 100
-                           ? qsTr("Rounds Meo panels, popups, apps and window corners. 100% is the Meo default.")
-                           : qsTr("Rounds Meo panels, popups, apps and window corners. Meo default: 100%.")),
-            "icon": "rounded_corner",
-            "tone": "tertiary",
-            "enabled": SurfaceEffectsBackend.available,
-            "trailingKind": "slider",
-            "from": SurfaceEffectsBackend.minimumCornerScale,
-            "to": SurfaceEffectsBackend.maximumCornerScale,
-            "value": SurfaceEffectsBackend.cornerScale,
-            "stepSize": 10,
-            "discrete": true,
-            "valueSuffix": "%"
-        },
-        {
             "id": "application-icons",
             "title": qsTr("Application icon style"),
             "subtitle": ApplicationIconBackend.busy
@@ -404,7 +382,7 @@ Item {
         MeoSettingsGroup {
             width: parent.width
             title: qsTr("Meo appearance")
-            subtitle: qsTr("Choose where Meo gets its colors and how round and translucent its surfaces are.")
+            subtitle: qsTr("Choose where Meo gets its colors. The change is confirmed before it is applied across Meo.")
             model: root.meoConfigurationRows
             onRowActivated: (index, row) => {
                 if (row.id === "dynamic-color-source")
@@ -419,12 +397,6 @@ Item {
             onRowToggled: (index, checked, row) => {
                 if (row.id === "surface-blur")
                     SurfaceEffectsBackend.setBlur(checked)
-            }
-            onRowSliderMoved: (index, value, row) => {
-                // Discrete 10% steps, so a drag writes at most 16 values and
-                // the desktop previews each one live.
-                if (row.id === "corner-scale")
-                    SurfaceEffectsBackend.setCornerScale(Math.round(value))
             }
             onRowActionTriggered: (index, row) => {
                 if (row.id === "apply-dynamic-color")

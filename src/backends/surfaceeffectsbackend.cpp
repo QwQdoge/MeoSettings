@@ -11,7 +11,6 @@ constexpr auto configFile = "meo-shellrc";
 constexpr auto groupName = "Appearance";
 constexpr auto transparencyKey = "SurfaceTransparency";
 constexpr auto blurKey = "SurfaceBlur";
-constexpr auto cornerScaleKey = "CornerScale";
 // KWin's default blur strength (5) is faint. A Pixel-like frosted look needs a
 // stronger, soft blur with no grain. Only applied when the user has not chosen
 // a strength themselves.
@@ -57,11 +56,9 @@ void SurfaceEffectsBackend::refresh()
     const KConfigGroup group(config, QString::fromLatin1(groupName));
     const bool transparency = group.readEntry(transparencyKey, false);
     const bool blur = group.readEntry(blurKey, false);
-    const int cornerScale = qBound(minimumCornerScale(), group.readEntry(cornerScaleKey, 100), maximumCornerScale());
-    if (transparency != m_transparency || blur != m_blur || cornerScale != m_cornerScale) {
+    if (transparency != m_transparency || blur != m_blur) {
         m_transparency = transparency;
         m_blur = blur;
-        m_cornerScale = cornerScale;
         Q_EMIT changed();
     }
 }
@@ -78,23 +75,6 @@ void SurfaceEffectsBackend::setTransparency(bool enabled)
 {
     // Without transparency blur has nothing to act on; keep the file honest.
     write(enabled, enabled ? m_blur : false);
-}
-
-void SurfaceEffectsBackend::setCornerScale(int percent)
-{
-    clearError();
-    const int value = qBound(minimumCornerScale(), percent, maximumCornerScale());
-    if (value == m_cornerScale) {
-        return;
-    }
-    auto group = KSharedConfig::openConfig(QString::fromLatin1(configFile))->group(QString::fromLatin1(groupName));
-    // Notify: the shell, running Qt applications and the window decoration
-    // all watch this key and restyle without a restart.
-    group.writeEntry(cornerScaleKey, value, KConfig::Notify);
-    if (!group.sync()) {
-        setError(tr("The corner roundness could not be saved."));
-    }
-    refresh();
 }
 
 bool SurfaceEffectsBackend::write(bool transparency, bool blur)
