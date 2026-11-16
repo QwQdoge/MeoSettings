@@ -77,6 +77,46 @@ private Q_SLOTS:
         QVERIFY(!backend.blur());
         QVERIFY(!backend.transparency());
     }
+
+    void cornerScaleDefaultsToTheDesignRadii()
+    {
+        SurfaceEffectsBackend backend;
+        QCOMPARE(backend.cornerScale(), 100);
+    }
+
+    void cornerScalePersistsAndLeavesSurfaceEffectsAlone()
+    {
+        SurfaceEffectsBackend backend;
+        backend.setBlur(true);
+        backend.setCornerScale(40);
+        QCOMPARE(backend.cornerScale(), 40);
+        QVERIFY(backend.blur());
+
+        const auto config = KSharedConfig::openConfig(QStringLiteral("meo-shellrc"));
+        config->reparseConfiguration();
+        const KConfigGroup group(config, QStringLiteral("Appearance"));
+        QCOMPARE(group.readEntry("CornerScale", 0), 40);
+        QVERIFY(group.readEntry("SurfaceBlur", false));
+    }
+
+    void cornerScaleIsClampedToTheShellRange()
+    {
+        SurfaceEffectsBackend backend;
+        backend.setCornerScale(400);
+        QCOMPARE(backend.cornerScale(), SurfaceEffectsBackend::maximumCornerScale());
+        backend.setCornerScale(-20);
+        QCOMPARE(backend.cornerScale(), SurfaceEffectsBackend::minimumCornerScale());
+    }
+
+    void cornerScaleFollowsExternalChanges()
+    {
+        SurfaceEffectsBackend backend;
+        auto config = KSharedConfig::openConfig(QStringLiteral("meo-shellrc"));
+        KConfigGroup(config, QStringLiteral("Appearance")).writeEntry("CornerScale", 130);
+        config->sync();
+        backend.refresh();
+        QCOMPARE(backend.cornerScale(), 130);
+    }
 };
 
 QTEST_GUILESS_MAIN(SurfaceEffectsBackendTest)

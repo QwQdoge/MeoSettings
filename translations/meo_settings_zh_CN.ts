@@ -757,6 +757,22 @@
 <context>
     <name>AppearancePage</name>
     <message>
+        <source>Corner roundness</source>
+        <translation>圆角程度</translation>
+    </message>
+    <message>
+        <source>Rounds Meo panels, popups, apps and window corners. 100% is the Meo default.</source>
+        <translation>调整 Meo 面板、弹出窗口、应用和窗口的圆角。100% 为 Meo 默认值。</translation>
+    </message>
+    <message>
+        <source>Rounds Meo panels, popups, apps and window corners. Meo default: 100%.</source>
+        <translation>调整 Meo 面板、弹出窗口、应用和窗口的圆角。Meo 默认值：100%。</translation>
+    </message>
+    <message>
+        <source>Choose where Meo gets its colors and how round and translucent its surfaces are.</source>
+        <translation>选择 Meo 的颜色来源，以及界面的圆润和通透程度。</translation>
+    </message>
+    <message>
         <source>Toolbar labels and icons in applications</source>
         <translation>应用中的工具栏文字和图标</translation>
     </message>
@@ -8282,6 +8298,13 @@ Total prompt: %7 characters</source>
     <message>
         <source>The trash could not be emptied.</source>
         <translation>无法清空回收站。</translation>
+    </message>
+</context>
+<context>
+    <name>SurfaceEffectsBackend</name>
+    <message>
+        <source>The corner roundness could not be saved.</source>
+        <translation>无法保存圆角程度。</translation>
     </message>
 </context>
 </TS>
