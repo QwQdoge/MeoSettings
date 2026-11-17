@@ -492,6 +492,9 @@ QVariantList build(const QString &page)
         };
     }
     if (page == QLatin1String("shell-surfaces")) {
+        // Defaults mirror Meo.System.ShellAppearance (meo-kde), which treats
+        // missing keys as off; the packaged meo-shellrc turns both on, so a
+        // seeded session still shows them on.
         return {
             section(nullptr, {
                 number("cornerScale", QT_TRANSLATE_NOOP("KdeConfigBackend", "Corner roundness"),
@@ -499,13 +502,13 @@ QVariantList build(const QString &page)
                        "meo-shellrc", "Appearance", "CornerScale", 100, 0, 150, 5, "%"),
                 toggle("surfaceTransparency", QT_TRANSLATE_NOOP("KdeConfigBackend", "Translucent surfaces"),
                        QT_TRANSLATE_NOOP("KdeConfigBackend", "Let panels and popups show a little of what is behind them"),
-                       "meo-shellrc", "Appearance", "SurfaceTransparency", true),
+                       "meo-shellrc", "Appearance", "SurfaceTransparency", false),
                 number("transparencyLevel", QT_TRANSLATE_NOOP("KdeConfigBackend", "Transparency level"),
                        QT_TRANSLATE_NOOP("KdeConfigBackend", "How see-through translucent surfaces are; 100% is the Meo design"),
                        "meo-shellrc", "Appearance", "TransparencyLevel", 100, 25, 200, 5, "%"),
                 toggle("surfaceBlur", QT_TRANSLATE_NOOP("KdeConfigBackend", "Blur behind surfaces"),
                        QT_TRANSLATE_NOOP("KdeConfigBackend", "Frosted-glass look; needs translucent surfaces"),
-                       "meo-shellrc", "Appearance", "SurfaceBlur", true),
+                       "meo-shellrc", "Appearance", "SurfaceBlur", false),
             }),
         };
     }
