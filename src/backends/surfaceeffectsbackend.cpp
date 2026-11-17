@@ -16,6 +16,8 @@ constexpr auto blurKey = "SurfaceBlur";
 // a strength themselves.
 constexpr int frostedBlurStrength = 10;
 
+}
+
 void applyFrostedKWinBlur()
 {
     auto group = KSharedConfig::openConfig(QStringLiteral("kwinrc"))->group(QStringLiteral("Effect-blur"));
@@ -33,7 +35,6 @@ void applyFrostedKWinBlur()
         reload.setArguments({QStringLiteral("blur")});
         QDBusConnection::sessionBus().send(reload);
     }
-}
 }
 
 SurfaceEffectsBackend::SurfaceEffectsBackend(QObject *parent)

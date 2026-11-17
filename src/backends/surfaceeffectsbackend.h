@@ -11,6 +11,11 @@
  * Blur is only effective together with transparency, so enabling blur also
  * enables transparency; disabling blur leaves transparency as it is.
  */
+// Raises KWin's blur strength to the frosted Meo default (10, no noise) when
+// the user has not chosen one; reloads KWin's blur effect. Used wherever
+// Settings turns on SurfaceBlur.
+void applyFrostedKWinBlur();
+
 class SurfaceEffectsBackend final : public BackendBase
 {
     Q_OBJECT

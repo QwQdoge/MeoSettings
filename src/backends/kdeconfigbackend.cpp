@@ -1,4 +1,5 @@
 #include "kdeconfigbackend.h"
+#include "surfaceeffectsbackend.h"
 
 #include <KConfigGroup>
 #include <KConfig>
@@ -819,11 +820,23 @@ void KdeConfigBackend::setValue(const QString &pageId, const QString &rowId, con
     KConfigGroup group = config->group(row.value("group").toString());
     const QString key = row.value("key").toString();
 
+    bool frostedBlurTurnedOn = false;
     if (type == QLatin1String("toggle")) {
         bool enabled = value.toBool();
         if (row.value("invert").toBool())
             enabled = !enabled;
         group.writeEntry(key, enabled, KConfig::Notify);
+        // Blur only shows through translucent surfaces: turning blur on also
+        // turns transparency on, and turning transparency off turns blur off.
+        if (row.value("file").toString() == QLatin1String("meo-shellrc")
+            && group.name() == QLatin1String("Appearance")) {
+            if (key == QLatin1String("SurfaceBlur") && enabled) {
+                group.writeEntry("SurfaceTransparency", true, KConfig::Notify);
+                frostedBlurTurnedOn = true;
+            } else if (key == QLatin1String("SurfaceTransparency") && !enabled) {
+                group.writeEntry("SurfaceBlur", false, KConfig::Notify);
+            }
+        }
     } else if (type == QLatin1String("number")) {
         const int number = std::clamp(value.toInt(), row.value("min").toInt(), row.value("max").toInt());
         if (row.contains("scale"))
@@ -868,6 +881,8 @@ void KdeConfigBackend::setValue(const QString &pageId, const QString &rowId, con
         setError(tr("The setting could not be saved."));
         return;
     }
+    if (frostedBlurTurnedOn)
+        applyFrostedKWinBlur();
     if (row.contains("exclusive"))
         applyExclusiveEffects(row, value.toString());
     else
